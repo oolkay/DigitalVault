@@ -46,7 +46,7 @@ typedef struct {
 
 #define SUPERBLOCK_BLOCK    0
 #define INODE_TABLE_START   1
-#define INODE_TABLE_BLOCKS  4
+#define INODE_TABLE_BLOCKS  10
 #define DATA_START_BLOCK    (INODE_TABLE_START + INODE_TABLE_BLOCKS)
 
 #endif /* FS_METADATA_H */

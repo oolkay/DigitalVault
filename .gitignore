@@ -1,0 +1,36 @@
+# DigitalVault GitIgnore
+# Sadece kaynak kodları (.c, .cpp, .h, .qml) tutar.
+
+# Derleme ve Binary Dosyaları
+build/
+bin/
+*.o
+*.a
+*.so
+*.out
+vault_fs
+DigitalVaultGUI
+
+# CMake Dosyaları (İsteğe özel)
+CMakeLists.txt
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+*.cmake
+
+# Markdown Dosyaları (İsteğe özel)
+*.md
+
+# IDE ve Geçici Dosyalar
+.vscode/
+.idea/
+.gemini/
+*.swp
+*~
+
+# Uygulama Spesifik
+vault.img
+*.sock
+/tmp/biometric_vault.sock
+EOF

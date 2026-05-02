@@ -53,18 +53,11 @@ int bio_open(block_io_t *bio, const char *image_path)
 {
     memset(bio, 0, sizeof(block_io_t));
 
-    bio->fd = open(image_path, O_RDWR | O_DIRECT);
-    if (bio->fd < 0) {
-        /* O_DIRECT bazı sistemlerde/dosya sistemlerinde desteklenmeyebilir.
-         * Eğer hata verirse normal açmayı dene. */
-        bio->fd = open(image_path, O_RDWR);
-    }
-
+    bio->fd = open(image_path, O_RDWR);
     if (bio->fd < 0) {
         perror("[BIO] Failed to open image");
         return -1;
     }
-
     /* Dosya boyutunu öğren */
     struct stat st;
     if (fstat(bio->fd, &st) < 0) {

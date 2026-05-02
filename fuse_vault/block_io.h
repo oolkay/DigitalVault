@@ -19,11 +19,11 @@
  * Block I/O context — backing store bağlantısı.
  */
 typedef struct {
-    int       fd;               /* Dosya descriptor */
-    uint64_t  total_blocks;     /* Toplam blok sayısı */
-    uint64_t  image_size;       /* Image boyutu (byte) */
-    uint8_t   xts_key[XTS_KEY_SIZE]; /* Türetilmiş XTS key */
-    int       key_loaded;       /* Key yüklü mü? */
+    int       fd;                                    /* Dosya descriptor */
+    uint64_t  total_blocks;                          /* Toplam blok sayısı */
+    uint64_t  image_size;                            /* Image boyutu (byte) */
+    uint8_t   xts_key[XTS_KEY_SIZE];                 /* Türetilmiş XTS key */
+    int       key_loaded;                            /* Key yüklü mü? */
 } block_io_t;
 
 /**
