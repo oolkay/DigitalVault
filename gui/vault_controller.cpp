@@ -242,21 +242,29 @@ bool VaultController::mountVault()
 
 bool VaultController::unmountVault()
 {
-    /* 1. Önce FUSE sürecini durdur (Anında erişimi kesmek için en etkili yol) */
+    /* 1. Önce standart yöntemle unmount et (FUSE'a kapanma sinyali gider) */
+    QProcess unmount;
+    unmount.start("fusermount3", QStringList() << "-u" << m_mountPoint);
+    if (!unmount.waitForFinished(2000)) {
+        unmount.start("fusermount", QStringList() << "-u" << m_mountPoint);
+        unmount.waitForFinished(2000);
+    }
+
+    /* 2. Eğer süreç hala çalışıyorsa (meşgulse), zorla durdur */
     if (m_fuseProcess && m_fuseProcess->state() == QProcess::Running) {
-        m_fuseProcess->terminate();
-        if (!m_fuseProcess->waitForFinished(1000)) {
-            m_fuseProcess->kill();
+        /* Sürecin kendi kendine kapanması için biraz daha bekle */
+        if (!m_fuseProcess->waitForFinished(2000)) {
+            m_fuseProcess->terminate();
+            if (!m_fuseProcess->waitForFinished(2000)) {
+                m_fuseProcess->kill();
+            }
         }
     }
 
-    /* 2. Ardından mount noktasını temizle (Lazy unmount) */
-    QProcess unmount;
-    unmount.start("fusermount3", QStringList() << "-uz" << m_mountPoint);
-    if (!unmount.waitForFinished(2000)) {
-        unmount.start("fusermount", QStringList() << "-uz" << m_mountPoint);
-        unmount.waitForFinished(2000);
-    }
+    /* 3. Hala mount noktası kaldıysa temizle (Lazy unmount) */
+    QProcess lazyUnmount;
+    lazyUnmount.start("fusermount3", QStringList() << "-uz" << m_mountPoint);
+    lazyUnmount.waitForFinished(1000);
 
     return true;
 }
@@ -307,12 +315,21 @@ void VaultController::toggleVault()
 
 void VaultController::onFuseFinished(int exitCode, QProcess::ExitStatus exitStatus)
 {
-    (void)exitStatus;
     m_isLocked = true;
-    if (exitCode != 0) {
-        addLog("ERROR", "Vault process crashed or was terminated. Exit code: " + QString::number(exitCode));
-        updateActivity("Vault process exited with error.");
-        emit notificationReceived("Vault process exited unexpectedly (code: " +
+
+    /*
+     * libfuse returns exit code 7 if the filesystem is unmounted forcefully
+     * while it is busy (e.g. terminal is inside the directory).
+     * This is expected behavior during a forced lock and is not a crash.
+     */
+    if (exitStatus == QProcess::NormalExit && exitCode == 7) {
+        addLog("INFO", "Vault forcefully unmounted safely (was busy).");
+        updateActivity("Vault unmounted (forced).");
+    } else if (exitStatus == QProcess::CrashExit || exitCode != 0) {
+        QString reason = (exitStatus == QProcess::CrashExit) ? "crashed" : "exited with error";
+        addLog("ERROR", "Vault process " + reason + ". Exit code: " + QString::number(exitCode));
+        updateActivity("Vault process " + reason + ".");
+        emit notificationReceived("Vault process " + reason + " (code: " +
                                   QString::number(exitCode) + ")", true);
     } else {
         addLog("INFO", "Vault unmounted safely.");

@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Layouts
 import DigitalVault
 
 Item {
@@ -111,7 +112,7 @@ Item {
                 
                 property bool editing: false
 
-                Row {
+                RowLayout {
                     anchors { fill: parent; leftMargin: 18; rightMargin: 18 }
                     spacing: 16
 

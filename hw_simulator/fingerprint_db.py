@@ -145,6 +145,24 @@ class FingerprintDB:
         self.save()
         return True
 
+    def rename(self, finger_id: int, new_name: str) -> bool:
+        """
+        Parmak izi adını güncelle.
+
+        Args:
+            finger_id: Güncellenecek ID
+            new_name: Yeni isim
+
+        Returns:
+            True = güncellendi, False = bulunamadı
+        """
+        if finger_id not in self._db:
+            return False
+
+        self._db[finger_id].name = new_name
+        self.save()
+        return True
+
     def list_all(self) -> list[dict]:
         """Tüm kayıtlı parmak izlerini listele."""
         return [

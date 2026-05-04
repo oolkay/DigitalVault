@@ -28,6 +28,7 @@ class Command(str, Enum):
     STATUS      = "status"       # Cihaz durumunu sorgula
     DISCONNECT  = "disconnect"   # Cihaz çekilmesini simüle et
     RECONNECT   = "reconnect"    # Cihaz tekrar bağlanmasını simüle et
+    RENAME      = "rename"       # Parmak izi adını güncelle
 
 
 # ─── Status Codes ────────────────────────────────────────────────────────────
@@ -53,7 +54,8 @@ class Request:
     """Host → STM32 istek mesajı."""
     cmd: str
     finger_id: Optional[int] = None
-    name: Optional[str] = None  # Enroll sırasında parmak izi adı
+    name: Optional[str] = None      # Enroll sırasında parmak izi adı
+    new_name: Optional[str] = None  # Rename sırasında yeni ad
 
     def to_json(self) -> str:
         d = {k: v for k, v in asdict(self).items() if v is not None}
@@ -66,6 +68,7 @@ class Request:
             cmd=d.get("cmd", ""),
             finger_id=d.get("finger_id"),
             name=d.get("name"),
+            new_name=d.get("new_name"),
         )
 
 

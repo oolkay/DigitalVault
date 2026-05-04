@@ -28,7 +28,7 @@ typedef struct {
     char             *image_path;
     int               finger_id;
     vault_superblock_t sb;
-    vault_inode_t      inodes[MAX_FILES];
+    vault_inode_t      inodes[MAX_FILES] __attribute__((aligned(16)));
     int                formatted;       /* Filesystem formatlanmış mı? */
     pthread_mutex_t    lock;            /* Thread-safety için mutex */
 } vault_context_t;
@@ -82,7 +82,7 @@ static int load_inodes(void) {
  * Inode tablosunu diske yaz (şifreli).
  */
 static int save_inodes(void) {
-    uint8_t buf[SECTOR_SIZE];
+    uint8_t buf[SECTOR_SIZE] __attribute__((aligned(16)));
     size_t inode_size = sizeof(vault_inode_t);
     size_t per_block = SECTOR_SIZE / inode_size;
 
@@ -332,7 +332,7 @@ static int vault_mknod(const char *path, mode_t mode, dev_t rdev) {
     g_ctx.sb.inode_count++;
 
     /* Bloku sıfırla */
-    uint8_t zero[SECTOR_SIZE];
+    uint8_t zero[SECTOR_SIZE] __attribute__((aligned(16)));
     memset(zero, 0, SECTOR_SIZE);
     bio_write_block(&g_ctx.bio, blk, zero);
 
@@ -751,23 +751,42 @@ static void *vault_init(struct fuse_conn_info *conn, struct fuse_config *cfg) {
  * Dosya sistemi kapatıldığında çalışır.
  */
 static void vault_destroy(void *private_data) {
-    (void) private_data;
+    vault_context_t *ctx = (vault_context_t *)private_data;
+    if (!ctx) ctx = &g_ctx;
+
+    /* 
+     * ÖNEMLİ: Kapanış sırasında diğer thread'lerin (veya işletim sisteminin)
+     * verilere erişimini engellemek için kilitle.
+     */
+    pthread_mutex_lock(&ctx->lock);
+
     printf("[FUSE] Shutting down vault...\n");
 
-    /* Metadata'yı son kez kaydet */
-    save_superblock();
-    save_inodes();
+    /* Metadata'yı son kez kaydet (eğer key yüklüyse) */
+    if (ctx->bio.key_loaded) {
+        printf("[FUSE] Saving final metadata...\n");
+        save_superblock();
+        save_inodes();
+        printf("[FUSE] Metadata saved.\n");
+    }
 
     /* Block I/O kapat (key'ler silinir) */
-    bio_close(&g_ctx.bio);
+    printf("[FUSE] Closing block device...\n");
+    bio_close(&ctx->bio);
 
     /* Inode tablosunu bellekten temizle */
-    crypto_secure_wipe(g_ctx.inodes, sizeof(g_ctx.inodes));
+    printf("[FUSE] Wiping sensitive data from memory...\n");
+    crypto_secure_wipe(ctx->inodes, sizeof(ctx->inodes));
 
-    pthread_mutex_destroy(&g_ctx.lock);
+    printf("[FUSE] Cleanup complete.\n");
+
+    /* Kilidi aç ve mutex'i yok et */
+    pthread_mutex_unlock(&ctx->lock);
+    pthread_mutex_destroy(&ctx->lock);
 
     hal_cleanup();
     printf("[FUSE] Vault shut down safely.\n");
+    fflush(stdout);
 }
 
 /* FUSE operasyon tablosu */
@@ -797,15 +816,19 @@ int main(int argc, char *argv[]) {
     g_ctx.formatted = 0;
 
     /* 
-     * Basit argüman kontrolü:
-     * Eğer 2'den fazla argüman varsa ve sonuncusu bir klasör değilse 
-     * onu image_path olarak kabul et. (Daha profesyonel bir parser eklenebilir)
+     * Argüman kontrolü:
+     * Standart kullanım: ./vault_fs -f <mountpoint> [image_path]
+     * Eğer son argüman bir klasör değilse onu image_path olarak al.
      */
     if (argc >= 3) {
-        /* Son argüman mountpoint olacak, ondan öncekini image_path olarak alalım */
-        /* fuse_main argümanları temizleyeceği için biz şimdilik kopyasını alıyoruz */
-        g_ctx.image_path = argv[argc - 1];
-        argc--; /* Mountpoint'i fuse_main'e bırak, image_path'i biz aldık */
+        struct stat st;
+        const char *last_arg = argv[argc - 1];
+        
+        /* Son argüman bir klasör DEĞİLSE, onu image_path olarak kabul et */
+        if (stat(last_arg, &st) == 0 && !S_ISDIR(st.st_mode)) {
+            g_ctx.image_path = strdup(last_arg);
+            argc--; /* FUSE'un görmemesi için argc'yi azalt */
+        }
     }
 
     printf("[FUSE] Target Vault: %s\n", g_ctx.image_path);

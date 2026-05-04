@@ -11,7 +11,7 @@
 #include <stdint.h>
 
 #define FS_MAGIC            0x42564C54  /* "BVLT" (Biometric Vault) */
-#define MAX_FILENAME        255
+#define MAX_FILENAME        256
 #define MAX_FILES           128         /* Şimdilik maksimum 128 dosya */
 
 /**
@@ -26,8 +26,9 @@ typedef struct {
 
 /**
  * Inode: Her bir dosyanın bilgilerini tutan yapı.
+ * OpenSSL ve derleyici optimizasyonları (SIMD) için 16-byte hizalanmıştır.
  */
-typedef struct {
+typedef struct __attribute__((aligned(16))) {
     char     filename[MAX_FILENAME];
     uint64_t size;          /* Dosya boyutu (byte) */
     uint64_t start_block;   /* Verinin başladığı blok numarası */

@@ -115,7 +115,7 @@ int bio_read_block(block_io_t *bio, uint64_t block_num, uint8_t *buffer)
     }
 
     /* Şifreli veriyi geçici buffer'a oku */
-    uint8_t encrypted[SECTOR_SIZE];
+    uint8_t encrypted[SECTOR_SIZE] __attribute__((aligned(16)));
     off_t offset = block_num * SECTOR_SIZE;
 
     if (pread(bio->fd, encrypted, SECTOR_SIZE, offset) != SECTOR_SIZE) {
@@ -144,7 +144,7 @@ int bio_write_block(block_io_t *bio, uint64_t block_num, const uint8_t *buffer)
     }
 
     /* Veriyi şifrele */
-    uint8_t encrypted[SECTOR_SIZE];
+    uint8_t encrypted[SECTOR_SIZE] __attribute__((aligned(16)));
     if (crypto_encrypt_sector(buffer, encrypted, block_num, bio->xts_key) != 0) {
         return -1;
     }
