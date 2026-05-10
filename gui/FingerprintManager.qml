@@ -118,7 +118,7 @@ Item {
 
                     // Index badge
                     Rectangle {
-                        anchors.verticalCenter: parent.verticalCenter
+                        Layout.alignment: Qt.AlignVCenter
                         width: 42; height: 42; radius: 10
                         color: Theme.accentGlow
                         Text {
@@ -130,7 +130,7 @@ Item {
                     }
 
                     Column {
-                        anchors.verticalCenter: parent.verticalCenter
+                        Layout.alignment: Qt.AlignVCenter
                         spacing: 3
                         
                         // Name / Edit Field
@@ -176,7 +176,7 @@ Item {
 
                     // Edit Button
                     Rectangle {
-                        anchors.verticalCenter: parent.verticalCenter
+                        Layout.alignment: Qt.AlignVCenter
                         width: 34; height: 34; radius: 17
                         color: editMouse.containsMouse ? Theme.bgOverlay : "transparent"
                         Text {
@@ -201,7 +201,7 @@ Item {
 
                     // Status chip
                     Rectangle {
-                        anchors.verticalCenter: parent.verticalCenter
+                        Layout.alignment: Qt.AlignVCenter
                         width: chipLabel.width + 16; height: 24; radius: 12
                         color: Theme.successBg
                         Behavior on color { ColorAnimation { duration: 250 } }
@@ -216,7 +216,7 @@ Item {
 
                     // Remove button
                     Rectangle {
-                        anchors.verticalCenter: parent.verticalCenter
+                        Layout.alignment: Qt.AlignVCenter
                         width: 90; height: 34; radius: 17
                         color: rmMouse.containsMouse ? Theme.dangerBg : "transparent"
                         border.color: rmMouse.containsMouse ? Theme.danger : Theme.border

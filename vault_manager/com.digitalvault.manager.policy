@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC
+ "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/PolicyKit/1.0/policyconfig.dtd">
+<!--
+  DigitalVault — PolicyKit Policy
+  
+  Bu dosya, vault_manager binary'sinin pkexec ile çalıştırılmasına
+  izin verir. GUI üzerinden kasa açma/kapama işlemleri için
+  grafik şifre diyaloğu gösterir.
+  
+  Kurulum:
+    sudo cp com.digitalvault.manager.policy /usr/share/polkit-1/actions/
+-->
+<policyconfig>
+  <vendor>DigitalVault</vendor>
+  <vendor_url>https://github.com/oolkay/DigitalVault</vendor_url>
+
+  <action id="com.digitalvault.manager.run">
+    <description>Run DigitalVault Manager</description>
+    <description xml:lang="tr">DigitalVault Yöneticisini Çalıştır</description>
+    <message>Authentication is required to manage the encrypted vault.</message>
+    <message xml:lang="tr">Şifreli kasayı yönetmek için kimlik doğrulaması gereklidir.</message>
+    <icon_name>drive-harddisk-encrypted</icon_name>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">@VAULT_MANAGER_PATH@</annotate>
+    <annotate key="org.freedesktop.policykit.exec.allow_gui">true</annotate>
+  </action>
+</policyconfig>

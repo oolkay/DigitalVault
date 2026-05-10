@@ -9,6 +9,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
+#include <QtConcurrent/QtConcurrent>
 
 /* Unix socket + HAL iletişimi için */
 #include <sys/socket.h>
@@ -36,7 +37,8 @@ static QByteArray sendSocketCommand(const QString &socketPath, const QJsonObject
 
     QJsonDocument doc(cmd);
     QByteArray data = doc.toJson(QJsonDocument::Compact) + "\n";
-    ::write(sock, data.constData(), data.size());
+    ssize_t bytesWritten = ::write(sock, data.constData(), data.size());
+    Q_UNUSED(bytesWritten);
 
     /* Yanıt oku */
     QByteArray response;
@@ -55,27 +57,38 @@ static QByteArray sendSocketCommand(const QString &socketPath, const QJsonObject
 VaultController::VaultController(QObject *parent)
     : QObject(parent)
     , m_isLocked(true)
+    , m_autoLockTimeout(5)
+    , m_isSetupRunning(false)
+    , m_isToggling(false)
+    , m_setupStatusText("")
     , m_mountPoint(QDir::homePath() + "/VaultMount")
     , m_lastActivity("—")
     , m_socketPath("/tmp/biometric_vault.sock")
-    , m_fuseProcess(nullptr)
     , m_simProcess(nullptr)
     , m_pollTimer(nullptr)
+    , m_setupWatcher(nullptr)
     , m_selectedDevice("vault.img")
 {
-    /* Proje dizinini bul (gui'nin bir üst dizini) */
+    /* Proje dizinini bul (DigitalVault klasörünü bulana kadar yukarı çık) */
     m_projectDir = QCoreApplication::applicationDirPath();
-    /* Build dizinindeyse, kaynak dizinine çık */
-    if (m_projectDir.contains("/build")) {
-        QDir d(m_projectDir);
-        while (d.dirName() != "gui" && d.cdUp()) {}
-        d.cdUp(); /* DigitalVault dizinine çık */
-        m_projectDir = d.absolutePath();
-    } else {
-        QDir d(m_projectDir);
-        d.cdUp(); /* gui -> DigitalVault */
-        m_projectDir = d.absolutePath();
+    QDir d(m_projectDir);
+    bool found = false;
+    // Maksimum 5 seviye yukarı çıkıp DigitalVault klasörünü ara
+    for (int i = 0; i < 5; ++i) {
+        if (d.dirName() == "DigitalVault" || d.exists("gui/Dashboard.qml")) {
+            found = true;
+            break;
+        }
+        if (!d.cdUp()) break;
     }
+    m_projectDir = d.absolutePath();
+    if (!found) {
+        // Fallback: Eğer bulunamazsa binary'nin olduğu yer
+        m_projectDir = QCoreApplication::applicationDirPath();
+    }
+
+    /* vault_manager binary'sini bul */
+    m_vaultManagerBin = findVaultManager();
 
     /* Mount dizinini oluştur */
     QDir().mkpath(m_mountPoint);
@@ -89,6 +102,27 @@ VaultController::VaultController(QObject *parent)
     m_pollTimer = new QTimer(this);
     connect(m_pollTimer, &QTimer::timeout, this, &VaultController::pollStatus);
     m_pollTimer->start(2000);
+
+    m_logFilePath = m_projectDir + "/security_logs.json";
+    
+    /* Auto-lock timer ayarla */
+    m_autoLockTimer = new QTimer(this);
+    m_autoLockTimer->setSingleShot(true);
+    connect(m_autoLockTimer, &QTimer::timeout, this, &VaultController::handleAutoLock);
+    resetAutoLockTimer();
+
+    // Eğer log dosyası yoksa boş bir array ile oluştur
+    if (!QFile::exists(m_logFilePath)) {
+        QFile file(m_logFilePath);
+        if (file.open(QIODevice::WriteOnly)) {
+            file.write("[]");
+            file.close();
+        }
+    } else {
+        // Başlangıçta son logları yükle
+        m_securityLogs = getSecurityLogsPage(0, 50);
+        emit logsChanged();
+    }
 }
 
 bool VaultController::simulatorRunning() const
@@ -104,7 +138,7 @@ bool VaultController::simulatorRunning() const
 
 VaultController::~VaultController()
 {
-    if (m_fuseProcess && m_fuseProcess->state() == QProcess::Running) {
+    if (!m_isLocked) {
         unmountVault();
     }
     if (m_simProcess && m_simProcess->state() == QProcess::Running) {
@@ -116,6 +150,101 @@ VaultController::~VaultController()
 void VaultController::updateActivity(const QString &msg)
 {
     m_lastActivity = QDateTime::currentDateTime().toString("hh:mm:ss") + " — " + msg;
+}
+
+/* ─── vault_manager Helper ───────────────────────────────────────────────── */
+
+QString VaultController::findVaultManager() const
+{
+    /* 1. Build dizinindeki bin/ klasörüne bak */
+    QString bin = QCoreApplication::applicationDirPath() + "/vault_manager";
+    if (QFile::exists(bin)) return bin;
+
+    /* 2. Proje dizininde ara */
+    bin = m_projectDir + "/vault_manager/vault_manager";
+    if (QFile::exists(bin)) return bin;
+
+    /* 3. Build dizininin altındaki bin/ klasörüne bak */
+    bin = m_projectDir + "/build/bin/vault_manager";
+    if (QFile::exists(bin)) return bin;
+
+    /* 4. Sistem PATH'inde ara */
+    return "vault_manager";
+}
+
+/**
+ * vault_manager binary'sini pkexec ile çalıştır ve sonucunu döndür.
+ * pkexec, grafik ortamda bir şifre diyaloğu gösterir — terminal gerekmez.
+ * Eğer pkexec yoksa sudo'ya düşer (fallback).
+ *
+ * @return Process exit code (0 = başarılı)
+ */
+int VaultController::runVaultManager(const QStringList &args, int timeoutMs)
+{
+    QProcess proc;
+    proc.setProcessChannelMode(QProcess::MergedChannels);
+
+    /*
+     * Ortam değişkenlerini hazırla:
+     *  - SUDO_UID / SUDO_GID: vault_manager mount sonrası chown için kullanır
+     *  - DISPLAY / XAUTHORITY: pkexec grafik diyaloğu için gerekli
+     */
+    QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+    env.insert("SUDO_UID", QString::number(getuid()));
+    env.insert("SUDO_GID", QString::number(getgid()));
+    proc.setProcessEnvironment(env);
+
+    /*
+     * pkexec kullan → grafik şifre diyaloğu
+     * PolicyKit policy: com.digitalvault.manager.run
+     */
+    QString launcher = "pkexec";
+    QStringList launchArgs;
+    launchArgs << m_vaultManagerBin << args;
+
+    /* pkexec yoksa sudo'ya düş */
+    QProcess which;
+    which.start("which", QStringList() << "pkexec");
+    which.waitForFinished(2000);
+    if (which.exitCode() != 0) {
+        launcher = "sudo";
+        addLog("WARNING", "pkexec not found, falling back to sudo");
+    }
+
+    printf("[GUI] Running: %s %s\n",
+           launcher.toStdString().c_str(),
+           launchArgs.join(" ").toStdString().c_str());
+
+    proc.start(launcher, launchArgs);
+
+    if (!proc.waitForStarted(5000)) {
+        qWarning() << "[GUI] Failed to start vault_manager!";
+        addLog("ERROR", "Could not launch vault_manager with " + launcher);
+        return -1;
+    }
+
+    if (!proc.waitForFinished(timeoutMs)) {
+        qWarning() << "[GUI] vault_manager timed out!";
+        proc.kill();
+        return -1;
+    }
+
+    /* vault_manager çıktılarını logla */
+    QString output = QString::fromUtf8(proc.readAll()).trimmed();
+    if (!output.isEmpty()) {
+        for (const QString &line : output.split('\n')) {
+            if (line.contains("Fingerprint verified")) {
+                addLog("SUCCESS", "Biometric verification passed");
+            } else if (line.contains("key wiped", Qt::CaseInsensitive)) {
+                addLog("INFO", "Encryption key cleared from memory");
+            } else if (line.contains("failed", Qt::CaseInsensitive)) {
+                addLog("ERROR", line.trimmed());
+            }
+            printf("[vault_manager] %s\n", line.toStdString().c_str());
+        }
+    }
+
+    return proc.exitCode();
 }
 
 /* ─── Simulator Management ───────────────────────────────────────────────── */
@@ -180,101 +309,50 @@ void VaultController::onSimFinished(int exitCode, QProcess::ExitStatus exitStatu
     emit statusChanged();
 }
 
-/* ─── Vault Mount/Unmount ────────────────────────────────────────────────── */
+/* ─── Vault Mount/Unmount (LUKS + ext4) ──────────────────────────────────── */
 
 bool VaultController::mountVault()
 {
-    if (m_fuseProcess && m_fuseProcess->state() == QProcess::Running) {
-        return true; /* Zaten mount */
+    addLog("INFO", "Starting LUKS unlock for: " + m_selectedDevice);
+
+    int ret = runVaultManager({"open", m_selectedDevice, m_mountPoint}, 15000);
+
+    if (ret == 0) {
+        addLog("SUCCESS", "Vault decrypted and mounted at " + m_mountPoint);
+
+        /*
+         * Mount başarılı — dosya yöneticisinde aç.
+         * Bu sayede kullanıcı hemen dosyalarına erişebilir.
+         * xdg-open ile varsayılan dosya yöneticisi açılır (Nautilus, Dolphin, Thunar vb.)
+         */
+        QProcess::startDetached("xdg-open", {m_mountPoint});
+
+        return true;
     }
 
-    m_fuseProcess = new QProcess(this);
-    connect(m_fuseProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
-            this, &VaultController::onFuseFinished);
-
-    QString fuseBin = QCoreApplication::applicationDirPath() + "/vault_fs";
-    if (!QFile::exists(fuseBin)) {
-        fuseBin = m_projectDir + "/fuse_vault/vault_fs";
-    }
-
-    if (!QFile::exists(fuseBin)) {
-        emit notificationReceived("FUSE binary not found!", true);
-        return false;
-    }
-
-    /* Mount dizinini oluştur */
-    QDir().mkpath(m_mountPoint);
-
-    /* Çalışma dizini olarak binary'nin olduğu yeri kullan (vault.img orada oluşsun) */
-    m_fuseProcess->setWorkingDirectory(QFileInfo(fuseBin).absolutePath());
-    
-    printf("[GUI] Starting FUSE: %s -f %s %s\n", 
-           fuseBin.toStdString().c_str(), 
-           m_mountPoint.toStdString().c_str(),
-           m_selectedDevice.toStdString().c_str());
-
-    m_fuseProcess->start(fuseBin, QStringList() << "-f" << m_mountPoint << m_selectedDevice);
-
-    /* FUSE'dan gelen audit loglarını dinle */
-    connect(m_fuseProcess, &QProcess::readyReadStandardOutput, this, [this]() {
-        while (m_fuseProcess->canReadLine()) {
-            QString line = QString::fromUtf8(m_fuseProcess->readLine()).trimmed();
-            if (line.startsWith("[AUDIT]")) {
-                QString auditMsg = line.mid(8).trimmed(); // "[AUDIT] " kısmını at
-                QString level = "INFO";
-                
-                if (auditMsg.startsWith("UNLOCK")) level = "SUCCESS";
-                else if (auditMsg.startsWith("DELETE")) level = "WARNING";
-                else if (auditMsg.startsWith("ERROR")) level = "ERROR";
-                
-                addLog(level, auditMsg);
-            }
-        }
-    });
-
-    if (!m_fuseProcess->waitForStarted(5000)) {
-        emit notificationReceived("Failed to start FUSE process!", true);
-        return false;
-    }
-
-    return true;
+    addLog("ERROR", "Failed to open vault (exit code: " + QString::number(ret) + ")");
+    return false;
 }
 
 bool VaultController::unmountVault()
 {
-    /* 1. Önce standart yöntemle unmount et (FUSE'a kapanma sinyali gider) */
-    QProcess unmount;
-    unmount.start("fusermount3", QStringList() << "-u" << m_mountPoint);
-    if (!unmount.waitForFinished(2000)) {
-        unmount.start("fusermount", QStringList() << "-u" << m_mountPoint);
-        unmount.waitForFinished(2000);
+    addLog("INFO", "Locking vault and clearing kernel keys...");
+
+    int ret = runVaultManager({"close", m_mountPoint}, 10000);
+
+    if (ret == 0) {
+        addLog("SUCCESS", "Vault locked. LUKS keys cleared from kernel.");
+        return true;
     }
 
-    /* 2. Eğer süreç hala çalışıyorsa (meşgulse), zorla durdur */
-    if (m_fuseProcess && m_fuseProcess->state() == QProcess::Running) {
-        /* Sürecin kendi kendine kapanması için biraz daha bekle */
-        if (!m_fuseProcess->waitForFinished(2000)) {
-            m_fuseProcess->terminate();
-            if (!m_fuseProcess->waitForFinished(2000)) {
-                m_fuseProcess->kill();
-            }
-        }
-    }
-
-    /* 3. Hala mount noktası kaldıysa temizle (Lazy unmount) */
-    QProcess lazyUnmount;
-    lazyUnmount.start("fusermount3", QStringList() << "-uz" << m_mountPoint);
-    lazyUnmount.waitForFinished(1000);
-
-    return true;
+    addLog("ERROR", "Failed to close vault (exit code: " + QString::number(ret) + ")");
+    return false;
 }
 
 void VaultController::toggleVault()
 {
-    /* Çift tıklama veya hızlı tıklama koruması */
-    if (m_fuseProcess && m_fuseProcess->state() == QProcess::Starting) {
-        return;
-    }
+    if (m_isToggling) return;
+    resetAutoLockTimer(); // Kullanıcı etkileşimi timer'ı sıfırlar
 
     if (m_isLocked) {
         /* Unlock — mount vault */
@@ -283,59 +361,161 @@ void VaultController::toggleVault()
             return;
         }
 
-        addLog("INFO", "Starting unlock sequence for: " + m_selectedDevice);
-        updateActivity("Mounting vault...");
+        m_isToggling = true;
+        emit togglingChanged();
+        updateActivity("Decrypting vault...");
         emit statusChanged();
 
-        if (mountVault()) {
-            m_isLocked = false;
-            QString msg = "Vault unlocked and mounted at " + m_mountPoint;
-            addLog("SUCCESS", "Vault accessible. Device: " + m_selectedDevice);
-            updateActivity(msg);
+        QFuture<bool> future = QtConcurrent::run(&VaultController::mountVault, this);
+        auto watcher = new QFutureWatcher<bool>(this);
+        connect(watcher, &QFutureWatcher<bool>::finished, this, [this, watcher]() {
+            bool success = watcher->result();
+            m_isToggling = false;
+            emit togglingChanged();
+
+            if (success) {
+                m_isLocked = false;
+                QString msg = "Vault unlocked and mounted at " + m_mountPoint;
+                updateActivity(msg);
+                emit notificationReceived(msg, false);
+                resetAutoLockTimer(); // Başarıyla açıldıktan sonra sayacı başlat
+            } else {
+                emit notificationReceived("Failed to unlock vault!", true);
+                updateActivity("Unlock failed.");
+            }
             emit statusChanged();
-            emit notificationReceived(msg, false);
-        } else {
-            addLog("ERROR", "Failed to mount vault on " + m_mountPoint);
-            emit notificationReceived("Failed to mount vault!", true);
-        }
+            watcher->deleteLater();
+        });
+        watcher->setFuture(future);
+
     } else {
         /* Lock — unmount vault */
-        addLog("INFO", "Locking vault and clearing memory keys...");
-        updateActivity("Unmounting vault...");
+        m_isToggling = true;
+        emit togglingChanged();
+        updateActivity("Locking vault...");
         emit statusChanged();
 
-        if (unmountVault()) {
-            m_isLocked = true;
-            updateActivity("Vault locked successfully.");
+        QFuture<bool> future = QtConcurrent::run(&VaultController::unmountVault, this);
+        auto watcher = new QFutureWatcher<bool>(this);
+        connect(watcher, &QFutureWatcher<bool>::finished, this, [this, watcher]() {
+            bool success = watcher->result();
+            m_isToggling = false;
+            emit togglingChanged();
+
+            if (success) {
+                m_isLocked = true;
+                updateActivity("Vault locked successfully.");
+                emit notificationReceived("Vault locked and dismounted.", false);
+            } else {
+                emit notificationReceived("Failed to lock vault!", true);
+                updateActivity("Lock failed.");
+            }
             emit statusChanged();
-            emit notificationReceived("Vault locked and unmounted.", false);
-        }
+            watcher->deleteLater();
+        });
+        watcher->setFuture(future);
     }
 }
 
-void VaultController::onFuseFinished(int exitCode, QProcess::ExitStatus exitStatus)
-{
-    m_isLocked = true;
+/* ─── Vault Setup (First-Time LUKS Format) ───────────────────────────────── */
 
-    /*
-     * libfuse returns exit code 7 if the filesystem is unmounted forcefully
-     * while it is busy (e.g. terminal is inside the directory).
-     * This is expected behavior during a forced lock and is not a crash.
-     */
-    if (exitStatus == QProcess::NormalExit && exitCode == 7) {
-        addLog("INFO", "Vault forcefully unmounted safely (was busy).");
-        updateActivity("Vault unmounted (forced).");
-    } else if (exitStatus == QProcess::CrashExit || exitCode != 0) {
-        QString reason = (exitStatus == QProcess::CrashExit) ? "crashed" : "exited with error";
-        addLog("ERROR", "Vault process " + reason + ". Exit code: " + QString::number(exitCode));
-        updateActivity("Vault process " + reason + ".");
-        emit notificationReceived("Vault process " + reason + " (code: " +
-                                  QString::number(exitCode) + ")", true);
-    } else {
-        addLog("INFO", "Vault unmounted safely.");
-        updateActivity("Vault unmounted.");
+bool VaultController::setupVault(const QString &device, bool force, int ownerId)
+{
+    if (device.isEmpty()) return false;
+
+    if (m_isSetupRunning) {
+        emit notificationReceived("Setup is already in progress!", true);
+        return false;
     }
-    emit statusChanged();
+
+    if (!simulatorRunning()) {
+        emit notificationReceived("Start the simulator first!", true);
+        return false;
+    }
+
+    /* Eğer bir .img dosyası ise ve henüz yoksa, oluştur */
+    if (device.endsWith(".img") && !QFile::exists(device)) {
+        addLog("INFO", "Creating container file: " + device);
+        QProcess dd;
+        dd.start("truncate", {"-s", "100M", device});
+        if (!dd.waitForFinished(5000)) {
+            emit notificationReceived("Failed to create vault file!", true);
+            return false;
+        }
+    }
+
+    /* ── Async başlat ── */
+    m_isSetupRunning = true;
+    m_setupStatusText = "Formatting LUKS2 container on " + device + "...";
+    emit setupRunningChanged();
+
+    addLog("INFO", QString("Formatting new LUKS vault on: %1 %2").arg(device).arg(force ? "(FORCED)" : ""));
+
+    /* QFutureWatcher ile arka plan threadi izle */
+    m_setupWatcher = new QFutureWatcher<int>(this);
+    connect(m_setupWatcher, &QFutureWatcher<int>::finished, this, [this, device]() {
+        int ret = m_setupWatcher->result();
+        m_isSetupRunning = false;
+        m_setupStatusText = "";
+        emit setupRunningChanged();
+
+        m_setupWatcher->deleteLater();
+        m_setupWatcher = nullptr;
+
+        if (ret == 0) {
+            m_selectedDevice = device;
+            addLog("SUCCESS", "Vault setup complete: " + device);
+            emit statusChanged();
+            emit setupFinished(true, "✅  Vault setup complete! You can now unlock it.");
+            emit notificationReceived("Vault initialized! You can now unlock it.", false);
+        } else if (ret == 3) {
+            addLog("INFO", "Device already has a LUKS vault: " + device);
+            emit setupFinished(false, "This device already has a vault. Use 'Unlock' to open it.");
+            emit notificationReceived("This device already has a vault! Use 'Open Vault' to unlock it.", false);
+        } else if (ret == 4) {
+            addLog("ERROR", "Existing filesystem detected on: " + device);
+            emit setupFinished(false, "⚠  Existing data detected. Enable 'Force format' to override.");
+            emit notificationReceived("Existing data detected! Enable Force Format to override.", true);
+        } else {
+            addLog("ERROR", "Vault setup failed on: " + device + " (exit " + QString::number(ret) + ")");
+            emit setupFinished(false, "❌  Setup failed. Check logs for details.");
+            emit notificationReceived("Vault setup failed!", true);
+        }
+    });
+
+    /* Threadi başlat */
+    QStringList args;
+    args << "setup" << device << QString::number(ownerId);
+    if (force) args << "--force";
+
+    /* runVaultManager main thread'den çağrılamaz — argümanları kopyalayıp yeni process aç */
+    QString vaultManagerBin = m_vaultManagerBin;
+    QFuture<int> future = QtConcurrent::run([vaultManagerBin, args]() -> int {
+        QProcess proc;
+        proc.setProcessChannelMode(QProcess::MergedChannels);
+        QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+        env.insert("SUDO_UID", QString::number(::getuid()));
+        env.insert("SUDO_GID", QString::number(::getgid()));
+        proc.setProcessEnvironment(env);
+
+        QStringList launchArgs;
+        launchArgs << vaultManagerBin << args;
+
+        proc.start("pkexec", launchArgs);
+        if (!proc.waitForStarted(5000)) return -1;
+        if (!proc.waitForFinished(120000)) { proc.kill(); return -1; } /* 2 dakika timeout */
+
+        QString output = QString::fromUtf8(proc.readAll()).trimmed();
+        if (!output.isEmpty()) {
+            for (const QString &line : output.split('\n')) {
+                printf("[vault_manager] %s\n", line.toStdString().c_str());
+            }
+        }
+        return proc.exitCode();
+    });
+
+    m_setupWatcher->setFuture(future);
+    return true; /* async başladı, sonuç setupFinished sinyaliyle gelecek */
 }
 
 /* ─── Fingerprint Operations (Real HAL via Socket) ───────────────────────── */
@@ -473,13 +653,16 @@ QString VaultController::fingerprintLabel(int index) const
 QVariantList VaultController::getStorageDevices()
 {
     QVariantList devices;
-    
-    /* 1. Varsayılan dosya opsiyonunu ekle */
-    QVariantMap fileOpt;
-    fileOpt["name"] = "Dosya Konteynırı (vault.img)";
-    fileOpt["path"] = "vault.img";
-    fileOpt["description"] = "Proje klasöründe sanal bir dosya oluşturur.";
-    devices << fileOpt;
+
+    /* 1. Eğer seçili cihaz bir dosya ise (fiziksel disk değilse), onu listeye ekle */
+    if (!m_selectedDevice.isEmpty() && !m_selectedDevice.startsWith("/dev/")) {
+        QVariantMap d;
+        d["path"] = m_selectedDevice;
+        QFileInfo fi(m_selectedDevice);
+        d["name"] = fi.fileName() + " (File Container)";
+        d["description"] = "Virtual Encrypted Container";
+        devices << d;
+    }
 
     /* 2. lsblk ile fiziksel diskleri listele */
     QProcess lsblk;
@@ -491,18 +674,25 @@ QVariantList VaultController::getStorageDevices()
             for (const auto &dev : blockDevices) {
                 QJsonObject obj = dev.toObject();
                 QString type = obj["type"].toString();
-                
-                /* Sadece disk bölümlerini (part) veya diskleri ekle */
-                if (type == "part" || type == "disk") {
+
+                /* Disk bölümlerini (part), diskleri veya loop cihazlarını ekle */
+                if (type == "part" || type == "disk" || type == "loop") {
+                    QString mountpoint = obj["mountpoint"].toString();
+                    
+                    /* Sistem loop cihazlarını (Snap paketleri vb.) gizle */
+                    if (type == "loop" && mountpoint.startsWith("/snap")) {
+                        continue;
+                    }
+
                     QVariantMap d;
                     QString name = obj["name"].toString();
                     d["path"] = "/dev/" + name;
                     d["name"] = QString("/dev/%1 (%2)").arg(name).arg(obj["size"].toString());
-                    
+
                     QString info = obj["model"].toString() + " " + obj["vendor"].toString();
                     if (info.trimmed().isEmpty()) info = "Physical Storage Device";
                     d["description"] = info;
-                    
+
                     devices << d;
                 }
             }
@@ -516,11 +706,20 @@ QVariantList VaultController::getStorageDevices()
 
 void VaultController::pollStatus()
 {
-    /* FUSE sürecinin durumunu kontrol et */
+    /*
+     * LUKS durumunu kontrol et:
+     * /dev/mapper/digitalvault varsa vault açık demektir.
+     */
     bool wasLocked = m_isLocked;
-    if (!m_isLocked && (!m_fuseProcess || m_fuseProcess->state() != QProcess::Running)) {
-        m_isLocked = true;
+
+    if (!m_isLocked) {
+        /* /dev/mapper/digitalvault hala var mı? */
+        if (!QFile::exists("/dev/mapper/digitalvault")) {
+            m_isLocked = true;
+            addLog("WARNING", "Vault was closed externally");
+        }
     }
+
     if (wasLocked != m_isLocked) {
         emit statusChanged();
     }
@@ -529,41 +728,76 @@ void VaultController::pollStatus()
 bool VaultController::createNewVault(const QString &path)
 {
     if (path.isEmpty()) return false;
-    
+
     /* URL formatındaysa (file://) temizle */
     QString localPath = QUrl(path).toLocalFile();
     if (localPath.isEmpty()) localPath = path;
 
-    /* Dizin var mı kontrol et */
-    QFileInfo info(localPath);
-    QDir dir = info.dir();
-    if (!dir.exists()) {
-        emit notificationReceived("Target directory does not exist!", true);
-        return false;
-    }
-
-    /* 
-     * Gerçek oluşturma işlemini vault_fs'e bırakıyoruz.
-     * Biz sadece yolu ayarlıyoruz ve kullanıcıya bilgi veriyoruz.
-     */
     m_selectedDevice = localPath;
-    updateActivity("New vault target set: " + info.fileName());
+    updateActivity("New vault target set: " + localPath);
     emit statusChanged();
-    emit notificationReceived("New vault path selected. It will be initialized on first unlock.", false);
-    
+    emit notificationReceived("Device selected: " + localPath + ". Use 'Setup Vault' to format.", false);
+
     return true;
 }
 
 void VaultController::addLog(const QString &level, const QString &msg)
 {
-    QVariantMap log;
-    log["ts"] = QDateTime::currentDateTime().toString("hh:mm:ss");
+    QJsonObject log;
+    log["time"] = QDateTime::currentDateTime().toString("yyyy-MM-dd HH:mm:ss");
     log["level"] = level;
-    log["msg"] = msg;
-    
+    log["message"] = msg;
+
+    // Bellekteki listeye ekle (Dashboard için)
     m_securityLogs.prepend(log);
-    if (m_securityLogs.size() > 100) m_securityLogs.removeLast();
-    
+    if (m_securityLogs.size() > 50) m_securityLogs.removeLast();
+    emit logsChanged();
+
+    // Dosyaya yaz
+    QFile file(m_logFilePath);
+    if (file.open(QIODevice::ReadWrite)) {
+        QByteArray data = file.readAll();
+        QJsonDocument doc = QJsonDocument::fromJson(data);
+        QJsonArray array = doc.array();
+        array.prepend(log); // En yeni en başa
+        
+        // Çok fazla log birikmesin (opsiyonel limit: 1000)
+        while (array.size() > 1000) array.removeLast();
+
+        file.seek(0);
+        file.write(QJsonDocument(array).toJson());
+        file.resize(file.pos());
+        file.close();
+    }
+}
+
+QVariantList VaultController::getSecurityLogsPage(int page, int pageSize)
+{
+    QFile file(m_logFilePath);
+    if (!file.open(QIODevice::ReadOnly)) return {};
+
+    QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
+    QJsonArray array = doc.array();
+    file.close();
+
+    QVariantList result;
+    int start = page * pageSize;
+    int end = qMin(start + pageSize, (int)array.size());
+
+    for (int i = start; i < end; ++i) {
+        result.append(array.at(i).toVariant());
+    }
+    return result;
+}
+
+void VaultController::clearLogs()
+{
+    QFile file(m_logFilePath);
+    if (file.open(QIODevice::WriteOnly)) {
+        file.write("[]");
+        file.close();
+    }
+    m_securityLogs.clear();
     emit logsChanged();
 }
 
@@ -599,5 +833,224 @@ void VaultController::renameFingerprint(int index, const QString &newName)
         emit notificationReceived("Fingerprint renamed!", false);
     } else {
         emit notificationReceived("Rename failed!", true);
+    }
+}
+
+/* ─── Quick Access: File Manager & Terminal ──────────────────────────────── */
+
+void VaultController::openInFileManager()
+{
+    if (m_isLocked) {
+        emit notificationReceived("Unlock the vault first!", true);
+        return;
+    }
+
+    QProcess::startDetached("xdg-open", {m_mountPoint});
+    resetAutoLockTimer();
+    addLog("INFO", "Opened vault in file manager");
+}
+
+void VaultController::openInTerminal()
+{
+    if (m_isLocked) {
+        emit notificationReceived("Unlock the vault first!", true);
+        return;
+    }
+    resetAutoLockTimer();
+
+    /*
+     * Yaygın terminal emülatörlerini dene:
+     *   1. gnome-terminal (GNOME/Ubuntu)
+     *   2. konsole (KDE)
+     *   3. xfce4-terminal (XFCE)
+     *   4. xterm (evrensel fallback)
+     */
+    struct { const char *cmd; QStringList args; } terminals[] = {
+        { "gnome-terminal", {"--working-directory=" + m_mountPoint} },
+        { "konsole",        {"--workdir", m_mountPoint} },
+        { "xfce4-terminal", {"--working-directory=" + m_mountPoint} },
+        { "xterm",          {"-e", "cd " + m_mountPoint + " && bash"} },
+    };
+
+    for (const auto &t : terminals) {
+        QProcess which;
+        which.start("which", QStringList() << t.cmd);
+        which.waitForFinished(1000);
+        if (which.exitCode() == 0) {
+            QProcess::startDetached(t.cmd, t.args);
+            addLog("INFO", "Opened terminal at " + m_mountPoint);
+            return;
+        }
+    }
+
+    emit notificationReceived("No supported terminal emulator found!", true);
+}
+
+/* ─── Multi-user Access Management ───────────────────────────────────── */
+
+bool VaultController::verifyOwner(int fingerId)
+{
+    if (!simulatorRunning()) {
+        emit notificationReceived("Start the simulator first!", true);
+        return false;
+    }
+
+    QJsonObject cmd;
+    cmd["cmd"] = "verify";
+    cmd["finger_id"] = fingerId;
+
+    QByteArray resp = sendSocketCommand(m_socketPath, cmd);
+    if (resp.isEmpty()) {
+        emit notificationReceived("Failed to communicate with simulator!", true);
+        return false;
+    }
+
+    QJsonDocument doc = QJsonDocument::fromJson(resp);
+    if (doc.object()["status"].toString() == "ok") {
+        addLog("SUCCESS", "Owner fingerprint verified (ID: " + QString::number(fingerId) + ")");
+        return true;
+    } else {
+        emit notificationReceived("Verification failed! Fingerprint didn't match.", true);
+        return false;
+    }
+}
+
+bool VaultController::grantAccess(int ownerFingerId, int newFingerId)
+{
+    if (m_selectedDevice.isEmpty()) {
+        emit notificationReceived("No device selected!", true);
+        return false;
+    }
+
+    if (!simulatorRunning()) {
+        emit notificationReceived("Start the simulator first!", true);
+        return false;
+    }
+
+    addLog("INFO", "Granting new access on " + m_selectedDevice +
+           " (owner: " + QString::number(ownerFingerId) +
+           ", new: " + QString::number(newFingerId) + ")");
+
+    int ret = runVaultManager({
+        "addkey", m_selectedDevice,
+        QString::number(ownerFingerId),
+        QString::number(newFingerId)
+    }, 60000);
+
+    if (ret == 0) {
+        addLog("SUCCESS", "New keyslot added for finger ID " + QString::number(newFingerId));
+        emit statusChanged();
+        emit notificationReceived("Access granted successfully!", false);
+        return true;
+    }
+
+    addLog("ERROR", "Failed to add keyslot (exit " + QString::number(ret) + ")");
+    emit notificationReceived("Failed to grant access. Check logs.", true);
+    return false;
+}
+
+bool VaultController::revokeAccess(int ownerFingerId, int slotNumber)
+{
+    if (m_selectedDevice.isEmpty()) {
+        emit notificationReceived("No device selected!", true);
+        return false;
+    }
+
+    if (slotNumber == 0) {
+        emit notificationReceived("Cannot remove vault owner (slot 0)!", true);
+        return false;
+    }
+
+    if (!simulatorRunning()) {
+        emit notificationReceived("Start the simulator first!", true);
+        return false;
+    }
+
+    addLog("WARNING", "Revoking access slot " + QString::number(slotNumber));
+
+    int ret = runVaultManager({
+        "killslot", m_selectedDevice,
+        QString::number(ownerFingerId),
+        QString::number(slotNumber)
+    }, 30000);
+
+    if (ret == 0) {
+        addLog("SUCCESS", "Keyslot " + QString::number(slotNumber) + " removed");
+        emit statusChanged();
+        emit notificationReceived("Access slot " + QString::number(slotNumber) + " revoked!", false);
+        return true;
+    }
+
+    if (ret == 5) {
+        emit notificationReceived("Cannot remove vault owner (slot 0)!", true);
+        return false;
+    }
+
+    addLog("ERROR", "Failed to revoke slot " + QString::number(slotNumber));
+    emit notificationReceived("Failed to revoke access.", true);
+    return false;
+}
+
+QVariantList VaultController::getKeyslots()
+{
+    QVariantList slotList;
+
+    if (m_selectedDevice.isEmpty()) return slotList;
+
+    /* vault_manager listslots çıktısını oku */
+    QString bin = findVaultManager();
+    if (bin.isEmpty()) return slotList;
+
+    QProcess proc;
+    proc.start("pkexec", QStringList() << bin << "listslots" << m_selectedDevice);
+    if (!proc.waitForFinished(10000)) return slotList;
+
+    QString output = proc.readAllStandardOutput();
+    QStringList lines = output.split('\n', Qt::SkipEmptyParts);
+
+    for (const QString &line : lines) {
+        /* Format: SLOT:0:luks2 */
+        if (line.startsWith("SLOT:")) {
+            QStringList parts = line.mid(5).split(':');
+            if (parts.size() >= 2) {
+                QVariantMap slot;
+                slot["number"] = parts[0].toInt();
+                slot["type"] = parts[1];
+                slot["label"] = (parts[0] == "0") ? "Owner (Primary)" : "User Slot " + parts[0];
+                slot["isOwner"] = (parts[0] == "0");
+                slotList << slot;
+            }
+        }
+    }
+
+    return slotList;
+}
+
+void VaultController::setAutoLockTimeout(int minutes)
+{
+    if (m_autoLockTimeout == minutes) return;
+    m_autoLockTimeout = minutes;
+    addLog("INFO", QString("Auto-lock timeout changed to %1 minutes").arg(minutes == 0 ? "Never" : QString::number(minutes)));
+    resetAutoLockTimer();
+    emit autoLockTimeoutChanged();
+}
+
+void VaultController::resetAutoLockTimer()
+{
+    if (!m_autoLockTimer) return;
+    
+    if (m_autoLockTimeout <= 0 || m_isLocked) {
+        m_autoLockTimer->stop();
+        return;
+    }
+    
+    m_autoLockTimer->start(m_autoLockTimeout * 60 * 1000);
+}
+
+void VaultController::handleAutoLock()
+{
+    if (!m_isLocked && !m_isToggling) {
+        addLog("WARNING", "Inactivity timeout reached. Auto-locking vault...");
+        toggleVault();
     }
 }

@@ -77,30 +77,82 @@ Item {
                         width: parent.width
                         label: "Auto-lock timeout"
                         description: "Lock vault after inactivity"
-                        control: Rectangle {
-                            width: 140; height: 34; radius: 8
-                            color: Theme.bgInput
-                            border.color: Theme.border
-                            border.width: 1
-                            Behavior on color { ColorAnimation { duration: 250 } }
+                        control: ComboBox {
+                            id: timeoutCombo
+                            width: 140
+                            model: ListModel {
+                                ListElement { label: "Never"; value: 0 }
+                                ListElement { label: "1 minute"; value: 1 }
+                                ListElement { label: "2 minutes"; value: 2 }
+                                ListElement { label: "5 minutes"; value: 5 }
+                                ListElement { label: "10 minutes"; value: 10 }
+                                ListElement { label: "30 minutes"; value: 30 }
+                            }
+                            textRole: "label"
+                            
+                            currentIndex: {
+                                for (var i = 0; i < model.count; i++) {
+                                    if (model.get(i).value === vaultController.autoLockTimeout) return i;
+                                }
+                                return 3; // Default 5 min
+                            }
+                            
+                            onActivated: (index) => {
+                                vaultController.autoLockTimeout = model.get(index).value
+                            }
 
-                            Row {
-                                anchors { fill: parent; leftMargin: 12; rightMargin: 8 }
-                                spacing: 6
-                                Text {
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    text: "5 minutes"
-                                    color: Theme.textPrimary
+                            popup: Popup {
+                                y: timeoutCombo.height + 4
+                                width: timeoutCombo.width
+                                padding: 1
+                                contentItem: ListView {
+                                    clip: true
+                                    implicitHeight: contentHeight
+                                    model: timeoutCombo.popup.visible ? timeoutCombo.delegateModel : null
+                                    currentIndex: timeoutCombo.highlightedIndex
+                                    ScrollIndicator.vertical: ScrollIndicator { }
+                                }
+                                background: Rectangle {
+                                    color: Theme.bgCard
+                                    border.color: Theme.border
+                                    radius: 8
+                                }
+                            }
+
+                            delegate: ItemDelegate {
+                                width: timeoutCombo.width
+                                height: 34
+                                contentItem: Text {
+                                    text: label
+                                    color: highlighted ? "white" : Theme.textPrimary
                                     font { pixelSize: 13; family: "Inter" }
-                                    Behavior on color { ColorAnimation { duration: 250 } }
+                                    verticalAlignment: Text.AlignVCenter
+                                    leftPadding: 12
                                 }
-                                Item { width: 1; height: 1; Layout.fillWidth: true }
-                                Text {
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    text: "▾"
-                                    color: Theme.textMuted
-                                    font.pixelSize: 12
+                                background: Rectangle {
+                                    color: highlighted ? Theme.accent : "transparent"
+                                    radius: 6
+                                    anchors { fill: parent; margins: 2 }
                                 }
+                            }
+
+                            contentItem: Text {
+                                leftPadding: 12
+                                rightPadding: timeoutCombo.indicator.width + timeoutCombo.spacing
+                                text: timeoutCombo.displayText
+                                font { pixelSize: 13; family: "Inter" }
+                                color: Theme.textPrimary
+                                verticalAlignment: Text.AlignVCenter
+                                elide: Text.ElideRight
+                            }
+
+                            background: Rectangle {
+                                implicitWidth: 140
+                                implicitHeight: 34
+                                radius: 8
+                                color: Theme.bgInput
+                                border.color: Theme.border
+                                border.width: 1
                             }
                         }
                     }
@@ -203,8 +255,8 @@ Item {
     component SettingsSection: Rectangle {
         property string title: ""
         property string icon: ""
-        default property alias content: innerCol.children
-        height: innerCol.height + 58
+        default property alias content: contentCol.children
+        height: innerCol.implicitHeight + 40
         radius: Theme.radius
         color: Theme.bgCard
         border.color: Theme.border
@@ -231,6 +283,13 @@ Item {
                 }
             }
             Rectangle { width: parent.width; height: 1; color: Theme.border; Behavior on color { ColorAnimation { duration: 250 } } }
+
+            // İçerik satırları
+            Column {
+                id: contentCol
+                width: parent.width
+                spacing: 0
+            }
         }
     }
 
@@ -240,27 +299,39 @@ Item {
         property alias control: controlSlot.children
         height: 62
 
-        Row {
+        Item {
             anchors { fill: parent; topMargin: 8; bottomMargin: 8 }
 
             Column {
+                anchors.left: parent.left
+                anchors.right: controlSlot.left
+                anchors.rightMargin: 10
                 anchors.verticalCenter: parent.verticalCenter
-                width: parent.width - controlSlot.width - 10
                 spacing: 3
                 Text {
+                    width: parent.width
                     text: label
                     color: Theme.textPrimary
                     font { pixelSize: 13; bold: true; family: "Inter" }
                     Behavior on color { ColorAnimation { duration: 250 } }
+                    wrapMode: Text.Wrap
                 }
                 Text {
+                    width: parent.width
                     text: description
                     color: Theme.textSecondary
                     font { pixelSize: 11; family: "Inter" }
                     Behavior on color { ColorAnimation { duration: 250 } }
+                    wrapMode: Text.Wrap
                 }
             }
-            Item { id: controlSlot; anchors.verticalCenter: parent.verticalCenter }
+            Item { 
+                id: controlSlot
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                width: childrenRect.width
+                height: childrenRect.height
+            }
         }
 
         Rectangle {

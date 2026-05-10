@@ -2,15 +2,115 @@ import QtQuick
 import QtQuick.Controls
 import DigitalVault
 
-Window {
+    Window {
     id: root
     width: 1160
     height: 740
     minimumWidth: 940
     minimumHeight: 600
     visible: true
-    title: "VaultGuard — Biometric Digital Vault"
-    color: Theme.bgBase
+    title: "VaultGuard"
+    color: "transparent"
+    flags: Qt.Window | Qt.FramelessWindowHint
+
+    // ── Resizing Logic ────────────────────────────────────────
+    property int edgeMargin: 6
+
+    // ── Main Background with Rounded Corners ──────────────────
+    Rectangle {
+        anchors.fill: parent
+        anchors.margins: root.visibility === Window.Maximized ? 0 : 4 // Shadow/Glow space
+        color: Theme.bgBase
+        radius: root.visibility === Window.Maximized ? 0 : 12
+        clip: true
+        border.color: Theme.border
+        border.width: 1
+
+        // ── Custom Title Bar ──────────────────────────────────
+        Rectangle {
+            id: customTitleBar
+            width: parent.width
+            height: 40
+            color: Theme.bgSidebar
+            z: 1000
+
+            // Drag handler
+            MouseArea {
+                anchors.fill: parent
+                onPressed: (mouse) => root.startSystemMove()
+                onDoubleClicked: {
+                    if (root.visibility === Window.Maximized) root.showNormal()
+                    else root.showMaximized()
+                }
+            }
+
+            Row {
+                anchors.verticalCenter: parent.verticalCenter
+                anchors.left: parent.left
+                anchors.leftMargin: 16
+                spacing: 10
+                Text { text: "🔐"; font.pixelSize: 14 }
+                Text {
+                    text: "VaultGuard — Biometric Digital Vault"
+                    color: Theme.textSecondary
+                    font { pixelSize: 12; family: "Inter"; weight: Font.Medium }
+                }
+            }
+
+            // Window Controls
+            Row {
+                anchors.verticalCenter: parent.verticalCenter
+                anchors.right: parent.right
+                anchors.rightMargin: 12
+                spacing: 4
+
+                // Minimize
+                ControlBtn { icon: "−"; onClicked: root.showMinimized() }
+
+                // Maximize / Restore
+                ControlBtn { 
+                    icon: root.visibility === Window.Maximized ? "❐" : "▢"
+                    onClicked: {
+                        if (root.visibility === Window.Maximized) root.showNormal()
+                        else root.showMaximized()
+                    }
+                }
+
+                // Close
+                ControlBtn { 
+                    icon: "✕"; isClose: true
+                    onClicked: root.close() 
+                }
+            }
+            
+            Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.border }
+        }
+
+        component ControlBtn: Rectangle {
+            property string icon: ""
+            property bool isClose: false
+            signal clicked()
+            width: 32; height: 32; radius: 6
+            color: btnMouse.containsMouse ? (isClose ? "#E81123" : Theme.bgHover) : "transparent"
+            Text { 
+                anchors.centerIn: parent
+                text: icon
+                color: btnMouse.containsMouse && isClose ? "white" : Theme.textPrimary
+                font.pixelSize: isClose ? 10 : 14
+            }
+            MouseArea { id: btnMouse; anchors.fill: parent; hoverEnabled: true; onClicked: parent.clicked() }
+        }
+
+        // ── Edge Resizers ─────────────────────────────────────
+        MouseArea { width: edgeMargin; height: parent.height; anchors.left: parent.left; cursorShape: Qt.SizeHorCursor; onPressed: root.startSystemResize(Qt.LeftEdge) }
+        MouseArea { width: edgeMargin; height: parent.height; anchors.right: parent.right; cursorShape: Qt.SizeHorCursor; onPressed: root.startSystemResize(Qt.RightEdge) }
+        MouseArea { height: edgeMargin; width: parent.width; anchors.top: parent.top; cursorShape: Qt.SizeVerCursor; onPressed: root.startSystemResize(Qt.TopEdge) }
+        MouseArea { height: edgeMargin; width: parent.width; anchors.bottom: parent.bottom; cursorShape: Qt.SizeVerCursor; onPressed: root.startSystemResize(Qt.BottomEdge) }
+        MouseArea { width: edgeMargin*2; height: edgeMargin*2; anchors.right: parent.right; anchors.bottom: parent.bottom; cursorShape: Qt.SizeBDiagCursor; onPressed: root.startSystemResize(Qt.RightEdge | Qt.BottomEdge) }
+        MouseArea { width: edgeMargin*2; height: edgeMargin*2; anchors.left: parent.left; anchors.bottom: parent.bottom; cursorShape: Qt.SizeFDiagCursor; onPressed: root.startSystemResize(Qt.LeftEdge | Qt.BottomEdge) }
+        MouseArea { width: edgeMargin*2; height: edgeMargin*2; anchors.right: parent.right; anchors.top: parent.top; cursorShape: Qt.SizeFDiagCursor; onPressed: root.startSystemResize(Qt.RightEdge | Qt.TopEdge) }
+        MouseArea { width: edgeMargin*2; height: edgeMargin*2; anchors.left: parent.left; anchors.top: parent.top; cursorShape: Qt.SizeBDiagCursor; onPressed: root.startSystemResize(Qt.LeftEdge | Qt.TopEdge) }
+
 
     // ── Backend Controller ────────────────────────────────────
     VaultController {
@@ -24,7 +124,7 @@ Window {
     Rectangle {
         id: sidebar
         width: 230
-        height: parent.height
+        anchors { top: customTitleBar.bottom; bottom: parent.bottom }
         color: Theme.bgSidebar
         layer.enabled: true
 
@@ -101,10 +201,12 @@ Window {
                 id: navRepeater
                 property int currentIndex: 0
                 model: [
-                    { label: "Dashboard",    icon: "⬡", page: "Dashboard.qml" },
-                    { label: "Fingerprints", icon: "☝", page: "FingerprintManager.qml" },
-                    { label: "Security Log", icon: "📋", page: "SecurityLog.qml" },
-                    { label: "Settings",     icon: "⚙", page: "Settings.qml" }
+                    { label: "Dashboard",      icon: "⬡", page: "Dashboard.qml" },
+                    { label: "Fingerprints",   icon: "☝", page: "FingerprintManager.qml" },
+                    { label: "Access Manager", icon: "🔑", page: "AccessManager.qml" },
+                    { label: "Security Log",   icon: "📋", page: "SecurityLog.qml" },
+                    { label: "Device Guide",   icon: "🔍", page: "DeviceGuide.qml" },
+                    { label: "Settings",       icon: "⚙", page: "Settings.qml" }
                 ]
 
                 delegate: Item {
@@ -257,7 +359,7 @@ Window {
                 width: parent.width; height: 28
                 Text {
                     anchors { left: parent.left; leftMargin: 22; verticalCenter: parent.verticalCenter }
-                    text: "v1.0.0 — CSE 496"
+                    text: "v2.0.0 — CSE 496"
                     color: Theme.textMuted
                     font { pixelSize: 10; family: "Inter" }
                     Behavior on color { ColorAnimation { duration: 250 } }
@@ -269,7 +371,7 @@ Window {
     // ── Main Content ─────────────────────────────────────────
     Rectangle {
         id: mainContent
-        anchors { left: sidebar.right; right: parent.right; top: parent.top; bottom: parent.bottom }
+        anchors { left: sidebar.right; right: parent.right; top: customTitleBar.bottom; bottom: parent.bottom }
         color: Theme.bgBase
         Behavior on color { ColorAnimation { duration: 250 } }
 
@@ -340,6 +442,7 @@ Window {
                 toastBar.opacity = 1
                 toastTimer.restart()
             }
+        }
         }
     }
 }
