@@ -251,14 +251,18 @@ Item {
                             Behavior on color { ColorAnimation { duration: 250 } }
                         }
 
-                        // Action button
+                        // Action button (Unlock/Lock or Setup)
                         Rectangle {
                             anchors.horizontalCenter: parent.horizontalCenter
-                            width: 160; height: 42
-                            radius: 21
-                            color: vaultController.isToggling ? "#444" : (vaultController.isLocked ? Theme.success : Theme.danger)
+                            width: 180; height: 44
+                            radius: 22
+                            color: {
+                                if (vaultController.isToggling) return "#444"
+                                if (!vaultController.isSelectedDeviceVault) return Theme.warning
+                                return vaultController.isLocked ? Theme.success : Theme.danger
+                            }
                             Behavior on color { ColorAnimation { duration: 300 } }
-                            opacity: vaultController.isToggling ? 0.8 : 1.0
+                            opacity: (vaultController.isToggling || vaultController.selectedDevice === "") ? 0.6 : 1.0
 
                             scale: (btnMouse.containsMouse && !vaultController.isToggling) ? 1.04 : 1.0
                             Behavior on scale { NumberAnimation { duration: 150 } }
@@ -268,6 +272,9 @@ Item {
                                 text: {
                                     if (vaultController.isToggling) {
                                         return vaultController.isLocked ? "⏳ Decrypting..." : "⏳ Locking..."
+                                    }
+                                    if (!vaultController.isSelectedDeviceVault) {
+                                        return "🛠  Setup Vault"
                                     }
                                     return vaultController.isLocked ? "🔓  Unlock Vault" : "🔒  Lock Vault"
                                 }
@@ -279,41 +286,34 @@ Item {
                                 anchors.fill: parent
                                 hoverEnabled: !vaultController.isToggling
                                 cursorShape: vaultController.isToggling ? Qt.ArrowCursor : Qt.PointingHandCursor
-                                onClicked: if (!vaultController.isToggling) vaultController.toggleVault()
+                                onClicked: {
+                                    if (vaultController.isToggling || vaultController.selectedDevice === "") return
+                                    if (vaultController.isSelectedDeviceVault) {
+                                        vaultController.toggleVault()
+                                    } else {
+                                        setupWarningDialog.open()
+                                    }
+                                }
                             }
                         }
 
-                        // SETUP BUTTON (Sadece kilitliyken ve bir cihaz seçiliyken)
-                        Rectangle {
+                        // Re-format button for existing vaults
+                        Text {
                             anchors.horizontalCenter: parent.horizontalCenter
-                            width: 160; height: 36
-                            radius: 18
-                            color: "transparent"
-                            border.color: Theme.warning
-                            border.width: 1
-                            visible: vaultController.isLocked && vaultController.selectedDevice !== ""
+                            text: "Re-format / Setup again"
+                            color: Theme.textMuted
+                            font { pixelSize: 11; underline: true; family: "Inter" }
+                            visible: vaultController.isSelectedDeviceVault && vaultController.isLocked
+                            opacity: formatMouse.containsMouse ? 1.0 : 0.7
                             
-                            scale: setupMouse.containsMouse ? 1.04 : 1.0
-                            Behavior on scale { NumberAnimation { duration: 150 } }
-
-                            Row {
-                                anchors.centerIn: parent
-                                spacing: 8
-                                Text { text: "🛠"; font.pixelSize: 14 }
-                                Text {
-                                    text: "Setup Vault"
-                                    color: Theme.warning
-                                    font { pixelSize: 12; bold: true; family: "Inter" }
-                                }
-                            }
                             MouseArea {
-                                id: setupMouse
+                                id: formatMouse
                                 anchors.fill: parent
-                                hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
+                                hoverEnabled: true; cursorShape: Qt.PointingHandCursor
                                 onClicked: setupWarningDialog.open()
                             }
                         }
+
 
 
                         // Quick access buttons (vault açıkken görünür)
@@ -437,100 +437,116 @@ Item {
                             ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
 
                             Column {
-                                width: devicesList.width
-                                spacing: 8
+                                width: devicesPanel.width - 40
+                                spacing: 16
 
-                                Repeater {
-                                    id: devicesList
-                                    model: vaultController.getStorageDevices()
+                                // SECTION 1: Vaults Found
+                                Column {
+                                    width: parent.width
+                                    spacing: 8
+                                    Text {
+                                        text: "VAULTS FOUND"
+                                        color: Theme.success
+                                        font { pixelSize: 10; bold: true; family: "Inter"; letterSpacing: 1.0 }
+                                        visible: vaultsRepeater.count > 0
+                                    }
+                                    Repeater {
+                                        id: vaultsRepeater
+                                        model: {
+                                            var devs = vaultController.getStorageDevices()
+                                            return devs.filter(d => d.isVault)
+                                        }
+                                        delegate: deviceDelegate
+                                    }
+                                }
 
-                                    delegate: Rectangle {
-                                        // Use the ScrollView's available width
+                                // SECTION 2: Other Storage
+                                Column {
+                                    width: parent.width
+                                    spacing: 8
+                                    Text {
+                                        text: "OTHER STORAGE"
+                                        color: Theme.textMuted
+                                        font { pixelSize: 10; bold: true; family: "Inter"; letterSpacing: 1.0 }
+                                        visible: otherRepeater.count > 0
+                                    }
+                                    Repeater {
+                                        id: otherRepeater
+                                        model: {
+                                            var devs = vaultController.getStorageDevices()
+                                            return devs.filter(d => !d.isVault)
+                                        }
+                                        delegate: deviceDelegate
+                                    }
+                                }
+
+                                Component {
+                                    id: deviceDelegate
+                                    Rectangle {
                                         width: devicesPanel.width - 40
-                                        height: 62
-                                        radius: 10
+                                        height: 62; radius: 10
                                         color: vaultController.selectedDevice === modelData.path
-                                               ? Theme.accentGlow : Theme.bgOverlay
+                                               ? Theme.accentGlow : (modelData.isVault ? Theme.successBg : Theme.bgOverlay)
                                         border.color: vaultController.selectedDevice === modelData.path
-                                                      ? Theme.accent : Theme.border
+                                                      ? Theme.accent : (modelData.isVault ? Theme.success : Theme.border)
                                         border.width: vaultController.selectedDevice === modelData.path ? 2 : 1
                                         Behavior on color { ColorAnimation { duration: 200 } }
                                         Behavior on border.color { ColorAnimation { duration: 200 } }
 
-                                        // Clickable area for selection
                                         MouseArea {
-                                            anchors.fill: parent
-                                            cursorShape: Qt.PointingHandCursor
-                                            onClicked: {
-                                                vaultController.setSelectedDevice(modelData.path)
-                                            }
+                                            anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+                                            onClicked: vaultController.setSelectedDevice(modelData.path)
                                         }
 
-                                        // Content row using anchors (not RowLayout) for reliable spacing
                                         Item {
                                             anchors { fill: parent; leftMargin: 14; rightMargin: 14 }
-
-                                            // Device icon
                                             Rectangle {
                                                 id: devIcon
                                                 anchors.verticalCenter: parent.verticalCenter
                                                 width: 38; height: 38; radius: 8
-                                                color: modelData.path.startsWith("/dev/")
-                                                       ? Theme.warningBg : Theme.accentGlow
+                                                color: modelData.isVault ? Theme.successBg : (modelData.path.startsWith("/dev/") ? Theme.warningBg : Theme.accentGlow)
                                                 Text {
                                                     anchors.centerIn: parent
-                                                    text: modelData.path.indexOf("loop") >= 0
-                                                          ? "🔁"
-                                                          : (modelData.path.startsWith("/dev/") ? "💾" : "🔐")
+                                                    text: modelData.isVault ? "🔐" : (modelData.path.indexOf("loop") >= 0 ? "🔁" : (modelData.path.startsWith("/dev/") ? "💾" : "📁"))
                                                     font.pixelSize: 18
                                                 }
                                             }
-
-                                            // Status badge (right-anchored first so text can elide)
                                             Rectangle {
                                                 id: statusBadge
                                                 anchors { right: parent.right; verticalCenter: parent.verticalCenter }
-                                                width: badgeLabel.implicitWidth + 20
-                                                height: 24; radius: 12
-                                                color: vaultController.selectedDevice === modelData.path
-                                                       ? Theme.successBg : "transparent"
-                                                border.color: vaultController.selectedDevice === modelData.path
-                                                              ? Theme.success : Theme.border
+                                                width: badgeLabel.implicitWidth + 20; height: 24; radius: 12
+                                                color: vaultController.selectedDevice === modelData.path ? Theme.successBg : "transparent"
+                                                border.color: vaultController.selectedDevice === modelData.path ? Theme.success : Theme.border
                                                 border.width: 1
                                                 Text {
-                                                    id: badgeLabel
-                                                    anchors.centerIn: parent
-                                                    text: vaultController.selectedDevice === modelData.path
-                                                          ? "✓  SELECTED" : "SELECT"
-                                                    color: vaultController.selectedDevice === modelData.path
-                                                           ? Theme.success : Theme.textMuted
+                                                    id: badgeLabel; anchors.centerIn: parent
+                                                    text: vaultController.selectedDevice === modelData.path ? "✓ SELECTED" : (modelData.isVault ? "USE VAULT" : "SELECT")
+                                                    color: vaultController.selectedDevice === modelData.path ? Theme.success : Theme.textMuted
                                                     font { pixelSize: 10; bold: true; family: "Inter" }
                                                 }
                                             }
-
-                                            // Name + description (fills space between icon and badge)
                                             Column {
-                                                anchors {
-                                                    left: devIcon.right; leftMargin: 12
-                                                    right: statusBadge.left; rightMargin: 10
-                                                    verticalCenter: parent.verticalCenter
+                                                anchors { 
+                                                    left: devIcon.right; 
+                                                    leftMargin: 12; 
+                                                    right: statusBadge.left; 
+                                                    rightMargin: 10; 
+                                                    verticalCenter: parent.verticalCenter 
                                                 }
                                                 spacing: 3
-                                                Text {
+                                                Text { 
                                                     width: parent.width
                                                     text: modelData.name
-                                                    color: Theme.textPrimary
+                                                    color: modelData.isVault ? Theme.success : Theme.textPrimary
                                                     font { pixelSize: 13; bold: true; family: "Inter" }
-                                                    elide: Text.ElideRight
-                                                    Behavior on color { ColorAnimation { duration: 250 } }
+                                                    elide: Text.ElideRight 
                                                 }
-                                                Text {
+                                                Text { 
                                                     width: parent.width
                                                     text: modelData.description
                                                     color: Theme.textSecondary
                                                     font { pixelSize: 11; family: "Inter" }
-                                                    elide: Text.ElideRight
-                                                    Behavior on color { ColorAnimation { duration: 250 } }
+                                                    elide: Text.ElideRight 
                                                 }
                                             }
                                         }
@@ -671,15 +687,13 @@ Item {
                     Row {
                         width: parent.width - wizardContentCol.leftPadding - wizardContentCol.rightPadding
                         spacing: 8
-                        Rectangle {
-                            width: (parent.width - 8) / 2; height: 4; radius: 2
-                            color: setupWizardLayout.currentIndex >= 0 ? Theme.accent : Theme.border
-                            Behavior on color { ColorAnimation { duration: 300 } }
-                        }
-                        Rectangle {
-                            width: (parent.width - 8) / 2; height: 4; radius: 2
-                            color: setupWizardLayout.currentIndex >= 1 ? Theme.accent : Theme.border
-                            Behavior on color { ColorAnimation { duration: 300 } }
+                        Repeater {
+                            model: 3
+                            Rectangle {
+                                width: (parent.width - 16) / 3; height: 4; radius: 2
+                                color: setupWizardLayout.currentIndex >= index ? Theme.accent : Theme.border
+                                Behavior on color { ColorAnimation { duration: 300 } }
+                            }
                         }
                     }
 
@@ -704,63 +718,68 @@ Item {
                                     color: Theme.textPrimary
                                     font { pixelSize: 14; bold: true; family: "Inter" }
                                 }
-                                Text {
-                                    text: "Configure your new vault. Choose a name and assign the Master Fingerprint ID that will have full ownership access."
-                                    color: Theme.textSecondary
-                                    font { pixelSize: 12; family: "Inter" }
-                                    width: parent.width
-                                    wrapMode: Text.Wrap
-                                }
-
+                                
                                 RowLayout {
-                                    width: parent.width
-                                    spacing: 16
-                                    
+                                    width: parent.width; spacing: 16
                                     Column {
-                                        spacing: 6
-                                        Layout.fillWidth: true
+                                        spacing: 6; Layout.fillWidth: true
                                         Text { text: "Vault Name"; color: Theme.textSecondary; font { pixelSize: 11; bold: true; family: "Inter" } }
                                         Rectangle {
-                                            width: parent.width; height: 38; radius: 8
-                                            color: Theme.bgInput
-                                            border.color: Theme.border; border.width: 1
-                                            TextInput {
+                                            width: parent.width; height: 38; radius: 8; color: Theme.bgInput; border.color: Theme.border; border.width: 1
+                                            TextInput { 
                                                 id: vaultNameInput
                                                 anchors { fill: parent; leftMargin: 12; rightMargin: 12 }
                                                 verticalAlignment: TextInput.AlignVCenter
                                                 color: Theme.textPrimary
                                                 font { pixelSize: 14; family: "Inter" }
-                                                text: "My Vault"
+                                                text: "My Vault" 
                                             }
                                         }
                                     }
-
                                     Column {
-                                        spacing: 6
-                                        Layout.preferredWidth: 120
+                                        spacing: 6; Layout.preferredWidth: 120
                                         Text { text: "Owner Finger ID"; color: Theme.textSecondary; font { pixelSize: 11; bold: true; family: "Inter" } }
                                         Rectangle {
-                                            width: parent.width; height: 38; radius: 8
-                                            color: Theme.bgInput
-                                            border.color: Theme.border; border.width: 1
-                                            TextInput {
+                                            width: parent.width; height: 38; radius: 8; color: Theme.bgInput; border.color: Theme.border; border.width: 1
+                                            TextInput { 
                                                 id: ownerIdInput
                                                 anchors { fill: parent; leftMargin: 12; rightMargin: 12 }
                                                 verticalAlignment: TextInput.AlignVCenter
                                                 color: Theme.textPrimary
                                                 font { pixelSize: 14; family: "Inter" }
                                                 text: "1"
-                                                validator: IntValidator { bottom: 1; top: 127 }
+                                                validator: IntValidator { bottom: 1; top: 127 } 
                                             }
                                         }
                                     }
                                 }
 
+                                Column {
+                                    spacing: 12; width: parent.width
+                                    visible: vaultController.selectedDevice.startsWith("/dev/")
+                                    Text { text: "Vault Storage Size"; color: Theme.textSecondary; font { pixelSize: 11; bold: true; family: "Inter" } }
+                                    RowLayout {
+                                        width: parent.width; spacing: 16
+                                        Slider {
+                                            id: vaultSizeSlider; Layout.fillWidth: true; from: 64
+                                            to: Math.max(64, vaultController.selectedDeviceCapacityMB - 128)
+                                            value: Math.min(2048, to); stepSize: 128
+                                        }
+                                        Rectangle {
+                                            width: 100; height: 38; radius: 8; color: Theme.bgInput; border.color: Theme.border; border.width: 1
+                                            Text { anchors.centerIn: parent; text: vaultSizeSlider.value >= 1024 ? (vaultSizeSlider.value / 1024).toFixed(1) + " GB" : vaultSizeSlider.value.toFixed(0) + " MB"; color: Theme.accent; font { pixelSize: 13; bold: true; family: "Inter" } }
+                                        }
+                                    }
+                                    Text {
+                                        text: "Selected: " + (vaultSizeSlider.value / 1024).toFixed(1) + " GB | Total Device: " + (vaultController.selectedDeviceCapacityMB / 1024).toFixed(1) + " GB"
+                                        color: Theme.textMuted; font { pixelSize: 10; family: "Inter" }
+                                    }
+                                }
                                 Rectangle { width: parent.width; height: 1; color: Theme.border }
                             }
                         }
 
-                        // ── STEP 2: Confirmation & Format ──
+                        // ── STEP 2: Normal Partition (Conditional) ──
                         Item {
                             width: parent.width
                             implicitHeight: step2Col.implicitHeight
@@ -770,64 +789,180 @@ Item {
                                 spacing: 16
 
                                 Text {
-                                    text: "Step 2: Biometric Authentication & Formatting"
+                                    text: "Step 2: Secondary Partition"
                                     color: Theme.textPrimary
                                     font { pixelSize: 14; bold: true; family: "Inter" }
                                 }
                                 Text {
-                                    text: "You are about to format the following device. This will ERASE ALL DATA. Once you click 'Start Setup', place your finger on the sensor to authenticate and begin formatting."
+                                    text: "The remaining " + ((vaultController.selectedDeviceCapacityMB - vaultSizeSlider.value) / 1024).toFixed(1) + " GB will be formatted as a standard storage partition."
                                     color: Theme.textSecondary
                                     font { pixelSize: 12; family: "Inter" }
                                     width: parent.width
                                     wrapMode: Text.Wrap
                                 }
 
+                                RowLayout {
+                                    width: parent.width
+                                    spacing: 16
+                                    Column {
+                                        spacing: 6
+                                        Layout.fillWidth: true
+                                        Text { 
+                                            text: "Partition Name"
+                                            color: Theme.textSecondary
+                                            font { pixelSize: 11; bold: true; family: "Inter" } 
+                                        }
+                                        Rectangle {
+                                            width: parent.width
+                                            height: 38
+                                            radius: 8
+                                            color: Theme.bgInput
+                                            border.color: Theme.border
+                                            border.width: 1
+                                            TextInput { 
+                                                id: normalNameInput
+                                                anchors { fill: parent; leftMargin: 12; rightMargin: 12 }
+                                                verticalAlignment: TextInput.AlignVCenter
+                                                color: Theme.textPrimary
+                                                font { pixelSize: 14; family: "Inter" }
+                                                text: "Normal" 
+                                            }
+                                        }
+                                    }
+                                    Column {
+                                        spacing: 6
+                                        Layout.preferredWidth: 140
+                                        Text { 
+                                            text: "Filesystem"
+                                            color: Theme.textSecondary
+                                            font { pixelSize: 11; bold: true; family: "Inter" } 
+                                        }
+                                        ComboBox {
+                                            id: normalFsCombo
+                                            model: ["exfat", "vfat", "ext4"]
+                                            Layout.fillWidth: true
+                                            currentIndex: 0
+                                        }
+                                    }
+                                }
+                                Rectangle { 
+                                    width: parent.width
+                                    height: 1
+                                    color: Theme.border 
+                                }
+                            }
+                        }
+
+                        // ── STEP 3: Summary ──
+                        Item {
+                            width: parent.width
+                            implicitHeight: step3Col.implicitHeight
+                            Column {
+                                id: step3Col
+                                width: parent.width
+                                spacing: 16
+
+                                Text {
+                                    text: "Step 3: Setup Summary"
+                                    color: Theme.textPrimary
+                                    font { pixelSize: 14; bold: true; family: "Inter" }
+                                }
+
                                 Rectangle {
-                                    width: parent.width; height: 60
-                                    color: Theme.dangerBg; radius: 8; border.color: Theme.danger; border.width: 1
-                                    Row {
-                                        anchors.centerIn: parent; spacing: 12
-                                        Text { text: "⚠"; font.pixelSize: 22; color: Theme.danger }
-                                        Column {
-                                            Text { text: "Target Device"; color: Theme.danger; font { pixelSize: 10; bold: true; family: "Inter" } }
-                                            Text { text: vaultController.selectedDevice; color: Theme.danger; font { pixelSize: 13; bold: true; family: "Courier New" } }
+                                    width: parent.width
+                                    height: summaryCol.implicitHeight + 24
+                                    color: Qt.rgba(1,1,1,0.03)
+                                    radius: 10
+                                    border.color: Theme.border
+                                    border.width: 1
+                                    Column {
+                                        id: summaryCol
+                                        anchors { fill: parent; margins: 12 }
+                                        spacing: 8
+                                        Text { 
+                                            text: "VAULT CONFIGURATION"
+                                            color: Theme.accent
+                                            font { pixelSize: 10; bold: true; family: "Inter" } 
+                                        }
+                                        Text { 
+                                            text: "• Target Device: " + vaultController.selectedDevice
+                                            color: Theme.textPrimary
+                                            font { pixelSize: 12; family: "Inter" } 
+                                        }
+                                        Text { 
+                                            text: "• Vault Name: " + vaultNameInput.text
+                                            color: Theme.textPrimary
+                                            font { pixelSize: 12; family: "Inter" } 
+                                        }
+                                        Text { 
+                                            text: "• Vault Size: " + (vaultSizeSlider.value / 1024).toFixed(1) + " GB"
+                                            color: Theme.textPrimary
+                                            font { pixelSize: 12; family: "Inter" } 
+                                        }
+                                        Text { 
+                                            text: "• Owner ID: " + ownerIdInput.text
+                                            color: Theme.textPrimary
+                                            font { pixelSize: 12; family: "Inter" } 
+                                        }
+                                        
+                                        Item { 
+                                            width: 1
+                                            height: 4 
+                                        }
+                                        Text { 
+                                            text: "NORMAL PARTITION"
+                                            color: Theme.warning
+                                            font { pixelSize: 10; bold: true; family: "Inter" }
+                                            visible: vaultSizeSlider.value < vaultSizeSlider.to
+                                        }
+                                        Text { 
+                                            text: "• Name: " + normalNameInput.text
+                                            color: Theme.textPrimary
+                                            font { pixelSize: 12; family: "Inter" }
+                                            visible: vaultSizeSlider.value < vaultSizeSlider.to
+                                        }
+                                        Text { 
+                                            text: "• Filesystem: " + normalFsCombo.currentText
+                                            color: Theme.textPrimary
+                                            font { pixelSize: 12; family: "Inter" }
+                                            visible: vaultSizeSlider.value < vaultSizeSlider.to
                                         }
                                     }
                                 }
 
-                                // Force format checkbox
                                 Rectangle {
                                     width: parent.width; height: 38; radius: 8
                                     color: forceCheckbox.checked ? Theme.dangerBg : Qt.rgba(1,1,1,0.04)
                                     border.color: forceCheckbox.checked ? Theme.danger : Theme.border
                                     border.width: 1
-
                                     Row {
-                                        anchors.centerIn: parent; spacing: 10
+                                        anchors.centerIn: parent
+                                        spacing: 10
                                         CheckBox { id: forceCheckbox; anchors.verticalCenter: parent.verticalCenter }
                                         Text {
-                                            text: "Force format (ignore existing data)"
+                                            text: "I understand all data on " + vaultController.selectedDevice + " will be ERASED."
                                             color: forceCheckbox.checked ? Theme.danger : Theme.textPrimary
-                                            font { pixelSize: 12; bold: forceCheckbox.checked; family: "Inter" }
+                                            font { pixelSize: 11; bold: forceCheckbox.checked; family: "Inter" }
                                             anchors.verticalCenter: parent.verticalCenter
                                         }
                                     }
                                 }
-
-                                Text {
-                                    id: setupResultText
-                                    width: parent.width
-                                    visible: false; height: visible ? implicitHeight : 0
-                                    wrapMode: Text.Wrap; horizontalAlignment: Text.AlignHCenter
-                                    font { pixelSize: 12; bold: true; family: "Inter" }
-                                }
-
-                                Rectangle { width: parent.width; height: 1; color: Theme.border }
                             }
                         }
                     }
 
-                    // Shared Wizard Buttons (Always at the bottom right of the dialog)
+                    Text {
+                        id: setupResultText
+                        width: parent.width
+                        visible: false
+                        height: visible ? implicitHeight : 0
+                        wrapMode: Text.Wrap
+                        horizontalAlignment: Text.AlignHCenter
+                        font { pixelSize: 12; bold: true; family: "Inter" }
+                        color: Theme.danger
+                    }
+
+                    // Shared Wizard Buttons
                     Item {
                         width: parent.width - wizardContentCol.leftPadding - wizardContentCol.rightPadding
                         height: 40
@@ -836,7 +971,7 @@ Item {
                             anchors.right: parent.right
                             spacing: 16
 
-                            // Left Button (Cancel or Back)
+                            // Back Button
                             Rectangle {
                                 width: 100; height: 38; radius: 19
                                 color: "transparent"; border.color: Theme.border; border.width: 1
@@ -848,23 +983,20 @@ Item {
                                 }
                                 MouseArea { 
                                     anchors.fill: parent; cursorShape: Qt.PointingHandCursor
-                                    onClicked: {
-                                        if (setupWizardLayout.currentIndex === 0) setupWarningDialog.close()
-                                        else setupWizardLayout.currentIndex = 0
-                                    }
+                                    onClicked: setupWarningDialog.handleBack()
                                 }
                             }
 
-                            // Right Button (Next or Start Setup)
+                            // Next/Start Button
                             Rectangle {
-                                width: setupWizardLayout.currentIndex === 0 ? 120 : 180; height: 38; radius: 19
-                                color: setupWizardLayout.currentIndex === 0 ? Theme.accent : Theme.danger
+                                width: setupWizardLayout.currentIndex === 2 ? 180 : 120; height: 38; radius: 19
+                                color: setupWizardLayout.currentIndex === 2 ? Theme.danger : Theme.accent
                                 Behavior on width { NumberAnimation { duration: 250; easing.type: Easing.OutCubic } }
                                 Behavior on color { ColorAnimation { duration: 250 } }
 
                                 Text { 
                                     anchors.centerIn: parent
-                                    text: setupWizardLayout.currentIndex === 0 ? "Next →" : "☝ Start Setup"
+                                    text: setupWizardLayout.currentIndex === 2 ? "☝ Start Setup" : "Next →"
                                     color: "white"
                                     font { pixelSize: 12; bold: true; family: "Inter" } 
                                 }
@@ -872,12 +1004,25 @@ Item {
                                     anchors.fill: parent; cursorShape: Qt.PointingHandCursor
                                     onClicked: {
                                         if (setupWizardLayout.currentIndex === 0) {
-                                            if (ownerIdInput.text !== "") setupWizardLayout.currentIndex = 1
+                                            if (vaultSizeSlider.value < vaultSizeSlider.to) {
+                                                setupWizardLayout.currentIndex = 1
+                                            } else {
+                                                setupWizardLayout.currentIndex = 2
+                                            }
+                                        } else if (setupWizardLayout.currentIndex === 1) {
+                                            setupWizardLayout.currentIndex = 2
                                         } else {
-                                            var oid = parseInt(ownerIdInput.text);
-                                            if (isNaN(oid)) oid = 1;
-                                            vaultController.setupVault(vaultController.selectedDevice, forceCheckbox.checked, oid);
-                                            setupWarningDialog.close();
+                                            var force = vaultController.isSelectedDeviceVault || forceCheckbox.checked
+                                            vaultController.setupVault(
+                                                vaultController.selectedDevice, 
+                                                force, 
+                                                parseInt(ownerIdInput.text), 
+                                                parseInt(vaultSizeSlider.value),
+                                                vaultNameInput.text,
+                                                normalNameInput.text,
+                                                normalFsCombo.currentText
+                                            )
+                                            setupWarningDialog.close()
                                         }
                                     }
                                 }
@@ -890,6 +1035,20 @@ Item {
 
         header: null
         footer: null
+
+        function handleBack() {
+            if (setupWizardLayout.currentIndex === 0) {
+                setupWarningDialog.close()
+            } else if (setupWizardLayout.currentIndex === 1) {
+                setupWizardLayout.currentIndex = 0
+            } else {
+                if (vaultSizeSlider.value < vaultSizeSlider.to) {
+                    setupWizardLayout.currentIndex = 1
+                } else {
+                    setupWizardLayout.currentIndex = 0
+                }
+            }
+        }
 
         onClosed: {
             forceCheckbox.checked = false

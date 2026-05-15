@@ -169,6 +169,51 @@ static int get_biometric_key(int finger_id, uint8_t *key_out)
     return 0;
 }
 
+/* ─── Device Resolution ─────────────────────────────────────────────────── */
+
+/**
+ * Cihazın LUKS olup olmadığını kontrol et.
+ * @return 0 evet, -1 hayır
+ */
+static int is_luks_device(const char *device)
+{
+    const char *args[] = {"cryptsetup", "isLuks", device, NULL};
+    return run_cmd(args);
+}
+
+/**
+ * Verilen cihaz yolunu "akıllı" şekilde çözümle.
+ * Eğer kullanıcı /dev/sdb verdiyse ve o LUKS değilse, /dev/sdb1'i dene.
+ */
+static void resolve_vault_device(const char *input, char *output, size_t maxlen)
+{
+    /* 1. Önce doğrudan girişi dene */
+    if (is_luks_device(input) == 0) {
+        strncpy(output, input, maxlen);
+        return;
+    }
+
+    /* 2. Bölüm 1'i dene (sdb -> sdb1) */
+    char p1[256];
+    snprintf(p1, sizeof(p1), "%s1", input);
+    if (is_luks_device(p1) == 0) {
+        printf("[vault_manager] Found LUKS on partition: %s\n", p1);
+        strncpy(output, p1, maxlen);
+        return;
+    }
+
+    /* 3. Loop cihazı bölümünü dene (loop0 -> loop0p1) */
+    snprintf(p1, sizeof(p1), "%sp1", input);
+    if (is_luks_device(p1) == 0) {
+        printf("[vault_manager] Found LUKS on loop partition: %s\n", p1);
+        strncpy(output, p1, maxlen);
+        return;
+    }
+
+    /* Bulunamadıysa orijinali bırak (hata mesajı cryptsetup'tan gelecek) */
+    strncpy(output, input, maxlen);
+}
+
 /* ─── Commands ───────────────────────────────────────────────────────────── */
 
 /**
@@ -238,10 +283,20 @@ static int check_device_status(const char *device)
  *   5. Mount → chown → unmount
  *   6. cryptsetup close
  */
-static int cmd_setup(const char *device, int finger_id, int force)
+static int cmd_setup(const char *device, int finger_id, int force, int partition_size_mb,
+                     const char *vault_name, const char *normal_name, const char *normal_fs)
 {
+    if (!vault_name) vault_name = "DigitalVault";
+    if (!normal_name) normal_name = "Normal";
+    if (!normal_fs) normal_fs = "exfat";
+
     printf("[vault_manager] ═══════════════════════════════════════\n");
     printf("[vault_manager] Setting up new vault on: %s %s\n", device, force ? "(FORCED)" : "");
+    printf("[vault_manager]   Vault Name  : %s\n", vault_name);
+    if (partition_size_mb > 0) {
+        printf("[vault_manager]   Normal Name : %s\n", normal_name);
+        printf("[vault_manager]   Normal FS   : %s\n", normal_fs);
+    }
     printf("[vault_manager] ═══════════════════════════════════════\n");
 
     /* 0. Disk güvenlik kontrolü */
@@ -261,6 +316,79 @@ static int cmd_setup(const char *device, int finger_id, int force)
         printf("[vault_manager] WARNING: Force flag detected. Overwriting existing data...\n");
     }
 
+    char target_device[256];
+    strncpy(target_device, device, sizeof(target_device));
+
+    /* 0.5 Partitioning (Optional) */
+    if (partition_size_mb > 0) {
+        printf("[vault_manager] Partitioning device: %s (Vault: %d MB)\n", device, partition_size_mb);
+        
+        /* 1. Wipe existing signatures */
+        const char *wipe_args[] = {"wipefs", "-a", device, NULL};
+        run_cmd(wipe_args);
+
+        /* 2. Create partition table */
+        const char *label_args[] = {"parted", "-s", device, "mklabel", "gpt", NULL};
+        if (run_cmd(label_args) != 0) {
+            fprintf(stderr, "[vault_manager] Failed to create partition table!\n");
+            return 1;
+        }
+
+        /* 3. Create vault partition (Partition 1) */
+        char size_str[32];
+        snprintf(size_str, sizeof(size_str), "%dMiB", partition_size_mb);
+        const char *part1_args[] = {"parted", "-s", device, "mkpart", "primary", "ext4", "1MiB", size_str, NULL};
+        if (run_cmd(part1_args) != 0) {
+            fprintf(stderr, "[vault_manager] Failed to create vault partition!\n");
+            return 1;
+        }
+
+        /* 4. Create normal partition (Partition 2) */
+        const char *part2_args[] = {"parted", "-s", device, "mkpart", "primary", "fat32", size_str, "100%", NULL};
+        if (run_cmd(part2_args) != 0) {
+            fprintf(stderr, "[vault_manager] Failed to create normal partition!\n");
+            return 1;
+        }
+
+        /* 5. Format partition 2 as exFAT */
+        printf("[vault_manager] Waiting for partitions to settle...\n");
+        usleep(1000000); // 1.0s for kernel to refresh
+        
+        char p1[270], p2[270];
+        // Handle loop device naming (loop0p1) vs disk naming (sdb1)
+        if (strstr(device, "loop")) {
+            snprintf(p1, sizeof(p1), "%sp1", device);
+            snprintf(p2, sizeof(p2), "%sp2", device);
+        } else {
+            snprintf(p1, sizeof(p1), "%s1", device);
+            snprintf(p2, sizeof(p2), "%s2", device);
+        }
+
+        printf("[vault_manager] Formatting normal partition: %s (%s)\n", p2, normal_fs);
+        if (strcmp(normal_fs, "exfat") == 0) {
+            const char *mkexfat_args[] = {"mkfs.exfat", "-L", normal_name, p2, NULL};
+            if (run_cmd(mkexfat_args) != 0) {
+                fprintf(stderr, "[vault_manager] Warning: exFAT format failed. Falling back to FAT32.\n");
+                const char *mkfat_args[] = {"mkfs.vfat", "-n", normal_name, p2, NULL};
+                run_cmd(mkfat_args);
+            }
+        } else if (strcmp(normal_fs, "vfat") == 0 || strcmp(normal_fs, "fat32") == 0) {
+            const char *mkfat_args[] = {"mkfs.vfat", "-n", normal_name, p2, NULL};
+            run_cmd(mkfat_args);
+        } else if (strcmp(normal_fs, "ext4") == 0) {
+            const char *mkext4_args[] = {"mkfs.ext4", "-L", normal_name, p2, NULL};
+            run_cmd(mkext4_args);
+        } else {
+            fprintf(stderr, "[vault_manager] Unknown filesystem type: %s. Using exFAT.\n", normal_fs);
+            const char *mkexfat_args[] = {"mkfs.exfat", "-L", normal_name, p2, NULL};
+            run_cmd(mkexfat_args);
+        }
+
+        // Update target for LUKS
+        strncpy(target_device, p1, sizeof(target_device));
+        printf("[vault_manager] Partitioning complete. Vault target: %s\n", target_device);
+    }
+
     /* 1. Biyometrik key al */
     uint8_t key[HAL_KEY_LEN];
     if (get_biometric_key(finger_id, key) != 0) return 1;
@@ -276,7 +404,7 @@ static int cmd_setup(const char *device, int finger_id, int force)
         "--key-file=-",
         "--keyfile-size", "32",
         "--batch-mode",
-        device, NULL
+        target_device, NULL
     };
 
     if (cryptsetup_with_key(fmt_args, key, HAL_KEY_LEN) != 0) {
@@ -292,7 +420,7 @@ static int cmd_setup(const char *device, int finger_id, int force)
         "--type",       "luks2",
         "--key-file=-",
         "--keyfile-size", "32",
-        device, MAPPER_NAME, NULL
+        target_device, MAPPER_NAME, NULL
     };
 
     if (cryptsetup_with_key(open_args, key, HAL_KEY_LEN) != 0) {
@@ -309,7 +437,7 @@ static int cmd_setup(const char *device, int finger_id, int force)
     printf("[vault_manager] Creating ext4 filesystem...\n");
     const char *mkfs_args[] = {
         "mkfs.ext4",
-        "-L", "DigitalVault",      /* Disk etiketi */
+        "-L", vault_name,           /* Disk etiketi */
         "-m", "1",                  /* %1 reserved (varsayılan %5 — USB için gereksiz) */
         MAPPER_PATH, NULL
     };
@@ -358,9 +486,10 @@ static int cmd_setup(const char *device, int finger_id, int force)
 
     printf("[vault_manager] ═══════════════════════════════════════\n");
     printf("[vault_manager] Vault setup complete!\n");
-    printf("[vault_manager]   Device : %s\n", device);
+    printf("[vault_manager]   Device : %s\n", target_device);
     printf("[vault_manager]   Cipher : AES-256-XTS (LUKS2)\n");
     printf("[vault_manager]   FS     : ext4\n");
+    printf("[vault_manager]   Label  : %s\n", vault_name);
     printf("[vault_manager] ═══════════════════════════════════════\n");
     return 0;
 }
@@ -370,13 +499,16 @@ static int cmd_setup(const char *device, int finger_id, int force)
  */
 static int cmd_open(const char *device, const char *mount_point, int finger_id)
 {
+    char resolved_device[256];
+    resolve_vault_device(device, resolved_device, sizeof(resolved_device));
+
     /* Zaten açık mı? */
     if (access(MAPPER_PATH, F_OK) == 0) {
         fprintf(stderr, "[vault_manager] Vault is already open!\n");
         return 1;
     }
 
-    printf("[vault_manager] Opening vault: %s → %s\n", device, mount_point);
+    printf("[vault_manager] Opening vault: %s → %s\n", resolved_device, mount_point);
 
     /* 1. Biyometrik key al */
     uint8_t key[HAL_KEY_LEN];
@@ -389,7 +521,7 @@ static int cmd_open(const char *device, const char *mount_point, int finger_id)
         "--type",       "luks2",
         "--key-file=-",
         "--keyfile-size", "32",
-        device, MAPPER_NAME, NULL
+        resolved_device, MAPPER_NAME, NULL
     };
 
     if (cryptsetup_with_key(open_args, key, HAL_KEY_LEN) != 0) {
@@ -455,32 +587,40 @@ static int cmd_close(const char *mount_point)
 {
     printf("[vault_manager] Locking vault...\n");
 
-    /* 1. Unmount */
-    printf("[vault_manager] Unmounting %s\n", mount_point);
-    /* 1. Unmount */
+    /* 1. Önce normal unmount dene */
     printf("[vault_manager] Unmounting %s\n", mount_point);
     const char *umount_args[] = {"umount", mount_point, NULL};
 
     if (run_cmd(umount_args) != 0) {
-        printf("[vault_manager] Mount is busy, attempting lazy unmount...\n");
-        const char *lazy_args[] = {"umount", "-l", mount_point, NULL};
-        if (run_cmd(lazy_args) != 0) {
-             fprintf(stderr, "[vault_manager] Error: Could not unmount device.\n");
-             return 1;
+        /* 2. Meşgulse, meşgul eden süreçleri öldür (fuser -mk) */
+        printf("[vault_manager] Vault is busy. Terminating processes using the mount point...\n");
+        const char *fuser_args[] = {"fuser", "-mk", mount_point, NULL};
+        run_cmd(fuser_args);
+
+        /* Biraz bekle ve tekrar dene */
+        usleep(500000); // 0.5s
+
+        if (run_cmd(umount_args) != 0) {
+            fprintf(stderr, "[vault_manager] Error: Could not unmount device even after forcing.\n");
+            return 1;
         }
     }
 
-    /* 2. LUKS kapat — kernel'daki key de silinir */
+    /* 3. LUKS kapat — kernel'daki key de silinir */
     printf("[vault_manager] Closing LUKS container...\n");
-    // --deferred: Cihaz meşgulse, tüm dosyalar kapandığında otomatik kapatır.
-    const char *close_args[] = {"cryptsetup", "close", "--deferred", MAPPER_NAME, NULL};
+    
+    /* 
+     * NOT: --deferred KULLANMIYORUZ. 
+     * Çünkü kullanıcı kilitlediğinde anahtarın anında RAM'den silinmesini istiyoruz.
+     */
+    const char *close_args[] = {"cryptsetup", "close", MAPPER_NAME, NULL};
 
     if (run_cmd(close_args) != 0) {
-        fprintf(stderr, "[vault_manager] Warning: LUKS container is still busy but will close once all files are released.\n");
-        return 0; // Yine de başarılı dönelim ki GUI kilitlendiğini bilsin.
+        fprintf(stderr, "[vault_manager] Warning: LUKS container is busy and could not be closed.\n");
+        return 1;
     }
 
-    printf("[vault_manager] ✓ Vault locked.\n");
+    printf("[vault_manager] ✓ Vault locked and encryption keys wiped from memory.\n");
     return 0;
 }
 
@@ -553,8 +693,11 @@ static int cryptsetup_addkey_pipe(const char *argv[],
  */
 static int cmd_addkey(const char *device, int owner_fid, int new_fid)
 {
+    char resolved_device[256];
+    resolve_vault_device(device, resolved_device, sizeof(resolved_device));
+
     printf("[vault_manager] ═══════════════════════════════════════\n");
-    printf("[vault_manager] Adding new access to: %s\n", device);
+    printf("[vault_manager] Adding new access to: %s\n", resolved_device);
     printf("[vault_manager] ═══════════════════════════════════════\n");
 
     /* 1. Sahip doğrulaması */
@@ -583,7 +726,7 @@ static int cmd_addkey(const char *device, int owner_fid, int new_fid)
         "--key-file", "-",
         "--new-keyfile-size", "32",
         "--key-file-size", "32",
-        device,
+        resolved_device,
         "-",  /* new key de stdin'den */
         NULL
     };
@@ -611,8 +754,11 @@ static int cmd_addkey(const char *device, int owner_fid, int new_fid)
  */
 static int cmd_killslot(const char *device, int owner_fid, int slot_num)
 {
+    char resolved_device[256];
+    resolve_vault_device(device, resolved_device, sizeof(resolved_device));
+
     printf("[vault_manager] ═══════════════════════════════════════\n");
-    printf("[vault_manager] Revoking access slot %d on: %s\n", slot_num, device);
+    printf("[vault_manager] Revoking access slot %d on: %s\n", slot_num, resolved_device);
     printf("[vault_manager] ═══════════════════════════════════════\n");
 
     /* Slot 0'ı silmeye izin verme — sahip her zaman kalmalı */
@@ -637,7 +783,7 @@ static int cmd_killslot(const char *device, int owner_fid, int slot_num)
     snprintf(slot_str, sizeof(slot_str), "%d", slot_num);
 
     const char *kill_args[] = {
-        "cryptsetup", "luksKillSlot", "-q", device, slot_str, NULL
+        "cryptsetup", "luksKillSlot", "-q", resolved_device, slot_str, NULL
     };
 
     if (run_cmd(kill_args) != 0) {
@@ -656,7 +802,10 @@ static int cmd_killslot(const char *device, int owner_fid, int slot_num)
  */
 static int cmd_listslots(const char *device)
 {
-    printf("[vault_manager] Scanning keyslots on: %s\n", device);
+    char resolved_device[256];
+    resolve_vault_device(device, resolved_device, sizeof(resolved_device));
+
+    printf("[vault_manager] Scanning keyslots on: %s\n", resolved_device);
 
     /* cryptsetup luksDump çıktısını oku ve keyslot satırlarını filtrele */
     int pipefd[2];
@@ -667,7 +816,7 @@ static int cmd_listslots(const char *device)
         close(pipefd[0]);
         dup2(pipefd[1], STDOUT_FILENO);
         close(pipefd[1]);
-        execlp("cryptsetup", "cryptsetup", "luksDump", device, NULL);
+        execlp("cryptsetup", "cryptsetup", "luksDump", resolved_device, NULL);
         _exit(127);
     }
 
@@ -756,17 +905,29 @@ int main(int argc, char *argv[])
         }
         int fid = 1;
         int force = 0;
+        int partition_size = 0;
+        const char *vault_name = "DigitalVault";
+        const char *normal_name = "Normal";
+        const char *normal_fs = "exfat";
 
         /* Parse optional arguments */
         for (int i = 3; i < argc; i++) {
             if (strcmp(argv[i], "--force") == 0) {
                 force = 1;
+            } else if (strcmp(argv[i], "--partition") == 0 && i + 1 < argc) {
+                partition_size = atoi(argv[++i]);
+            } else if (strcmp(argv[i], "--vault-name") == 0 && i + 1 < argc) {
+                vault_name = argv[++i];
+            } else if (strcmp(argv[i], "--normal-name") == 0 && i + 1 < argc) {
+                normal_name = argv[++i];
+            } else if (strcmp(argv[i], "--normal-fs") == 0 && i + 1 < argc) {
+                normal_fs = argv[++i];
             } else {
                 fid = atoi(argv[i]);
             }
         }
 
-        return cmd_setup(argv[2], fid, force);
+        return cmd_setup(argv[2], fid, force, partition_size, vault_name, normal_name, normal_fs);
     }
     else if (strcmp(cmd, "open") == 0) {
         if (argc < 4) {

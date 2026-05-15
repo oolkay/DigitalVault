@@ -1,322 +1,1212 @@
 [
     {
-        "level": "WARNING",
-        "message": "Access revoked for Fingerprint ID: 2",
-        "time": "2026-05-10 21:25:03"
-    },
-    {
-        "level": "SUCCESS",
-        "message": "New fingerprint enrolled (ID: 2)",
-        "time": "2026-05-10 21:25:02"
-    },
-    {
-        "level": "ERROR",
-        "message": "Failed to open vault (exit code: 1)",
-        "time": "2026-05-10 21:19:18"
-    },
-    {
-        "level": "SUCCESS",
-        "message": "Biometric verification passed",
-        "time": "2026-05-10 21:19:18"
-    },
-    {
-        "level": "ERROR",
-        "message": "[vault_manager] LUKS open failed! Wrong fingerprint or not a LUKS device.",
-        "time": "2026-05-10 21:19:18"
-    },
-    {
-        "level": "INFO",
-        "message": "Starting LUKS unlock for: /dev/sda",
-        "time": "2026-05-10 21:19:18"
-    },
-    {
         "level": "SUCCESS",
         "message": "Vault locked. LUKS keys cleared from kernel.",
-        "time": "2026-05-10 21:19:03"
+        "time": "2026-05-16 02:00:25"
     },
     {
         "level": "INFO",
         "message": "Locking vault and clearing kernel keys...",
-        "time": "2026-05-10 21:19:03"
+        "time": "2026-05-16 02:00:21"
+    },
+    {
+        "level": "ERROR",
+        "message": "Failed to close vault (exit code: -1)",
+        "time": "2026-05-16 01:58:06"
+    },
+    {
+        "level": "INFO",
+        "message": "Locking vault and clearing kernel keys...",
+        "time": "2026-05-16 01:57:56"
     },
     {
         "level": "WARNING",
         "message": "Inactivity timeout reached. Auto-locking vault...",
-        "time": "2026-05-10 21:19:03"
+        "time": "2026-05-16 01:57:56"
     },
     {
         "level": "SUCCESS",
         "message": "Vault decrypted and mounted at /home/oolkay/VaultMount",
-        "time": "2026-05-10 21:18:02"
+        "time": "2026-05-16 01:52:56"
     },
     {
         "level": "INFO",
         "message": "Encryption key cleared from memory",
-        "time": "2026-05-10 21:18:02"
+        "time": "2026-05-16 01:52:56"
     },
     {
         "level": "SUCCESS",
         "message": "Biometric verification passed",
-        "time": "2026-05-10 21:18:02"
+        "time": "2026-05-16 01:52:56"
     },
     {
         "level": "INFO",
-        "message": "Starting LUKS unlock for: /dev/sdb",
-        "time": "2026-05-10 21:17:53"
-    },
-    {
-        "level": "INFO",
-        "message": "Auto-lock timeout changed to 1 minutes",
-        "time": "2026-05-10 21:17:42"
+        "message": "Starting LUKS unlock for: /dev/sdb1",
+        "time": "2026-05-16 01:52:51"
     },
     {
         "level": "SUCCESS",
         "message": "Vault locked. LUKS keys cleared from kernel.",
-        "time": "2026-05-10 21:16:09"
+        "time": "2026-05-16 01:48:24"
     },
     {
         "level": "INFO",
         "message": "Locking vault and clearing kernel keys...",
-        "time": "2026-05-10 21:16:08"
+        "time": "2026-05-16 01:48:23"
     },
     {
         "level": "SUCCESS",
         "message": "Vault decrypted and mounted at /home/oolkay/VaultMount",
-        "time": "2026-05-10 21:13:12"
+        "time": "2026-05-16 01:48:16"
     },
     {
         "level": "INFO",
         "message": "Encryption key cleared from memory",
-        "time": "2026-05-10 21:13:12"
+        "time": "2026-05-16 01:48:16"
     },
     {
         "level": "SUCCESS",
         "message": "Biometric verification passed",
-        "time": "2026-05-10 21:13:12"
+        "time": "2026-05-16 01:48:16"
     },
     {
         "level": "INFO",
-        "message": "Starting LUKS unlock for: /dev/sdb",
-        "time": "2026-05-10 21:13:05"
+        "message": "Starting LUKS unlock for: /dev/sdb1",
+        "time": "2026-05-16 01:48:11"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault locked. LUKS keys cleared from kernel.",
+        "time": "2026-05-16 01:48:08"
     },
     {
         "level": "INFO",
-        "message": "Auto-lock timeout changed to 1 minutes",
-        "time": "2026-05-10 21:12:59"
+        "message": "Locking vault and clearing kernel keys...",
+        "time": "2026-05-16 01:48:05"
     },
     {
         "level": "ERROR",
-        "message": "Vault setup failed on: /dev/loop16 (exit 126)",
-        "time": "2026-05-10 21:08:07"
-    },
-    {
-        "level": "INFO",
-        "message": "Formatting new LUKS vault on: /dev/loop16 ",
-        "time": "2026-05-10 21:08:05"
-    },
-    {
-        "level": "SUCCESS",
-        "message": "Vault locked. LUKS keys cleared from kernel.",
-        "time": "2026-05-10 21:07:05"
+        "message": "Failed to close vault (exit code: 126)",
+        "time": "2026-05-16 01:48:04"
     },
     {
         "level": "INFO",
         "message": "Locking vault and clearing kernel keys...",
-        "time": "2026-05-10 21:07:05"
+        "time": "2026-05-16 01:48:03"
     },
     {
         "level": "SUCCESS",
         "message": "Vault decrypted and mounted at /home/oolkay/VaultMount",
-        "time": "2026-05-10 21:06:58"
+        "time": "2026-05-16 01:43:15"
     },
     {
         "level": "INFO",
         "message": "Encryption key cleared from memory",
-        "time": "2026-05-10 21:06:58"
+        "time": "2026-05-16 01:43:15"
     },
     {
         "level": "SUCCESS",
         "message": "Biometric verification passed",
-        "time": "2026-05-10 21:06:58"
+        "time": "2026-05-16 01:43:15"
     },
     {
         "level": "INFO",
-        "message": "Starting LUKS unlock for: /dev/loop16",
-        "time": "2026-05-10 21:06:56"
-    },
-    {
-        "level": "SUCCESS",
-        "message": "Vault setup complete: /dev/loop16",
-        "time": "2026-05-10 21:06:52"
-    },
-    {
-        "level": "INFO",
-        "message": "Formatting new LUKS vault on: /dev/loop16 ",
-        "time": "2026-05-10 21:06:42"
+        "message": "Starting LUKS unlock for: /dev/sdb1",
+        "time": "2026-05-16 01:43:11"
     },
     {
         "level": "SUCCESS",
         "message": "Vault locked. LUKS keys cleared from kernel.",
-        "time": "2026-05-10 21:01:19"
+        "time": "2026-05-16 01:42:13"
     },
     {
         "level": "INFO",
         "message": "Locking vault and clearing kernel keys...",
-        "time": "2026-05-10 21:01:19"
+        "time": "2026-05-16 01:42:12"
     },
     {
         "level": "SUCCESS",
         "message": "Vault decrypted and mounted at /home/oolkay/VaultMount",
-        "time": "2026-05-10 21:01:04"
+        "time": "2026-05-16 01:42:09"
     },
     {
         "level": "INFO",
         "message": "Encryption key cleared from memory",
-        "time": "2026-05-10 21:01:04"
+        "time": "2026-05-16 01:42:09"
     },
     {
         "level": "SUCCESS",
         "message": "Biometric verification passed",
-        "time": "2026-05-10 21:01:04"
+        "time": "2026-05-16 01:42:09"
     },
     {
         "level": "INFO",
-        "message": "Starting LUKS unlock for: /dev/sdb",
-        "time": "2026-05-10 21:01:01"
+        "message": "Starting LUKS unlock for: /dev/sdb1",
+        "time": "2026-05-16 01:42:05"
     },
     {
         "level": "SUCCESS",
         "message": "Vault locked. LUKS keys cleared from kernel.",
-        "time": "2026-05-10 20:59:16"
+        "time": "2026-05-16 01:41:00"
     },
     {
         "level": "INFO",
         "message": "Locking vault and clearing kernel keys...",
-        "time": "2026-05-10 20:59:13"
+        "time": "2026-05-16 01:41:00"
     },
     {
         "level": "SUCCESS",
         "message": "Vault decrypted and mounted at /home/oolkay/VaultMount",
-        "time": "2026-05-10 20:58:53"
+        "time": "2026-05-16 01:40:57"
     },
     {
         "level": "INFO",
         "message": "Encryption key cleared from memory",
-        "time": "2026-05-10 20:58:53"
+        "time": "2026-05-16 01:40:57"
     },
     {
         "level": "SUCCESS",
         "message": "Biometric verification passed",
-        "time": "2026-05-10 20:58:53"
+        "time": "2026-05-16 01:40:57"
     },
     {
         "level": "INFO",
-        "message": "Starting LUKS unlock for: /dev/sdb",
-        "time": "2026-05-10 20:58:42"
+        "message": "Starting LUKS unlock for: /dev/sdb1",
+        "time": "2026-05-16 01:40:54"
     },
     {
         "level": "SUCCESS",
         "message": "Vault locked. LUKS keys cleared from kernel.",
-        "time": "2026-05-10 20:48:04"
+        "time": "2026-05-16 01:40:53"
     },
     {
         "level": "INFO",
         "message": "Locking vault and clearing kernel keys...",
-        "time": "2026-05-10 20:48:04"
+        "time": "2026-05-16 01:40:52"
     },
     {
         "level": "SUCCESS",
         "message": "Vault decrypted and mounted at /home/oolkay/VaultMount",
-        "time": "2026-05-10 20:47:40"
+        "time": "2026-05-16 01:40:50"
     },
     {
         "level": "INFO",
         "message": "Encryption key cleared from memory",
-        "time": "2026-05-10 20:47:40"
+        "time": "2026-05-16 01:40:50"
     },
     {
         "level": "SUCCESS",
         "message": "Biometric verification passed",
-        "time": "2026-05-10 20:47:40"
+        "time": "2026-05-16 01:40:50"
     },
     {
         "level": "INFO",
-        "message": "Starting LUKS unlock for: /dev/sdb",
-        "time": "2026-05-10 20:47:35"
+        "message": "Starting LUKS unlock for: /dev/sdb1",
+        "time": "2026-05-16 01:40:46"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault locked. LUKS keys cleared from kernel.",
+        "time": "2026-05-16 01:40:43"
+    },
+    {
+        "level": "INFO",
+        "message": "Locking vault and clearing kernel keys...",
+        "time": "2026-05-16 01:40:37"
     },
     {
         "level": "ERROR",
-        "message": "Failed to open vault (exit code: 126)",
-        "time": "2026-05-10 20:47:32"
-    },
-    {
-        "level": "INFO",
-        "message": "Starting LUKS unlock for: vault.img",
-        "time": "2026-05-10 20:47:30"
-    },
-    {
-        "level": "SUCCESS",
-        "message": "Vault locked. LUKS keys cleared from kernel.",
-        "time": "2026-05-10 20:41:22"
+        "message": "Failed to close vault (exit code: 126)",
+        "time": "2026-05-16 01:38:20"
     },
     {
         "level": "INFO",
         "message": "Locking vault and clearing kernel keys...",
-        "time": "2026-05-10 20:41:22"
+        "time": "2026-05-16 01:38:19"
+    },
+    {
+        "level": "ERROR",
+        "message": "Failed to close vault (exit code: 126)",
+        "time": "2026-05-16 01:38:08"
+    },
+    {
+        "level": "INFO",
+        "message": "Locking vault and clearing kernel keys...",
+        "time": "2026-05-16 01:38:07"
+    },
+    {
+        "level": "WARNING",
+        "message": "Inactivity timeout reached. Auto-locking vault...",
+        "time": "2026-05-16 01:38:07"
     },
     {
         "level": "INFO",
         "message": "Opened terminal at /home/oolkay/VaultMount",
-        "time": "2026-05-10 20:41:00"
+        "time": "2026-05-16 01:33:07"
     },
     {
         "level": "SUCCESS",
         "message": "Vault decrypted and mounted at /home/oolkay/VaultMount",
-        "time": "2026-05-10 20:40:56"
+        "time": "2026-05-16 01:32:50"
     },
     {
         "level": "INFO",
         "message": "Encryption key cleared from memory",
-        "time": "2026-05-10 20:40:56"
+        "time": "2026-05-16 01:32:50"
     },
     {
         "level": "SUCCESS",
         "message": "Biometric verification passed",
-        "time": "2026-05-10 20:40:56"
+        "time": "2026-05-16 01:32:50"
     },
     {
         "level": "INFO",
-        "message": "Starting LUKS unlock for: /dev/sdb",
-        "time": "2026-05-10 20:40:50"
+        "message": "Starting LUKS unlock for: /dev/sdb1",
+        "time": "2026-05-16 01:32:44"
     },
     {
         "level": "SUCCESS",
         "message": "Vault locked. LUKS keys cleared from kernel.",
-        "time": "2026-05-10 20:37:29"
+        "time": "2026-05-16 01:28:08"
     },
     {
         "level": "INFO",
         "message": "Locking vault and clearing kernel keys...",
-        "time": "2026-05-10 20:37:27"
+        "time": "2026-05-16 01:28:08"
     },
     {
         "level": "SUCCESS",
         "message": "Vault decrypted and mounted at /home/oolkay/VaultMount",
-        "time": "2026-05-10 20:37:08"
+        "time": "2026-05-16 01:24:12"
     },
     {
         "level": "INFO",
         "message": "Encryption key cleared from memory",
-        "time": "2026-05-10 20:37:08"
+        "time": "2026-05-16 01:24:12"
     },
     {
         "level": "SUCCESS",
         "message": "Biometric verification passed",
-        "time": "2026-05-10 20:37:08"
+        "time": "2026-05-16 01:24:12"
+    },
+    {
+        "level": "INFO",
+        "message": "Starting LUKS unlock for: /dev/sdb1",
+        "time": "2026-05-16 01:24:03"
+    },
+    {
+        "level": "ERROR",
+        "message": "Failed to open vault (exit code: 126)",
+        "time": "2026-05-16 01:24:02"
+    },
+    {
+        "level": "INFO",
+        "message": "Starting LUKS unlock for: /dev/sdb1",
+        "time": "2026-05-16 01:24:01"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault locked. LUKS keys cleared from kernel.",
+        "time": "2026-05-16 01:05:15"
+    },
+    {
+        "level": "INFO",
+        "message": "Locking vault and clearing kernel keys...",
+        "time": "2026-05-16 01:05:14"
+    },
+    {
+        "level": "CRITICAL",
+        "message": "HAL Disconnected! Emergency locking for security.",
+        "time": "2026-05-16 01:05:14"
+    },
+    {
+        "level": "INFO",
+        "message": "Opened vault in file manager",
+        "time": "2026-05-16 01:05:10"
+    },
+    {
+        "level": "INFO",
+        "message": "Opened terminal at /home/oolkay/VaultMount",
+        "time": "2026-05-16 01:05:09"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault decrypted and mounted at /home/oolkay/VaultMount",
+        "time": "2026-05-16 01:05:08"
+    },
+    {
+        "level": "INFO",
+        "message": "Encryption key cleared from memory",
+        "time": "2026-05-16 01:05:08"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Biometric verification passed",
+        "time": "2026-05-16 01:05:08"
+    },
+    {
+        "level": "INFO",
+        "message": "Starting LUKS unlock for: /dev/sdb1",
+        "time": "2026-05-16 01:05:04"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault locked. LUKS keys cleared from kernel.",
+        "time": "2026-05-16 01:04:58"
+    },
+    {
+        "level": "INFO",
+        "message": "Locking vault and clearing kernel keys...",
+        "time": "2026-05-16 01:04:57"
+    },
+    {
+        "level": "INFO",
+        "message": "Opened terminal at /home/oolkay/VaultMount",
+        "time": "2026-05-16 01:04:50"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault decrypted and mounted at /home/oolkay/VaultMount",
+        "time": "2026-05-16 01:04:47"
+    },
+    {
+        "level": "INFO",
+        "message": "Encryption key cleared from memory",
+        "time": "2026-05-16 01:04:47"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Biometric verification passed",
+        "time": "2026-05-16 01:04:47"
+    },
+    {
+        "level": "INFO",
+        "message": "Starting LUKS unlock for: /dev/sdb1",
+        "time": "2026-05-16 01:04:41"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault locked. LUKS keys cleared from kernel.",
+        "time": "2026-05-16 01:02:07"
+    },
+    {
+        "level": "INFO",
+        "message": "Locking vault and clearing kernel keys...",
+        "time": "2026-05-16 01:02:07"
+    },
+    {
+        "level": "CRITICAL",
+        "message": "HAL Disconnected! Emergency locking for security.",
+        "time": "2026-05-16 01:02:07"
+    },
+    {
+        "level": "INFO",
+        "message": "Opened terminal at /home/oolkay/VaultMount",
+        "time": "2026-05-16 01:02:01"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault decrypted and mounted at /home/oolkay/VaultMount",
+        "time": "2026-05-16 01:01:58"
+    },
+    {
+        "level": "INFO",
+        "message": "Encryption key cleared from memory",
+        "time": "2026-05-16 01:01:58"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Biometric verification passed",
+        "time": "2026-05-16 01:01:58"
+    },
+    {
+        "level": "INFO",
+        "message": "Starting LUKS unlock for: /dev/sdb1",
+        "time": "2026-05-16 01:01:55"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault locked. LUKS keys cleared from kernel.",
+        "time": "2026-05-16 01:01:47"
+    },
+    {
+        "level": "INFO",
+        "message": "Locking vault and clearing kernel keys...",
+        "time": "2026-05-16 01:01:47"
+    },
+    {
+        "level": "CRITICAL",
+        "message": "HAL Disconnected! Emergency locking for security.",
+        "time": "2026-05-16 01:01:47"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault decrypted and mounted at /home/oolkay/VaultMount",
+        "time": "2026-05-16 01:01:44"
+    },
+    {
+        "level": "INFO",
+        "message": "Encryption key cleared from memory",
+        "time": "2026-05-16 01:01:44"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Biometric verification passed",
+        "time": "2026-05-16 01:01:44"
+    },
+    {
+        "level": "INFO",
+        "message": "Starting LUKS unlock for: /dev/sdb1",
+        "time": "2026-05-16 01:01:41"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault locked. LUKS keys cleared from kernel.",
+        "time": "2026-05-16 01:01:31"
+    },
+    {
+        "level": "INFO",
+        "message": "Locking vault and clearing kernel keys...",
+        "time": "2026-05-16 01:01:31"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault decrypted and mounted at /home/oolkay/VaultMount",
+        "time": "2026-05-16 01:01:25"
+    },
+    {
+        "level": "INFO",
+        "message": "Encryption key cleared from memory",
+        "time": "2026-05-16 01:01:25"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Biometric verification passed",
+        "time": "2026-05-16 01:01:25"
+    },
+    {
+        "level": "INFO",
+        "message": "Starting LUKS unlock for: /dev/sdb1",
+        "time": "2026-05-16 01:01:22"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault locked. LUKS keys cleared from kernel.",
+        "time": "2026-05-16 01:01:03"
+    },
+    {
+        "level": "INFO",
+        "message": "Locking vault and clearing kernel keys...",
+        "time": "2026-05-16 01:01:03"
+    },
+    {
+        "level": "CRITICAL",
+        "message": "HAL Disconnected! Emergency locking for security.",
+        "time": "2026-05-16 01:01:03"
+    },
+    {
+        "level": "INFO",
+        "message": "Opened terminal at /home/oolkay/VaultMount",
+        "time": "2026-05-16 01:00:57"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault decrypted and mounted at /home/oolkay/VaultMount",
+        "time": "2026-05-16 01:00:55"
+    },
+    {
+        "level": "INFO",
+        "message": "Encryption key cleared from memory",
+        "time": "2026-05-16 01:00:55"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Biometric verification passed",
+        "time": "2026-05-16 01:00:55"
+    },
+    {
+        "level": "INFO",
+        "message": "Starting LUKS unlock for: /dev/sdb1",
+        "time": "2026-05-16 01:00:52"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault locked. LUKS keys cleared from kernel.",
+        "time": "2026-05-16 01:00:01"
+    },
+    {
+        "level": "INFO",
+        "message": "Locking vault and clearing kernel keys...",
+        "time": "2026-05-16 01:00:01"
+    },
+    {
+        "level": "CRITICAL",
+        "message": "HAL Disconnected! Emergency locking for security.",
+        "time": "2026-05-16 01:00:01"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault decrypted and mounted at /home/oolkay/VaultMount",
+        "time": "2026-05-16 00:59:58"
+    },
+    {
+        "level": "INFO",
+        "message": "Encryption key cleared from memory",
+        "time": "2026-05-16 00:59:58"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Biometric verification passed",
+        "time": "2026-05-16 00:59:58"
+    },
+    {
+        "level": "INFO",
+        "message": "Starting LUKS unlock for: /dev/sdb1",
+        "time": "2026-05-16 00:59:54"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault locked. LUKS keys cleared from kernel.",
+        "time": "2026-05-16 00:59:41"
+    },
+    {
+        "level": "INFO",
+        "message": "Locking vault and clearing kernel keys...",
+        "time": "2026-05-16 00:59:41"
+    },
+    {
+        "level": "CRITICAL",
+        "message": "HAL Disconnected! Emergency locking for security.",
+        "time": "2026-05-16 00:59:41"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault decrypted and mounted at /home/oolkay/VaultMount",
+        "time": "2026-05-16 00:59:35"
+    },
+    {
+        "level": "INFO",
+        "message": "Encryption key cleared from memory",
+        "time": "2026-05-16 00:59:35"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Biometric verification passed",
+        "time": "2026-05-16 00:59:35"
+    },
+    {
+        "level": "INFO",
+        "message": "Starting LUKS unlock for: /dev/sdb1",
+        "time": "2026-05-16 00:59:27"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault locked. LUKS keys cleared from kernel.",
+        "time": "2026-05-16 00:39:25"
+    },
+    {
+        "level": "INFO",
+        "message": "Locking vault and clearing kernel keys...",
+        "time": "2026-05-16 00:39:25"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault decrypted and mounted at /home/oolkay/VaultMount",
+        "time": "2026-05-16 00:39:02"
+    },
+    {
+        "level": "INFO",
+        "message": "Encryption key cleared from memory",
+        "time": "2026-05-16 00:39:02"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Biometric verification passed",
+        "time": "2026-05-16 00:39:02"
+    },
+    {
+        "level": "INFO",
+        "message": "Starting LUKS unlock for: /dev/sdb1",
+        "time": "2026-05-16 00:38:55"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault locked. LUKS keys cleared from kernel.",
+        "time": "2026-05-16 00:33:58"
+    },
+    {
+        "level": "INFO",
+        "message": "Locking vault and clearing kernel keys...",
+        "time": "2026-05-16 00:33:57"
+    },
+    {
+        "level": "INFO",
+        "message": "Opened terminal at /home/oolkay/VaultMount",
+        "time": "2026-05-16 00:33:38"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault decrypted and mounted at /home/oolkay/VaultMount",
+        "time": "2026-05-16 00:33:16"
+    },
+    {
+        "level": "INFO",
+        "message": "Encryption key cleared from memory",
+        "time": "2026-05-16 00:33:16"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Biometric verification passed",
+        "time": "2026-05-16 00:33:16"
+    },
+    {
+        "level": "INFO",
+        "message": "Starting LUKS unlock for: /dev/sdb1",
+        "time": "2026-05-16 00:33:06"
+    },
+    {
+        "level": "ERROR",
+        "message": "Failed to open vault (exit code: 1)",
+        "time": "2026-05-16 00:22:35"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Biometric verification passed",
+        "time": "2026-05-16 00:22:35"
+    },
+    {
+        "level": "ERROR",
+        "message": "[vault_manager] LUKS open failed! Wrong fingerprint or not a LUKS device.",
+        "time": "2026-05-16 00:22:35"
     },
     {
         "level": "INFO",
         "message": "Starting LUKS unlock for: /dev/sdb",
-        "time": "2026-05-10 20:37:01"
+        "time": "2026-05-16 00:22:35"
+    },
+    {
+        "level": "ERROR",
+        "message": "Vault setup failed on: /dev/sdb (exit 1)",
+        "time": "2026-05-16 00:18:39"
+    },
+    {
+        "level": "INFO",
+        "message": "Formatting new LUKS vault on: /dev/sdb (FORCED)",
+        "time": "2026-05-16 00:18:39"
+    },
+    {
+        "level": "ERROR",
+        "message": "Failed to open vault (exit code: 1)",
+        "time": "2026-05-16 00:18:31"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Biometric verification passed",
+        "time": "2026-05-16 00:18:31"
+    },
+    {
+        "level": "ERROR",
+        "message": "[vault_manager] LUKS open failed! Wrong fingerprint or not a LUKS device.",
+        "time": "2026-05-16 00:18:31"
+    },
+    {
+        "level": "INFO",
+        "message": "Starting LUKS unlock for: /dev/sdb",
+        "time": "2026-05-16 00:18:31"
+    },
+    {
+        "level": "ERROR",
+        "message": "Vault setup failed on: /dev/sdb (exit 1)",
+        "time": "2026-05-16 00:18:23"
+    },
+    {
+        "level": "INFO",
+        "message": "Formatting new LUKS vault on: /dev/sdb (FORCED)",
+        "time": "2026-05-16 00:18:23"
+    },
+    {
+        "level": "ERROR",
+        "message": "Failed to open vault (exit code: 1)",
+        "time": "2026-05-16 00:18:17"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Biometric verification passed",
+        "time": "2026-05-16 00:18:17"
+    },
+    {
+        "level": "ERROR",
+        "message": "[vault_manager] LUKS open failed! Wrong fingerprint or not a LUKS device.",
+        "time": "2026-05-16 00:18:17"
+    },
+    {
+        "level": "INFO",
+        "message": "Starting LUKS unlock for: /dev/sdb",
+        "time": "2026-05-16 00:18:16"
+    },
+    {
+        "level": "ERROR",
+        "message": "Failed to open vault (exit code: 1)",
+        "time": "2026-05-16 00:18:06"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Biometric verification passed",
+        "time": "2026-05-16 00:18:06"
+    },
+    {
+        "level": "ERROR",
+        "message": "[vault_manager] LUKS open failed! Wrong fingerprint or not a LUKS device.",
+        "time": "2026-05-16 00:18:06"
+    },
+    {
+        "level": "INFO",
+        "message": "Starting LUKS unlock for: /dev/sdb",
+        "time": "2026-05-16 00:18:03"
+    },
+    {
+        "level": "ERROR",
+        "message": "Vault setup failed on: /dev/sdb (exit 1)",
+        "time": "2026-05-16 00:11:17"
+    },
+    {
+        "level": "INFO",
+        "message": "Formatting new LUKS vault on: /dev/sdb (FORCED)",
+        "time": "2026-05-16 00:11:16"
+    },
+    {
+        "level": "ERROR",
+        "message": "Failed to open vault (exit code: 1)",
+        "time": "2026-05-16 00:11:10"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Biometric verification passed",
+        "time": "2026-05-16 00:11:10"
+    },
+    {
+        "level": "ERROR",
+        "message": "[vault_manager] LUKS open failed! Wrong fingerprint or not a LUKS device.",
+        "time": "2026-05-16 00:11:10"
+    },
+    {
+        "level": "INFO",
+        "message": "Starting LUKS unlock for: /dev/sdb",
+        "time": "2026-05-16 00:11:10"
+    },
+    {
+        "level": "ERROR",
+        "message": "Vault setup failed on: /dev/sdb (exit 1)",
+        "time": "2026-05-16 00:09:56"
+    },
+    {
+        "level": "INFO",
+        "message": "Formatting new LUKS vault on: /dev/sdb (FORCED)",
+        "time": "2026-05-16 00:09:55"
+    },
+    {
+        "level": "ERROR",
+        "message": "Failed to open vault (exit code: 1)",
+        "time": "2026-05-16 00:09:23"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Biometric verification passed",
+        "time": "2026-05-16 00:09:23"
+    },
+    {
+        "level": "ERROR",
+        "message": "[vault_manager] LUKS open failed! Wrong fingerprint or not a LUKS device.",
+        "time": "2026-05-16 00:09:23"
+    },
+    {
+        "level": "INFO",
+        "message": "Starting LUKS unlock for: /dev/sdb",
+        "time": "2026-05-16 00:09:23"
+    },
+    {
+        "level": "ERROR",
+        "message": "Failed to open vault (exit code: 1)",
+        "time": "2026-05-16 00:08:34"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Biometric verification passed",
+        "time": "2026-05-16 00:08:34"
+    },
+    {
+        "level": "ERROR",
+        "message": "[vault_manager] LUKS open failed! Wrong fingerprint or not a LUKS device.",
+        "time": "2026-05-16 00:08:34"
+    },
+    {
+        "level": "INFO",
+        "message": "Starting LUKS unlock for: /dev/sdb",
+        "time": "2026-05-16 00:08:30"
+    },
+    {
+        "level": "ERROR",
+        "message": "Failed to open vault (exit code: 1)",
+        "time": "2026-05-15 20:15:46"
+    },
+    {
+        "level": "INFO",
+        "message": "Starting LUKS unlock for: /dev/sdc",
+        "time": "2026-05-15 20:15:43"
+    },
+    {
+        "level": "ERROR",
+        "message": "Failed to open vault (exit code: 1)",
+        "time": "2026-05-15 20:14:28"
+    },
+    {
+        "level": "INFO",
+        "message": "Starting LUKS unlock for: /dev/sdb",
+        "time": "2026-05-15 20:14:27"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault setup complete: /dev/sdb",
+        "time": "2026-05-15 20:14:16"
+    },
+    {
+        "level": "INFO",
+        "message": "Formatting new LUKS vault on: /dev/sdb (FORCED)",
+        "time": "2026-05-15 20:12:47"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault setup complete: /dev/sdb",
+        "time": "2026-05-15 20:09:51"
+    },
+    {
+        "level": "INFO",
+        "message": "Formatting new LUKS vault on: /dev/sdb (FORCED)",
+        "time": "2026-05-15 20:08:25"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault locked. LUKS keys cleared from kernel.",
+        "time": "2026-05-15 20:08:08"
+    },
+    {
+        "level": "INFO",
+        "message": "Locking vault and clearing kernel keys...",
+        "time": "2026-05-15 20:08:08"
+    },
+    {
+        "level": "INFO",
+        "message": "Opened vault in file manager",
+        "time": "2026-05-15 20:08:02"
+    },
+    {
+        "level": "INFO",
+        "message": "Opened vault in file manager",
+        "time": "2026-05-15 20:07:57"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault decrypted and mounted at /home/oolkay/VaultMount",
+        "time": "2026-05-15 20:07:54"
+    },
+    {
+        "level": "INFO",
+        "message": "Encryption key cleared from memory",
+        "time": "2026-05-15 20:07:54"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Biometric verification passed",
+        "time": "2026-05-15 20:07:54"
+    },
+    {
+        "level": "INFO",
+        "message": "Starting LUKS unlock for: /dev/sdb",
+        "time": "2026-05-15 20:07:52"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault locked. LUKS keys cleared from kernel.",
+        "time": "2026-05-15 20:07:43"
+    },
+    {
+        "level": "INFO",
+        "message": "Locking vault and clearing kernel keys...",
+        "time": "2026-05-15 20:07:43"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault decrypted and mounted at /home/oolkay/VaultMount",
+        "time": "2026-05-15 20:07:31"
+    },
+    {
+        "level": "INFO",
+        "message": "Encryption key cleared from memory",
+        "time": "2026-05-15 20:07:31"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Biometric verification passed",
+        "time": "2026-05-15 20:07:31"
+    },
+    {
+        "level": "INFO",
+        "message": "Starting LUKS unlock for: /dev/sdb",
+        "time": "2026-05-15 20:07:29"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault locked. LUKS keys cleared from kernel.",
+        "time": "2026-05-15 20:07:26"
+    },
+    {
+        "level": "INFO",
+        "message": "Locking vault and clearing kernel keys...",
+        "time": "2026-05-15 20:07:26"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault decrypted and mounted at /home/oolkay/VaultMount",
+        "time": "2026-05-15 20:07:23"
+    },
+    {
+        "level": "INFO",
+        "message": "Encryption key cleared from memory",
+        "time": "2026-05-15 20:07:23"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Biometric verification passed",
+        "time": "2026-05-15 20:07:23"
+    },
+    {
+        "level": "INFO",
+        "message": "Starting LUKS unlock for: /dev/sdb",
+        "time": "2026-05-15 20:07:20"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault locked. LUKS keys cleared from kernel.",
+        "time": "2026-05-15 20:07:19"
+    },
+    {
+        "level": "INFO",
+        "message": "Locking vault and clearing kernel keys...",
+        "time": "2026-05-15 20:07:19"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault decrypted and mounted at /home/oolkay/VaultMount",
+        "time": "2026-05-15 20:07:13"
+    },
+    {
+        "level": "INFO",
+        "message": "Encryption key cleared from memory",
+        "time": "2026-05-15 20:07:13"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Biometric verification passed",
+        "time": "2026-05-15 20:07:13"
+    },
+    {
+        "level": "INFO",
+        "message": "Starting LUKS unlock for: /dev/sdb",
+        "time": "2026-05-15 20:07:05"
+    },
+    {
+        "level": "ERROR",
+        "message": "Failed to open vault (exit code: 1)",
+        "time": "2026-05-15 20:05:50"
+    },
+    {
+        "level": "INFO",
+        "message": "Starting LUKS unlock for: /dev/sdb",
+        "time": "2026-05-15 20:05:48"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault decrypted and mounted at /home/oolkay/VaultMount",
+        "time": "2026-05-15 20:05:03"
+    },
+    {
+        "level": "INFO",
+        "message": "Encryption key cleared from memory",
+        "time": "2026-05-15 20:05:03"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Biometric verification passed",
+        "time": "2026-05-15 20:05:03"
+    },
+    {
+        "level": "INFO",
+        "message": "Starting LUKS unlock for: /dev/sdb",
+        "time": "2026-05-15 20:04:53"
+    },
+    {
+        "level": "ERROR",
+        "message": "Failed to open vault (exit code: 1)",
+        "time": "2026-05-15 19:58:12"
+    },
+    {
+        "level": "INFO",
+        "message": "Starting LUKS unlock for: /dev/sdc",
+        "time": "2026-05-15 19:58:09"
+    },
+    {
+        "level": "ERROR",
+        "message": "Failed to open vault (exit code: 1)",
+        "time": "2026-05-15 19:55:56"
+    },
+    {
+        "level": "INFO",
+        "message": "Starting LUKS unlock for: /dev/sdc",
+        "time": "2026-05-15 19:55:53"
+    },
+    {
+        "level": "ERROR",
+        "message": "Failed to open vault (exit code: 1)",
+        "time": "2026-05-15 19:54:03"
+    },
+    {
+        "level": "INFO",
+        "message": "Starting LUKS unlock for: /dev/sdb",
+        "time": "2026-05-15 19:54:01"
+    },
+    {
+        "level": "ERROR",
+        "message": "Failed to close vault (exit code: 1)",
+        "time": "2026-05-15 19:53:13"
+    },
+    {
+        "level": "INFO",
+        "message": "Locking vault and clearing kernel keys...",
+        "time": "2026-05-15 19:53:11"
+    },
+    {
+        "level": "INFO",
+        "message": "Opened vault in file manager",
+        "time": "2026-05-15 19:53:07"
+    },
+    {
+        "level": "INFO",
+        "message": "Vault detected as open",
+        "time": "2026-05-15 19:53:04"
+    },
+    {
+        "level": "INFO",
+        "message": "Vault detected as open",
+        "time": "2026-05-15 19:53:04"
+    },
+    {
+        "level": "ERROR",
+        "message": "Failed to close vault (exit code: 1)",
+        "time": "2026-05-15 19:52:53"
+    },
+    {
+        "level": "INFO",
+        "message": "Locking vault and clearing kernel keys...",
+        "time": "2026-05-15 19:52:53"
+    },
+    {
+        "level": "ERROR",
+        "message": "Failed to close vault (exit code: 1)",
+        "time": "2026-05-15 19:52:53"
+    },
+    {
+        "level": "INFO",
+        "message": "Locking vault and clearing kernel keys...",
+        "time": "2026-05-15 19:52:52"
+    },
+    {
+        "level": "ERROR",
+        "message": "Failed to close vault (exit code: 1)",
+        "time": "2026-05-15 19:52:31"
+    },
+    {
+        "level": "INFO",
+        "message": "Locking vault and clearing kernel keys...",
+        "time": "2026-05-15 19:52:31"
+    },
+    {
+        "level": "ERROR",
+        "message": "Failed to close vault (exit code: 1)",
+        "time": "2026-05-15 19:52:25"
+    },
+    {
+        "level": "INFO",
+        "message": "Locking vault and clearing kernel keys...",
+        "time": "2026-05-15 19:52:25"
+    },
+    {
+        "level": "ERROR",
+        "message": "Failed to close vault (exit code: 1)",
+        "time": "2026-05-15 19:52:14"
+    },
+    {
+        "level": "INFO",
+        "message": "Locking vault and clearing kernel keys...",
+        "time": "2026-05-15 19:52:12"
+    },
+    {
+        "level": "INFO",
+        "message": "Vault detected as open",
+        "time": "2026-05-15 19:52:08"
+    },
+    {
+        "level": "INFO",
+        "message": "Vault detected as open",
+        "time": "2026-05-15 19:52:08"
+    },
+    {
+        "level": "ERROR",
+        "message": "Failed to open vault (exit code: 1)",
+        "time": "2026-05-15 19:48:38"
+    },
+    {
+        "level": "INFO",
+        "message": "Starting LUKS unlock for: /dev/sdb",
+        "time": "2026-05-15 19:48:31"
+    },
+    {
+        "level": "ERROR",
+        "message": "Failed to open vault (exit code: 1)",
+        "time": "2026-05-15 19:48:21"
+    },
+    {
+        "level": "INFO",
+        "message": "Starting LUKS unlock for: /dev/sdb",
+        "time": "2026-05-15 19:48:21"
+    },
+    {
+        "level": "ERROR",
+        "message": "Failed to open vault (exit code: 1)",
+        "time": "2026-05-15 19:47:59"
+    },
+    {
+        "level": "INFO",
+        "message": "Starting LUKS unlock for: /dev/sdb",
+        "time": "2026-05-15 19:47:59"
+    },
+    {
+        "level": "ERROR",
+        "message": "Failed to open vault (exit code: 1)",
+        "time": "2026-05-15 19:47:34"
+    },
+    {
+        "level": "INFO",
+        "message": "Starting LUKS unlock for: /dev/sdb",
+        "time": "2026-05-15 19:47:34"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault setup complete: /dev/sdb",
+        "time": "2026-05-15 19:47:29"
+    },
+    {
+        "level": "INFO",
+        "message": "Formatting new LUKS vault on: /dev/sdb (FORCED)",
+        "time": "2026-05-15 19:46:07"
     }
 ]

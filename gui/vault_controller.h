@@ -25,6 +25,8 @@ class VaultController : public QObject
     Q_PROPERTY(bool isToggling        READ isToggling        NOTIFY togglingChanged)
     Q_PROPERTY(int autoLockTimeout    READ autoLockTimeout    WRITE setAutoLockTimeout NOTIFY autoLockTimeoutChanged)
     Q_PROPERTY(QString setupStatusText READ setupStatusText   NOTIFY setupRunningChanged)
+    Q_PROPERTY(bool isSelectedDeviceVault READ isSelectedDeviceVault NOTIFY statusChanged)
+    Q_PROPERTY(int selectedDeviceCapacityMB READ selectedDeviceCapacityMB NOTIFY statusChanged)
 
 public:
     explicit VaultController(QObject *parent = nullptr);
@@ -39,6 +41,8 @@ public:
     QVariantList securityLogs() const { return m_securityLogs; }
     bool    isSetupRunning()  const { return m_isSetupRunning; }
     QString setupStatusText() const { return m_setupStatusText; }
+    bool    isSelectedDeviceVault() const { return m_isSelectedDeviceVault; }
+    int     selectedDeviceCapacityMB() const { return m_selectedDeviceCapacityMB; }
 
     void    addLog(const QString &level, const QString &msg);
     bool    simulatorRunning() const;
@@ -52,9 +56,10 @@ public:
     Q_INVOKABLE void        refreshFingerprints();
     Q_INVOKABLE void        startSimulator();
     Q_INVOKABLE void        stopSimulator();
-    Q_INVOKABLE void        setSelectedDevice(const QString &path) { m_selectedDevice = path; emit statusChanged(); }
+    Q_INVOKABLE void        setSelectedDevice(const QString &path);
     Q_INVOKABLE bool        createNewVault(const QString &path);
-    Q_INVOKABLE bool        setupVault(const QString &device, bool force = false, int ownerId = 1);
+    Q_INVOKABLE bool        setupVault(const QString &device, bool force, int ownerId, int vaultSizeMB, 
+                                       const QString &vaultName, const QString &normalName, const QString &normalFs);
     Q_INVOKABLE void        openInFileManager();
     Q_INVOKABLE void        openInTerminal();
     
@@ -102,6 +107,8 @@ private:
     QString      m_socketPath;
     QString      m_projectDir;
     QString      m_selectedDevice;
+    bool         m_isSelectedDeviceVault;
+    int          m_selectedDeviceCapacityMB;
     QString      m_vaultManagerBin;
     QString      m_logFilePath;
 

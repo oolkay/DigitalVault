@@ -68,6 +68,8 @@ VaultController::VaultController(QObject *parent)
     , m_pollTimer(nullptr)
     , m_setupWatcher(nullptr)
     , m_selectedDevice("vault.img")
+    , m_isSelectedDeviceVault(false)
+    , m_selectedDeviceCapacityMB(100)
 {
     /* Proje dizinini bul (DigitalVault klasörünü bulana kadar yukarı çık) */
     m_projectDir = QCoreApplication::applicationDirPath();
@@ -419,7 +421,8 @@ void VaultController::toggleVault()
 
 /* ─── Vault Setup (First-Time LUKS Format) ───────────────────────────────── */
 
-bool VaultController::setupVault(const QString &device, bool force, int ownerId)
+bool VaultController::setupVault(const QString &device, bool force, int ownerId, int vaultSizeMB,
+                                 const QString &vaultName, const QString &normalName, const QString &normalFs)
 {
     if (device.isEmpty()) return false;
 
@@ -487,6 +490,10 @@ bool VaultController::setupVault(const QString &device, bool force, int ownerId)
     QStringList args;
     args << "setup" << device << QString::number(ownerId);
     if (force) args << "--force";
+    if (vaultSizeMB > 0) args << "--partition" << QString::number(vaultSizeMB);
+    if (!vaultName.isEmpty()) args << "--vault-name" << vaultName;
+    if (!normalName.isEmpty()) args << "--normal-name" << normalName;
+    if (!normalFs.isEmpty()) args << "--normal-fs" << normalFs;
 
     /* runVaultManager main thread'den çağrılamaz — argümanları kopyalayıp yeni process aç */
     QString vaultManagerBin = m_vaultManagerBin;
@@ -661,41 +668,75 @@ QVariantList VaultController::getStorageDevices()
         QFileInfo fi(m_selectedDevice);
         d["name"] = fi.fileName() + " (File Container)";
         d["description"] = "Virtual Encrypted Container";
+        d["isVault"] = true;
         devices << d;
     }
 
     /* 2. lsblk ile fiziksel diskleri listele */
     QProcess lsblk;
-    lsblk.start("lsblk", QStringList() << "-Jno" << "NAME,SIZE,TYPE,MOUNTPOINT,MODEL,VENDOR");
+    // FSTYPE ekleyerek hangi bölümün LUKS olduğunu anlıyoruz
+    lsblk.start("lsblk", QStringList() << "-Jno" << "NAME,SIZE,TYPE,MOUNTPOINT,MODEL,VENDOR,FSTYPE");
     if (lsblk.waitForFinished(3000)) {
         QJsonDocument doc = QJsonDocument::fromJson(lsblk.readAllStandardOutput());
         if (doc.isObject()) {
             QJsonArray blockDevices = doc.object()["blockdevices"].toArray();
-            for (const auto &dev : blockDevices) {
-                QJsonObject obj = dev.toObject();
-                QString type = obj["type"].toString();
+            
+            // Helper lambda for recursive parsing
+            std::function<void(const QJsonArray&)> parseDevices = [&](const QJsonArray& devs) {
+                for (const auto &dev : devs) {
+                    QJsonObject obj = dev.toObject();
+                    QString type = obj["type"].toString();
+                    QString fstype = obj["fstype"].toString();
+                    QString name = obj["name"].toString();
+                    QString size = obj["size"].toString();
+                    bool isLuks = (fstype == "crypto_LUKS");
 
-                /* Disk bölümlerini (part), diskleri veya loop cihazlarını ekle */
-                if (type == "part" || type == "disk" || type == "loop") {
-                    QString mountpoint = obj["mountpoint"].toString();
-                    
                     /* Sistem loop cihazlarını (Snap paketleri vb.) gizle */
-                    if (type == "loop" && mountpoint.startsWith("/snap")) {
+                    if (type == "loop" && obj["mountpoint"].toString().startsWith("/snap")) {
                         continue;
                     }
 
-                    QVariantMap d;
-                    QString name = obj["name"].toString();
-                    d["path"] = "/dev/" + name;
-                    d["name"] = QString("/dev/%1 (%2)").arg(name).arg(obj["size"].toString());
+                    if (type == "part" || type == "disk" || type == "loop") {
+                        QVariantMap d;
+                        d["path"] = "/dev/" + name;
+                        
+                        QString displayName = "/dev/" + name;
+                        if (isLuks) {
+                            d["name"] = QString("🔐  Vault: %1").arg(size);
+                            d["description"] = "Encrypted Partition (LUKS2)";
+                            d["isVault"] = true;
+                        } else {
+                            d["name"] = QString("/dev/%1 (%2)").arg(name).arg(size);
+                            QString info = obj["model"].toString() + " " + obj["vendor"].toString();
+                            if (info.trimmed().isEmpty()) info = (type == "disk") ? "Physical Disk" : "Storage Partition";
+                            d["description"] = info;
+                            d["isVault"] = false;
+                        }
 
-                    QString info = obj["model"].toString() + " " + obj["vendor"].toString();
-                    if (info.trimmed().isEmpty()) info = "Physical Storage Device";
-                    d["description"] = info;
+                        // Eğer bu bir disk ise ve çocukları arasında LUKS varsa, description'a ekle
+                        if (type == "disk" && obj.contains("children")) {
+                            QJsonArray children = obj["children"].toArray();
+                            for (const auto &child : children) {
+                                if (child.toObject()["fstype"].toString() == "crypto_LUKS") {
+                                    QString desc = d["description"].toString();
+                                    desc += " — Contains Vault (" + child.toObject()["size"].toString() + ")";
+                                    d["description"] = desc;
+                                    break;
+                                }
+                            }
+                        }
 
-                    devices << d;
+                        devices << d;
+                    }
+
+                    // Çocukları varsa onları da işle
+                    if (obj.contains("children")) {
+                        parseDevices(obj["children"].toArray());
+                    }
                 }
-            }
+            };
+
+            parseDevices(blockDevices);
         }
     }
 
@@ -711,6 +752,17 @@ void VaultController::pollStatus()
      * /dev/mapper/digitalvault varsa vault açık demektir.
      */
     bool wasLocked = m_isLocked;
+
+    /* 
+     * HAL Bağlantısını Kontrol Et (Simülatör ya da Gerçek Donanım)
+     * Eğer HAL koptuysa ve vault açıksa, acil durum kilitlemesi yap.
+     */
+    if (!simulatorRunning()) {
+        if (!m_isLocked && !m_isToggling) {
+            addLog("CRITICAL", "HAL Disconnected! Emergency locking for security.");
+            toggleVault(); // Kilitlemeyi başlat
+        }
+    }
 
     if (!m_isLocked) {
         /* /dev/mapper/digitalvault hala var mı? */
@@ -739,6 +791,37 @@ bool VaultController::createNewVault(const QString &path)
     emit notificationReceived("Device selected: " + localPath + ". Use 'Setup Vault' to format.", false);
 
     return true;
+}
+
+void VaultController::setSelectedDevice(const QString &path)
+{
+    if (m_selectedDevice == path) return;
+    
+    m_selectedDevice = path;
+    m_isSelectedDeviceVault = false;
+    m_selectedDeviceCapacityMB = 0;
+
+    /* Bu cihazın LUKS olup olmadığını ve kapasitesini kontrol et */
+    QProcess lsblk;
+    lsblk.start("lsblk", {"-Jbno", "FSTYPE,SIZE", path});
+    if (lsblk.waitForFinished(2000)) {
+        QJsonDocument doc = QJsonDocument::fromJson(lsblk.readAllStandardOutput());
+        if (doc.isObject()) {
+            QJsonArray devs = doc.object()["blockdevices"].toArray();
+            if (!devs.isEmpty()) {
+                QJsonObject obj = devs.at(0).toObject();
+                QString fstype = obj["fstype"].toString();
+                if (fstype == "crypto_LUKS") {
+                    m_isSelectedDeviceVault = true;
+                }
+                
+                qlonglong bytes = obj["size"].toVariant().toLongLong();
+                m_selectedDeviceCapacityMB = static_cast<int>(bytes / (1024 * 1024));
+            }
+        }
+    }
+
+    emit statusChanged();
 }
 
 void VaultController::addLog(const QString &level, const QString &msg)
