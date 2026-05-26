@@ -54,7 +54,7 @@ Item {
                 border.color: Theme.border; border.width: 1
                 Text {
                     anchors.centerIn: parent
-                    text: "🗑  Clear"
+                    text: "Clear"
                     color: Theme.danger
                     font { pixelSize: 13; bold: true; family: "Inter" }
                 }

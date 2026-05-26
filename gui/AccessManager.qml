@@ -17,6 +17,8 @@ Item {
 
     Component.onCompleted: refreshSlots()
 
+    StackView.onActivated: refreshSlots()
+
     ScrollView {
         anchors.fill: parent
         contentWidth: availableWidth
@@ -41,7 +43,7 @@ Item {
                     Behavior on color { ColorAnimation { duration: 250 } }
                 }
                 Text {
-                    text: "Manage who can unlock this vault. Each keyslot represents a unique fingerprint credential."
+                    text: "Manage who can unlock the vault selected on the Dashboard. Each keyslot is an authorized unlock credential."
                     color: Theme.textSecondary
                     font { pixelSize: 13; family: "Inter" }
                     width: parent.width
@@ -65,7 +67,7 @@ Item {
                     spacing: 12
                     Text { text: "⚠"; font.pixelSize: 22; anchors.verticalCenter: parent.verticalCenter }
                     Text {
-                        text: "Please select a device from the Dashboard first."
+                        text: "Please select a vault from the Dashboard first."
                         color: Theme.warning
                         font { pixelSize: 14; bold: true; family: "Inter" }
                         anchors.verticalCenter: parent.verticalCenter
@@ -347,7 +349,7 @@ Item {
                         Row {
                             anchors.verticalCenter: parent.verticalCenter
                             spacing: 10
-                            Text { text: "🗝"; font.pixelSize: 18; anchors.verticalCenter: parent.verticalCenter }
+                            Text { text: "🔑"; font.pixelSize: 18; anchors.verticalCenter: parent.verticalCenter }
                             Text {
                                 text: "Active Keyslots"
                                 color: Theme.textPrimary
@@ -422,7 +424,7 @@ Item {
                                         color: modelData.isOwner ? Theme.accentGlow : Theme.warningBg
                                         Text {
                                             anchors.centerIn: parent
-                                            text: modelData.isOwner ? "👑" : "🔑"
+                                            text: modelData.isOwner ? "O" : "K"
                                             font.pixelSize: 18
                                         }
                                     }
@@ -461,7 +463,7 @@ Item {
                                         Text {
                                             id: revokeLabel
                                             anchors.centerIn: parent
-                                            text: "✕  Revoke"
+                                            text: "Revoke"
                                             color: Theme.danger
                                             font { pixelSize: 11; bold: true; family: "Inter" }
                                         }
@@ -514,7 +516,7 @@ Item {
                                 spacing: 6
                                 Text {
                                     anchors.horizontalCenter: parent.horizontalCenter
-                                    text: "🔒"
+                                    text: "L"
                                     font.pixelSize: 22
                                 }
                                 Text {
@@ -552,7 +554,7 @@ Item {
             width: parent.width; height: 50; color: "transparent"
             Text {
                 anchors.centerIn: parent
-                text: "⚠️  Revoke Access"
+                text: "Revoke Access"
                 color: Theme.danger
                 font { pixelSize: 16; bold: true; family: "Inter" }
             }

@@ -34,7 +34,7 @@ Item {
                 // ── Appearance ───────────────────────────────────
                 SettingsSection {
                     title: "Appearance"
-                    icon: "🎨"
+                    icon: "A"
                     width: parent.width
 
                     SettingsRow {
@@ -70,7 +70,7 @@ Item {
                 // ── Security ─────────────────────────────────────
                 SettingsSection {
                     title: "Security"
-                    icon: "🔐"
+                    icon: "S"
                     width: parent.width
 
                     SettingsRow {
@@ -175,24 +175,25 @@ Item {
                 // ── Storage ──────────────────────────────────────
                 SettingsSection {
                     title: "Storage"
-                    icon: "💾"
+                    icon: "D"
                     width: parent.width
 
                     SettingsRow {
                         width: parent.width
-                        label: "Vault image path"
-                        description: "Location of the encrypted vault.img file"
+                        label: "Container storage"
+                        description: "Backing images for loop devices (Create New)"
                         control: Rectangle {
-                            width: 220; height: 34; radius: 8
+                            width: Math.min(parent.width, 420); height: 34; radius: 8
                             color: Theme.bgInput
                             border.color: Theme.border
                             border.width: 1
                             Behavior on color { ColorAnimation { duration: 250 } }
                             Text {
-                                anchors { verticalCenter: parent.verticalCenter; left: parent.left; leftMargin: 12 }
-                                text: "./fuse_vault/vault.img"
+                                anchors { verticalCenter: parent.verticalCenter; left: parent.left; leftMargin: 12; right: parent.right; rightMargin: 8 }
+                                text: vaultController.defaultContainersDir()
                                 color: Theme.textSecondary
-                                font { pixelSize: 12; family: "Courier New" }
+                                font { pixelSize: 11; family: "Courier New" }
+                                elide: Text.ElideMiddle
                                 Behavior on color { ColorAnimation { duration: 250 } }
                             }
                         }
@@ -222,7 +223,7 @@ Item {
                 // ── About ────────────────────────────────────────
                 SettingsSection {
                     title: "About"
-                    icon: "ℹ"
+                    icon: "I"
                     width: parent.width
 
                     SettingsRow {

@@ -9,12 +9,22 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
+#include <QStandardPaths>
+#include <QRegularExpression>
 #include <QtConcurrent/QtConcurrent>
+#include <memory>
+#include <atomic>
 
 /* Unix socket + HAL iletişimi için */
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
+#include <sys/wait.h>
+
+VaultController *g_vaultController = nullptr;
+std::atomic<bool> VaultController::s_emergencyClosing{false};
+
+static const char kMapperPath[] = "/dev/mapper/digitalvault";
 
 /*
  * HAL ile doğrudan socket üzerinden iletişim kurar.
@@ -61,15 +71,16 @@ VaultController::VaultController(QObject *parent)
     , m_isSetupRunning(false)
     , m_isToggling(false)
     , m_setupStatusText("")
+    /* Default mount dir; safe lock uses findmnt/mountpoint probes, not path alone. */
     , m_mountPoint(QDir::homePath() + "/VaultMount")
     , m_lastActivity("—")
     , m_socketPath("/tmp/biometric_vault.sock")
     , m_simProcess(nullptr)
     , m_pollTimer(nullptr)
     , m_setupWatcher(nullptr)
-    , m_selectedDevice("vault.img")
+    , m_selectedDevice("")
     , m_isSelectedDeviceVault(false)
-    , m_selectedDeviceCapacityMB(100)
+    , m_selectedDeviceCapacityMB(0)
 {
     /* Proje dizinini bul (DigitalVault klasörünü bulana kadar yukarı çık) */
     m_projectDir = QCoreApplication::applicationDirPath();
@@ -91,6 +102,21 @@ VaultController::VaultController(QObject *parent)
 
     /* vault_manager binary'sini bul */
     m_vaultManagerBin = findVaultManager();
+
+    const QString dataRoot = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation)
+                             + "/DigitalVault";
+    m_registryPath = dataRoot + "/vault_registry.json";
+    m_containersDir = dataRoot + "/containers";
+    m_statePath = dataRoot + "/vault_state.json";
+    QDir().mkpath(m_containersDir);
+    QDir().mkpath(QFileInfo(m_registryPath).absolutePath());
+
+    m_vaultManagerBinCache = m_vaultManagerBin.toUtf8();
+    m_mountPointCache = m_mountPoint.toUtf8();
+    g_vaultController = this;
+
+    syncRegistryWithLosetup();
+    refreshStorageDevices();
 
     /* Mount dizinini oluştur */
     QDir().mkpath(m_mountPoint);
@@ -125,6 +151,150 @@ VaultController::VaultController(QObject *parent)
         m_securityLogs = getSecurityLogsPage(0, 50);
         emit logsChanged();
     }
+
+    QTimer::singleShot(1000, this, &VaultController::startupRecovery);
+}
+
+const char *VaultController::cachedVaultManagerBin() const
+{
+    return m_vaultManagerBinCache.constData();
+}
+
+const char *VaultController::cachedMountPoint() const
+{
+    return m_mountPointCache.constData();
+}
+
+int VaultController::posixEmergencyClose(const char *vaultManagerBin, const char *mountPoint)
+{
+    if (!vaultManagerBin || !mountPoint || !*vaultManagerBin || !*mountPoint)
+        return -1;
+
+    const pid_t pid = fork();
+    if (pid < 0)
+        return -1;
+    if (pid == 0) {
+        execlp("pkexec", "pkexec", vaultManagerBin, "forceclose", mountPoint, nullptr);
+        _exit(127);
+    }
+
+    int status = 0;
+    if (waitpid(pid, &status, 0) < 0)
+        return -1;
+    if (WIFEXITED(status))
+        return WEXITSTATUS(status);
+    return -1;
+}
+
+bool VaultController::vaultRuntimeOpen() const
+{
+    return isVaultRuntimeOpen();
+}
+
+bool VaultController::isVaultRuntimeOpen() const
+{
+    if (QFile::exists(QString::fromUtf8(kMapperPath)))
+        return true;
+
+    QProcess proc;
+    proc.start(QStringLiteral("findmnt"),
+               {QStringLiteral("-no"), QStringLiteral("SOURCE"),
+                QStringLiteral("--target"), m_mountPoint});
+    if (!proc.waitForFinished(1000) || proc.exitCode() != 0)
+        return false;
+
+    const QString src = QString::fromUtf8(proc.readAllStandardOutput()).trimmed();
+    return src.contains(QStringLiteral("digitalvault"));
+}
+
+bool VaultController::emergencyClose()
+{
+    if (s_emergencyClosing.exchange(true))
+        return m_isLocked;
+
+    bool ok = true;
+    if (isVaultRuntimeOpen()) {
+        const int ret = runVaultManager({QStringLiteral("forceclose"), m_mountPoint}, 20000);
+        ok = (ret == 0);
+        if (ok) {
+            m_isLocked = true;
+            m_unlockedDevice.clear();
+            saveState(QStringLiteral("locked"), false);
+            emit statusChanged();
+        } else {
+            addLog("ERROR", QStringLiteral("Emergency lock failed (exit ")
+                   + QString::number(ret) + QStringLiteral(")."));
+        }
+    } else {
+        if (!m_isLocked) {
+            addLog("INFO", QStringLiteral("Vault already locked at kernel level; syncing UI state."));
+        }
+        m_isLocked = true;
+        m_unlockedDevice.clear();
+        saveState(QStringLiteral("locked"), false);
+        emit statusChanged();
+        ok = true;
+    }
+
+    s_emergencyClosing.store(false);
+    return ok;
+}
+
+void VaultController::saveState(const QString &lastKnownState, bool setupInProgress)
+{
+    QJsonObject obj;
+    obj.insert(QStringLiteral("lastKnownState"), lastKnownState);
+    obj.insert(QStringLiteral("setupInProgress"), setupInProgress);
+    obj.insert(QStringLiteral("lastDevice"), m_selectedDevice);
+    obj.insert(QStringLiteral("lastUnlockedDevice"), m_unlockedDevice);
+    obj.insert(QStringLiteral("lastMountPoint"), m_mountPoint);
+    obj.insert(QStringLiteral("timestamp"),
+               QDateTime::currentDateTime().toString(Qt::ISODate));
+
+    const QString tmpPath = m_statePath + QStringLiteral(".tmp");
+    QFile tmp(tmpPath);
+    if (!tmp.open(QIODevice::WriteOnly))
+        return;
+    tmp.write(QJsonDocument(obj).toJson(QJsonDocument::Compact));
+    tmp.close();
+    QFile::remove(m_statePath);
+    QFile::rename(tmpPath, m_statePath);
+}
+
+QJsonObject VaultController::loadState() const
+{
+    QFile f(m_statePath);
+    if (!f.open(QIODevice::ReadOnly))
+        return {};
+    return QJsonDocument::fromJson(f.readAll()).object();
+}
+
+void VaultController::startupRecovery()
+{
+    const QJsonObject state = loadState();
+
+    if (isVaultRuntimeOpen()) {
+        addLog("WARNING", "Orphan vault state detected at startup — locking vault.");
+        QTimer::singleShot(500, this, [this]() {
+            if (emergencyClose())
+                emit notificationReceived("Vault was left open; it has been locked.", false);
+            else
+                emit notificationReceived(
+                    "Could not lock orphaned vault. Close apps using the mount point.", true);
+        });
+    } else if (!m_isLocked) {
+        m_isLocked = true;
+        saveState(QStringLiteral("locked"), false);
+        emit statusChanged();
+    }
+
+    if (state.value(QStringLiteral("setupInProgress")).toBool()) {
+        QTimer::singleShot(1500, this, [this]() {
+            saveState(QStringLiteral("locked"), false);
+            emit notificationReceived(
+                "Previous setup was interrupted. Verify the device before retrying.", true);
+        });
+    }
 }
 
 bool VaultController::simulatorRunning() const
@@ -140,8 +310,10 @@ bool VaultController::simulatorRunning() const
 
 VaultController::~VaultController()
 {
-    if (!m_isLocked) {
-        unmountVault();
+    if (isVaultRuntimeOpen()) {
+        runVaultManager({QStringLiteral("forceclose"), m_mountPoint}, 20000);
+        m_isLocked = true;
+        m_unlockedDevice.clear();
     }
     if (m_simProcess && m_simProcess->state() == QProcess::Running) {
         m_simProcess->terminate();
@@ -294,6 +466,9 @@ void VaultController::stopSimulator()
         return;
     }
 
+    if (isVaultRuntimeOpen())
+        emergencyClose();
+
     m_simProcess->terminate();
     if (!m_simProcess->waitForFinished(3000)) {
         m_simProcess->kill();
@@ -307,6 +482,8 @@ void VaultController::stopSimulator()
 void VaultController::onSimFinished(int exitCode, QProcess::ExitStatus exitStatus)
 {
     (void)exitCode; (void)exitStatus;
+    if (isVaultRuntimeOpen() && !m_isToggling)
+        emergencyClose();
     updateActivity("Simulator process ended.");
     emit statusChanged();
 }
@@ -315,7 +492,7 @@ void VaultController::onSimFinished(int exitCode, QProcess::ExitStatus exitStatu
 
 bool VaultController::mountVault()
 {
-    addLog("INFO", "Starting LUKS unlock for: " + m_selectedDevice);
+    addLog("INFO", "Starting vault unlock for: " + m_selectedDevice);
 
     int ret = runVaultManager({"open", m_selectedDevice, m_mountPoint}, 15000);
 
@@ -343,80 +520,113 @@ bool VaultController::unmountVault()
     int ret = runVaultManager({"close", m_mountPoint}, 10000);
 
     if (ret == 0) {
-        addLog("SUCCESS", "Vault locked. LUKS keys cleared from kernel.");
+        addLog("SUCCESS", "Vault locked. Encryption keys cleared from kernel.");
         return true;
     }
 
-    addLog("ERROR", "Failed to close vault (exit code: " + QString::number(ret) + ")");
+    if (ret == 2) {
+        addLog("WARNING", "Mount point is busy. Close file manager or terminal windows using the vault.");
+        emit notificationReceived(
+            "Could not lock vault: mount point is busy. Close apps using the mount folder.", true);
+    } else {
+        addLog("ERROR", "Failed to close vault (exit code: " + QString::number(ret) + ")");
+    }
     return false;
+}
+
+void VaultController::beginUnlockVault()
+{
+    if (!simulatorRunning()) {
+        emit notificationReceived("Start the simulator first!", true);
+        return;
+    }
+
+    m_isToggling = true;
+    emit togglingChanged();
+    updateActivity("Decrypting vault...");
+    emit statusChanged();
+
+    QFuture<bool> future = QtConcurrent::run(&VaultController::mountVault, this);
+    auto watcher = new QFutureWatcher<bool>(this);
+    connect(watcher, &QFutureWatcher<bool>::finished, this, [this, watcher]() {
+        const bool success = watcher->result();
+        m_isToggling = false;
+        emit togglingChanged();
+
+        if (success) {
+            m_isLocked = false;
+            m_unlockedDevice = m_selectedDevice;
+            saveState(QStringLiteral("unlocked"), false);
+            const QString msg = QStringLiteral("Vault unlocked and mounted at ") + m_mountPoint;
+            updateActivity(msg);
+            emit notificationReceived(msg, false);
+            resetAutoLockTimer();
+        } else {
+            emit notificationReceived("Failed to unlock vault!", true);
+            updateActivity("Unlock failed.");
+        }
+        emit statusChanged();
+        watcher->deleteLater();
+    });
+    watcher->setFuture(future);
+}
+
+void VaultController::beginLockVault()
+{
+    m_isToggling = true;
+    emit togglingChanged();
+    updateActivity("Locking vault...");
+    emit statusChanged();
+
+    QFuture<bool> future = QtConcurrent::run(&VaultController::unmountVault, this);
+    auto watcher = new QFutureWatcher<bool>(this);
+    connect(watcher, &QFutureWatcher<bool>::finished, this, [this, watcher]() {
+        const bool success = watcher->result();
+        m_isToggling = false;
+        emit togglingChanged();
+
+        if (success) {
+            m_isLocked = true;
+            m_unlockedDevice.clear();
+            saveState(QStringLiteral("locked"), false);
+            updateActivity("Vault locked successfully.");
+            emit notificationReceived("Vault locked and dismounted.", false);
+        } else {
+            emit notificationReceived("Failed to lock vault!", true);
+            updateActivity("Lock failed.");
+        }
+        emit statusChanged();
+        watcher->deleteLater();
+    });
+    watcher->setFuture(future);
 }
 
 void VaultController::toggleVault()
 {
     if (m_isToggling) return;
-    resetAutoLockTimer(); // Kullanıcı etkileşimi timer'ı sıfırlar
+    resetAutoLockTimer();
 
-    if (m_isLocked) {
-        /* Unlock — mount vault */
-        if (!simulatorRunning()) {
-            emit notificationReceived("Start the simulator first!", true);
-            return;
-        }
-
-        m_isToggling = true;
-        emit togglingChanged();
-        updateActivity("Decrypting vault...");
-        emit statusChanged();
-
-        QFuture<bool> future = QtConcurrent::run(&VaultController::mountVault, this);
-        auto watcher = new QFutureWatcher<bool>(this);
-        connect(watcher, &QFutureWatcher<bool>::finished, this, [this, watcher]() {
-            bool success = watcher->result();
-            m_isToggling = false;
-            emit togglingChanged();
-
-            if (success) {
-                m_isLocked = false;
-                QString msg = "Vault unlocked and mounted at " + m_mountPoint;
-                updateActivity(msg);
-                emit notificationReceived(msg, false);
-                resetAutoLockTimer(); // Başarıyla açıldıktan sonra sayacı başlat
-            } else {
-                emit notificationReceived("Failed to unlock vault!", true);
-                updateActivity("Unlock failed.");
-            }
-            emit statusChanged();
-            watcher->deleteLater();
-        });
-        watcher->setFuture(future);
-
-    } else {
-        /* Lock — unmount vault */
-        m_isToggling = true;
-        emit togglingChanged();
-        updateActivity("Locking vault...");
-        emit statusChanged();
-
-        QFuture<bool> future = QtConcurrent::run(&VaultController::unmountVault, this);
-        auto watcher = new QFutureWatcher<bool>(this);
-        connect(watcher, &QFutureWatcher<bool>::finished, this, [this, watcher]() {
-            bool success = watcher->result();
-            m_isToggling = false;
-            emit togglingChanged();
-
-            if (success) {
-                m_isLocked = true;
-                updateActivity("Vault locked successfully.");
-                emit notificationReceived("Vault locked and dismounted.", false);
-            } else {
-                emit notificationReceived("Failed to lock vault!", true);
-                updateActivity("Lock failed.");
-            }
-            emit statusChanged();
-            watcher->deleteLater();
-        });
-        watcher->setFuture(future);
+    if (m_selectedDevice.isEmpty()) {
+        emit notificationReceived("Select a vault first.", true);
+        return;
     }
+
+    if (isVaultUnlockedForDevice(m_selectedDevice)) {
+        beginLockVault();
+        return;
+    }
+
+    if (isVaultRuntimeOpen() && !m_unlockedDevice.isEmpty()
+        && m_unlockedDevice != m_selectedDevice) {
+        const QString label = registryLabelForDevice(m_unlockedDevice);
+        const QString who = label.isEmpty() ? m_unlockedDevice : label;
+        emit notificationReceived(
+            QStringLiteral("Another vault is open (%1). Lock it before opening this one.").arg(who),
+            true);
+        return;
+    }
+
+    beginUnlockVault();
 }
 
 /* ─── Vault Setup (First-Time LUKS Format) ───────────────────────────────── */
@@ -431,32 +641,28 @@ bool VaultController::setupVault(const QString &device, bool force, int ownerId,
         return false;
     }
 
+    if (!device.startsWith("/dev/")) {
+        emit notificationReceived("Setup requires a block device (/dev/...). Create a loop device first.", true);
+        return false;
+    }
+
     if (!simulatorRunning()) {
         emit notificationReceived("Start the simulator first!", true);
         return false;
     }
 
-    /* Eğer bir .img dosyası ise ve henüz yoksa, oluştur */
-    if (device.endsWith(".img") && !QFile::exists(device)) {
-        addLog("INFO", "Creating container file: " + device);
-        QProcess dd;
-        dd.start("truncate", {"-s", "100M", device});
-        if (!dd.waitForFinished(5000)) {
-            emit notificationReceived("Failed to create vault file!", true);
-            return false;
-        }
-    }
-
     /* ── Async başlat ── */
     m_isSetupRunning = true;
-    m_setupStatusText = "Formatting LUKS2 container on " + device + "...";
+    m_setupStatusText = "Formatting encrypted vault on " + device + "...";
+    saveState(QStringLiteral("locked"), true);
     emit setupRunningChanged();
 
-    addLog("INFO", QString("Formatting new LUKS vault on: %1 %2").arg(device).arg(force ? "(FORCED)" : ""));
+    addLog("INFO", QString("Formatting new encrypted vault on: %1 %2").arg(device).arg(force ? "(FORCED)" : ""));
 
     /* QFutureWatcher ile arka plan threadi izle */
     m_setupWatcher = new QFutureWatcher<int>(this);
-    connect(m_setupWatcher, &QFutureWatcher<int>::finished, this, [this, device]() {
+    connect(m_setupWatcher, &QFutureWatcher<int>::finished, this,
+            [this, device, vaultName, ownerId]() {
         int ret = m_setupWatcher->result();
         m_isSetupRunning = false;
         m_setupStatusText = "";
@@ -464,24 +670,36 @@ bool VaultController::setupVault(const QString &device, bool force, int ownerId,
 
         m_setupWatcher->deleteLater();
         m_setupWatcher = nullptr;
+        saveState(QStringLiteral("locked"), false);
 
         if (ret == 0) {
             m_selectedDevice = device;
+            QJsonObject regEntry = registryEntryForDevice(device);
+            if (regEntry.isEmpty()) {
+                regEntry.insert(QStringLiteral("path"), device);
+            }
+            regEntry.insert(QStringLiteral("isVault"), true);
+            if (!vaultName.isEmpty())
+                regEntry.insert(QStringLiteral("vaultName"), vaultName);
+            regEntry.insert(QStringLiteral("ownerFingerId"), ownerId);
+            saveRegistryEntry(regEntry);
             addLog("SUCCESS", "Vault setup complete: " + device);
-            emit statusChanged();
-            emit setupFinished(true, "✅  Vault setup complete! You can now unlock it.");
-            emit notificationReceived("Vault initialized! You can now unlock it.", false);
+            refreshStorageDevices();
+            selectDeviceByPath(device, true);
+            emit setupFinished(true, "✅ Vault setup complete! You can now unlock it.");
+            emit notificationReceived("✅ Vault initialized! You can now unlock it.", false);
+            emit navigationRequested(QStringLiteral("Dashboard.qml"));
         } else if (ret == 3) {
-            addLog("INFO", "Device already has a LUKS vault: " + device);
+            addLog("INFO", "Device already has an encrypted vault: " + device);
             emit setupFinished(false, "This device already has a vault. Use 'Unlock' to open it.");
             emit notificationReceived("This device already has a vault! Use 'Open Vault' to unlock it.", false);
         } else if (ret == 4) {
             addLog("ERROR", "Existing filesystem detected on: " + device);
-            emit setupFinished(false, "⚠  Existing data detected. Enable 'Force format' to override.");
+            emit setupFinished(false, "Existing data detected. Enable 'Force format' to override.");
             emit notificationReceived("Existing data detected! Enable Force Format to override.", true);
         } else {
             addLog("ERROR", "Vault setup failed on: " + device + " (exit " + QString::number(ret) + ")");
-            emit setupFinished(false, "❌  Setup failed. Check logs for details.");
+            emit setupFinished(false, "Setup failed. Check logs for details.");
             emit notificationReceived("Vault setup failed!", true);
         }
     });
@@ -657,90 +875,235 @@ QString VaultController::fingerprintLabel(int index) const
     return QString("Fingerprint #%1").arg(index + 1);
 }
 
+namespace {
+
+struct ChildPartitionSummary {
+    bool hasLuks = false;
+    QString luksSize;
+    QString normalSize;
+};
+
+ChildPartitionSummary summarizePartitions(const QJsonArray &children)
+{
+    ChildPartitionSummary summary;
+    for (const QJsonValue &v : children) {
+        const QJsonObject child = v.toObject();
+        if (child.value(QStringLiteral("type")).toString() != QStringLiteral("part"))
+            continue;
+
+        const QString fstype = child.value(QStringLiteral("fstype")).toString();
+        const QString childSize = child.value(QStringLiteral("size")).toString();
+        if (fstype == QStringLiteral("crypto_LUKS")) {
+            summary.hasLuks = true;
+            summary.luksSize = childSize;
+        } else {
+            summary.normalSize = childSize;
+        }
+    }
+    return summary;
+}
+
+void insertActionFields(QVariantMap &entry,
+                        const QString &kind,
+                        bool isVault,
+                        bool canDelete,
+                        const QString &deleteTargetPath = QString())
+{
+    entry.insert(QStringLiteral("kind"), kind);
+    entry.insert(QStringLiteral("canDelete"), canDelete);
+    entry.insert(QStringLiteral("deleteTargetPath"),
+                 canDelete ? deleteTargetPath : QString());
+    entry.insert(QStringLiteral("canSetup"), !isVault);
+    entry.insert(QStringLiteral("canOpen"), isVault);
+}
+
+QVariantMap makeDigitalVaultLoopEntry(const QJsonObject &obj,
+                                      const QString &devPath,
+                                      const QString &label,
+                                      const ChildPartitionSummary &summary)
+{
+    const QString name = obj.value(QStringLiteral("name")).toString();
+    const QString size = obj.value(QStringLiteral("size")).toString();
+    const bool isVault = summary.hasLuks;
+
+    QVariantMap entry;
+    entry.insert(QStringLiteral("path"), devPath);
+    entry.insert(QStringLiteral("isVault"), isVault);
+
+    if (isVault) {
+        entry.insert(QStringLiteral("name"), label.isEmpty()
+            ? QStringLiteral("Vault (%1)").arg(size)
+            : QStringLiteral("%1 (%2)").arg(label, size));
+        if (!summary.luksSize.isEmpty())
+            entry.insert(QStringLiteral("luksSize"), summary.luksSize);
+        QString description = QStringLiteral("Encrypted vault");
+        if (!summary.normalSize.isEmpty())
+            description += QStringLiteral(" — Normal storage (%1)").arg(summary.normalSize);
+        entry.insert(QStringLiteral("description"), description);
+    } else {
+        entry.insert(QStringLiteral("name"), label.isEmpty()
+            ? QStringLiteral("Loop: %1").arg(name)
+            : QStringLiteral("%1 (%2)").arg(label, size));
+        entry.insert(QStringLiteral("description"),
+                     QStringLiteral("DigitalVault container"));
+    }
+
+    insertActionFields(entry, QStringLiteral("digitalVaultLoop"), isVault, true, devPath);
+    return entry;
+}
+
+QVariantMap makeVaultPartitionEntry(const QString &devPath, const QString &size)
+{
+    QVariantMap entry;
+    entry.insert(QStringLiteral("path"), devPath);
+    entry.insert(QStringLiteral("name"), QStringLiteral("Vault: %1").arg(size));
+    entry.insert(QStringLiteral("luksSize"), size);
+    entry.insert(QStringLiteral("description"), QStringLiteral("Encrypted vault"));
+    entry.insert(QStringLiteral("isVault"), true);
+    insertActionFields(entry, QStringLiteral("vaultPartition"), true, false);
+    return entry;
+}
+
+QVariantMap makeGenericStorageEntry(const QJsonObject &obj,
+                                    const QString &devPath,
+                                    const QString &type)
+{
+    const QString name = obj.value(QStringLiteral("name")).toString();
+    const QString size = obj.value(QStringLiteral("size")).toString();
+
+    QVariantMap entry;
+    entry.insert(QStringLiteral("path"), devPath);
+    entry.insert(QStringLiteral("isVault"), false);
+    entry.insert(QStringLiteral("name"), QStringLiteral("/dev/%1 (%2)").arg(name, size));
+
+    QString info = obj.value(QStringLiteral("model")).toString()
+                   + QStringLiteral(" ")
+                   + obj.value(QStringLiteral("vendor")).toString();
+    info = info.trimmed();
+    if (info.isEmpty())
+        info = (type == QStringLiteral("disk")) ? QStringLiteral("Physical disk")
+                                              : QStringLiteral("Storage partition");
+    entry.insert(QStringLiteral("description"), info);
+
+    const QString kind = (type == QStringLiteral("disk")) ? QStringLiteral("disk")
+                                                        : QStringLiteral("partition");
+    insertActionFields(entry, kind, false, false);
+    return entry;
+}
+
+} // namespace
+
 QVariantList VaultController::getStorageDevices()
 {
     QVariantList devices;
 
-    /* 1. Eğer seçili cihaz bir dosya ise (fiziksel disk değilse), onu listeye ekle */
-    if (!m_selectedDevice.isEmpty() && !m_selectedDevice.startsWith("/dev/")) {
-        QVariantMap d;
-        d["path"] = m_selectedDevice;
-        QFileInfo fi(m_selectedDevice);
-        d["name"] = fi.fileName() + " (File Container)";
-        d["description"] = "Virtual Encrypted Container";
-        d["isVault"] = true;
-        devices << d;
-    }
-
-    /* 2. lsblk ile fiziksel diskleri listele */
     QProcess lsblk;
-    // FSTYPE ekleyerek hangi bölümün LUKS olduğunu anlıyoruz
-    lsblk.start("lsblk", QStringList() << "-Jno" << "NAME,SIZE,TYPE,MOUNTPOINT,MODEL,VENDOR,FSTYPE");
-    if (lsblk.waitForFinished(3000)) {
-        QJsonDocument doc = QJsonDocument::fromJson(lsblk.readAllStandardOutput());
-        if (doc.isObject()) {
-            QJsonArray blockDevices = doc.object()["blockdevices"].toArray();
-            
-            // Helper lambda for recursive parsing
-            std::function<void(const QJsonArray&)> parseDevices = [&](const QJsonArray& devs) {
-                for (const auto &dev : devs) {
-                    QJsonObject obj = dev.toObject();
-                    QString type = obj["type"].toString();
-                    QString fstype = obj["fstype"].toString();
-                    QString name = obj["name"].toString();
-                    QString size = obj["size"].toString();
-                    bool isLuks = (fstype == "crypto_LUKS");
+    lsblk.start(QStringLiteral("lsblk"),
+                {QStringLiteral("-Jno"),
+                 QStringLiteral("NAME,SIZE,TYPE,MOUNTPOINT,MODEL,VENDOR,FSTYPE")});
+    if (!lsblk.waitForFinished(3000))
+        return devices;
 
-                    /* Sistem loop cihazlarını (Snap paketleri vb.) gizle */
-                    if (type == "loop" && obj["mountpoint"].toString().startsWith("/snap")) {
-                        continue;
-                    }
+    const QJsonDocument doc = QJsonDocument::fromJson(lsblk.readAllStandardOutput());
+    if (!doc.isObject())
+        return devices;
 
-                    if (type == "part" || type == "disk" || type == "loop") {
-                        QVariantMap d;
-                        d["path"] = "/dev/" + name;
-                        
-                        QString displayName = "/dev/" + name;
-                        if (isLuks) {
-                            d["name"] = QString("🔐  Vault: %1").arg(size);
-                            d["description"] = "Encrypted Partition (LUKS2)";
-                            d["isVault"] = true;
-                        } else {
-                            d["name"] = QString("/dev/%1 (%2)").arg(name).arg(size);
-                            QString info = obj["model"].toString() + " " + obj["vendor"].toString();
-                            if (info.trimmed().isEmpty()) info = (type == "disk") ? "Physical Disk" : "Storage Partition";
-                            d["description"] = info;
-                            d["isVault"] = false;
-                        }
+    const QJsonArray blockDevices = doc.object()[QStringLiteral("blockdevices")].toArray();
 
-                        // Eğer bu bir disk ise ve çocukları arasında LUKS varsa, description'a ekle
-                        if (type == "disk" && obj.contains("children")) {
-                            QJsonArray children = obj["children"].toArray();
-                            for (const auto &child : children) {
-                                if (child.toObject()["fstype"].toString() == "crypto_LUKS") {
-                                    QString desc = d["description"].toString();
-                                    desc += " — Contains Vault (" + child.toObject()["size"].toString() + ")";
-                                    d["description"] = desc;
-                                    break;
-                                }
-                            }
-                        }
+    std::function<void(const QJsonArray &, const QString &)> parseDevices;
+    parseDevices = [&](const QJsonArray &devs, const QString &parentPath) {
+        for (const QJsonValue &dev : devs) {
+            const QJsonObject obj = dev.toObject();
+            const QString type = obj.value(QStringLiteral("type")).toString();
+            const QString fstype = obj.value(QStringLiteral("fstype")).toString();
+            const QString name = obj.value(QStringLiteral("name")).toString();
+            const QString size = obj.value(QStringLiteral("size")).toString();
+            const QString devPath = QStringLiteral("/dev/") + name;
+            const bool isLuks = (fstype == QStringLiteral("crypto_LUKS"));
+            const QJsonArray children = obj.value(QStringLiteral("children")).toArray();
 
-                        devices << d;
-                    }
+            if (type == QStringLiteral("loop")) {
+                if (obj.value(QStringLiteral("mountpoint")).toString().startsWith(QStringLiteral("/snap")))
+                    continue;
+                if (!isRegistryLoopDevice(devPath))
+                    continue;
 
-                    // Çocukları varsa onları da işle
-                    if (obj.contains("children")) {
-                        parseDevices(obj["children"].toArray());
+                const QString label = registryLabelForDevice(devPath);
+                if (!children.isEmpty()) {
+                    devices << makeDigitalVaultLoopEntry(obj, devPath, label,
+                                                         summarizePartitions(children));
+                    continue;
+                }
+
+                devices << makeDigitalVaultLoopEntry(obj, devPath, label, {});
+                continue;
+            }
+
+            if (type == QStringLiteral("part")) {
+                if (!parentPath.isEmpty() && isRegistryLoopDevice(parentPath))
+                    continue;
+
+                if (isLuks) {
+                    devices << makeVaultPartitionEntry(devPath, size);
+                    continue;
+                }
+
+                devices << makeGenericStorageEntry(obj, devPath, type);
+                continue;
+            }
+
+            if (type == QStringLiteral("disk")) {
+                QVariantMap entry = makeGenericStorageEntry(obj, devPath, type);
+                if (!children.isEmpty()) {
+                    const ChildPartitionSummary summary = summarizePartitions(children);
+                    if (summary.hasLuks) {
+                        QString desc = entry.value(QStringLiteral("description")).toString();
+                        desc += QStringLiteral(" — Encrypted vault (%1)").arg(summary.luksSize);
+                        if (!summary.normalSize.isEmpty())
+                            desc += QStringLiteral(", normal storage (%1)").arg(summary.normalSize);
+                        entry.insert(QStringLiteral("description"), desc);
                     }
                 }
-            };
+                devices << entry;
 
-            parseDevices(blockDevices);
+                if (!children.isEmpty()) {
+                    const QString childParent = devPath;
+                    parseDevices(children, childParent);
+                }
+                continue;
+            }
+
+            if (!children.isEmpty())
+                parseDevices(children, parentPath);
         }
-    }
+    };
 
+    parseDevices(blockDevices, QString());
     return devices;
+}
+
+bool VaultController::deviceListsEqual(const QVariantList &a, const QVariantList &b)
+{
+    if (a.size() != b.size())
+        return false;
+    for (int i = 0; i < a.size(); ++i) {
+        const QVariantMap ma = a.at(i).toMap();
+        const QVariantMap mb = b.at(i).toMap();
+        if (ma.value(QStringLiteral("path")).toString() != mb.value(QStringLiteral("path")).toString())
+            return false;
+        if (ma.value(QStringLiteral("isVault")).toBool() != mb.value(QStringLiteral("isVault")).toBool())
+            return false;
+    }
+    return true;
+}
+
+void VaultController::refreshStorageDevices()
+{
+    const QVariantList next = getStorageDevices();
+    if (deviceListsEqual(next, m_storageDevices))
+        return;
+    m_storageDevices = next;
+    emit devicesChanged();
 }
 
 /* ─── Periodic Status Poll ───────────────────────────────────────────────── */
@@ -758,70 +1121,587 @@ void VaultController::pollStatus()
      * Eğer HAL koptuysa ve vault açıksa, acil durum kilitlemesi yap.
      */
     if (!simulatorRunning()) {
-        if (!m_isLocked && !m_isToggling) {
-            addLog("CRITICAL", "HAL Disconnected! Emergency locking for security.");
-            toggleVault(); // Kilitlemeyi başlat
+        if (isVaultRuntimeOpen() && !m_isToggling && !s_emergencyClosing.load()) {
+            addLog("CRITICAL", "HAL disconnected — emergency locking vault.");
+            emergencyClose();
         }
     }
 
-    if (!m_isLocked) {
-        /* /dev/mapper/digitalvault hala var mı? */
-        if (!QFile::exists("/dev/mapper/digitalvault")) {
-            m_isLocked = true;
-            addLog("WARNING", "Vault was closed externally");
-        }
+    if (!m_isLocked && !isVaultRuntimeOpen()) {
+        m_isLocked = true;
+        m_unlockedDevice.clear();
+        saveState(QStringLiteral("locked"), false);
+        addLog("WARNING", "Vault was closed externally");
     }
 
-    if (wasLocked != m_isLocked) {
+    bool stateChanged = (wasLocked != m_isLocked);
+    if (!isVaultRuntimeOpen() && !m_unlockedDevice.isEmpty()) {
+        m_unlockedDevice.clear();
+        stateChanged = true;
+    }
+    if (stateChanged)
         emit statusChanged();
-    }
+
+    refreshStorageDevices();
 }
 
-bool VaultController::createNewVault(const QString &path)
+QString VaultController::defaultContainersDir() const
 {
-    if (path.isEmpty()) return false;
+    return m_containersDir;
+}
 
-    /* URL formatındaysa (file://) temizle */
-    QString localPath = QUrl(path).toLocalFile();
-    if (localPath.isEmpty()) localPath = path;
+QString VaultController::sanitizeContainerName(const QString &name) const
+{
+    QString s = name.trimmed().toLower();
+    s.replace(QRegularExpression(QStringLiteral("[^a-z0-9_-]")), QStringLiteral("_"));
+    s.replace(QRegularExpression(QStringLiteral("_+")), QStringLiteral("_"));
+    if (s.isEmpty()) s = QStringLiteral("vault");
+    return s.left(48);
+}
 
-    m_selectedDevice = localPath;
-    updateActivity("New vault target set: " + localPath);
+QJsonArray VaultController::loadRegistryArray() const
+{
+    QFile f(m_registryPath);
+    if (!f.open(QIODevice::ReadOnly))
+        return QJsonArray();
+    const QJsonDocument doc = QJsonDocument::fromJson(f.readAll());
+    if (!doc.isArray())
+        return QJsonArray();
+    return doc.array();
+}
+
+bool VaultController::saveRegistryEntry(const QJsonObject &entry)
+{
+    QJsonArray arr = loadRegistryArray();
+    const QString backing = entry.value(QStringLiteral("backing")).toString();
+    const QString path = entry.value(QStringLiteral("path")).toString();
+    QJsonArray updated;
+    bool replaced = false;
+    for (const QJsonValue &v : arr) {
+        QJsonObject o = v.toObject();
+        if ((!backing.isEmpty() && o.value(QStringLiteral("backing")).toString() == backing)
+            || (!path.isEmpty() && o.value(QStringLiteral("path")).toString() == path)) {
+            updated.append(entry);
+            replaced = true;
+        } else {
+            updated.append(o);
+        }
+    }
+    if (!replaced)
+        updated.append(entry);
+
+    QFile f(m_registryPath);
+    if (!f.open(QIODevice::WriteOnly))
+        return false;
+    f.write(QJsonDocument(updated).toJson(QJsonDocument::Indented));
+    return true;
+}
+
+void VaultController::syncRegistryWithLosetup()
+{
+    QProcess losetup;
+    losetup.start(QStringLiteral("losetup"), {QStringLiteral("-J")});
+    if (!losetup.waitForFinished(3000))
+        return;
+
+    QJsonDocument doc = QJsonDocument::fromJson(losetup.readAllStandardOutput());
+    if (!doc.isObject())
+        return;
+
+    QHash<QString, QString> backingToLoop;
+    const QJsonArray loops = doc.object().value(QStringLiteral("loopdevices")).toArray();
+    for (const QJsonValue &v : loops) {
+        const QJsonObject o = v.toObject();
+        const QString backing = o.value(QStringLiteral("back-file")).toString();
+        const QString dev = QStringLiteral("/dev/") + o.value(QStringLiteral("name")).toString();
+        if (!backing.isEmpty() && dev.startsWith(QStringLiteral("/dev/loop")))
+            backingToLoop.insert(backing, dev);
+    }
+
+    QJsonArray arr = loadRegistryArray();
+    bool changed = false;
+    for (int i = 0; i < arr.size(); ++i) {
+        QJsonObject o = arr.at(i).toObject();
+        const QString backing = o.value(QStringLiteral("backing")).toString();
+        if (backing.isEmpty())
+            continue;
+        const QString loop = backingToLoop.value(backing);
+        if (!loop.isEmpty() && o.value(QStringLiteral("path")).toString() != loop) {
+            o.insert(QStringLiteral("path"), loop);
+            arr.replace(i, o);
+            changed = true;
+        }
+    }
+    if (!changed)
+        return;
+
+    QFile f(m_registryPath);
+    if (f.open(QIODevice::WriteOnly))
+        f.write(QJsonDocument(arr).toJson(QJsonDocument::Indented));
+}
+
+bool VaultController::isRegistryLoopDevice(const QString &devPath) const
+{
+    for (const QJsonValue &v : loadRegistryArray()) {
+        if (v.toObject().value(QStringLiteral("path")).toString() == devPath)
+            return true;
+    }
+    return false;
+}
+
+QString VaultController::registryLabelForDevice(const QString &devPath) const
+{
+    const QJsonObject entry = registryEntryForDevice(devPath);
+    return entry.value(QStringLiteral("label")).toString();
+}
+
+QJsonObject VaultController::registryEntryForDevice(const QString &devPath) const
+{
+    for (const QJsonValue &v : loadRegistryArray()) {
+        const QJsonObject o = v.toObject();
+        if (o.value(QStringLiteral("path")).toString() == devPath)
+            return o;
+    }
+    return {};
+}
+
+namespace {
+
+constexpr int kMinVaultPartitionMB = 16;
+constexpr int kMinNormalPartitionMB = 16;
+constexpr int kDefaultVaultSizeCapMB = 2048;
+
+} // namespace
+
+QVariantMap VaultController::resolveDeviceInfo(const QString &path) const
+{
+    QVariantMap info;
+    info.insert(QStringLiteral("valid"), false);
+    info.insert(QStringLiteral("path"), path);
+
+    if (!path.startsWith(QStringLiteral("/dev/"))) {
+        info.insert(QStringLiteral("error"),
+                    QStringLiteral("Not a block device path."));
+        return info;
+    }
+
+    QString fstype;
+    QString devType;
+    int capacityMB = 0;
+
+    QJsonObject lsblkRoot;
+    QProcess lsblk;
+    lsblk.start(QStringLiteral("lsblk"),
+                {QStringLiteral("-Jbno"), QStringLiteral("FSTYPE,SIZE,TYPE"), path});
+    if (lsblk.waitForFinished(2000)) {
+        const QJsonDocument doc = QJsonDocument::fromJson(lsblk.readAllStandardOutput());
+        if (doc.isObject()) {
+            const QJsonArray devs = doc.object()[QStringLiteral("blockdevices")].toArray();
+            if (!devs.isEmpty()) {
+                lsblkRoot = devs.at(0).toObject();
+                fstype = lsblkRoot[QStringLiteral("fstype")].toString();
+                devType = lsblkRoot[QStringLiteral("type")].toString();
+                const qlonglong bytes = lsblkRoot[QStringLiteral("size")].toVariant().toLongLong();
+                capacityMB = static_cast<int>(bytes / (1024 * 1024));
+            }
+        }
+    }
+
+    const QJsonObject reg = registryEntryForDevice(path);
+    const bool isRegistryLoop = !reg.isEmpty();
+    QString label = reg.value(QStringLiteral("label")).toString();
+    const QString backing = reg.value(QStringLiteral("backing")).toString();
+    const int registrySizeMB = reg.value(QStringLiteral("sizeMB")).toInt();
+    bool isVault = (fstype == QStringLiteral("crypto_LUKS"));
+    if (reg.value(QStringLiteral("isVault")).toBool())
+        isVault = true;
+    if (!isVault && lsblkRoot.contains(QStringLiteral("children"))) {
+        const QJsonArray children = lsblkRoot[QStringLiteral("children")].toArray();
+        for (const QJsonValue &v : children) {
+            if (v.toObject().value(QStringLiteral("fstype")).toString()
+                == QStringLiteral("crypto_LUKS")) {
+                isVault = true;
+                break;
+            }
+        }
+    }
+
+    if (capacityMB <= 0 && registrySizeMB > 0)
+        capacityMB = registrySizeMB;
+
+    if (devType.isEmpty()) {
+        if (path.startsWith(QStringLiteral("/dev/loop")))
+            devType = QStringLiteral("loop");
+        else
+            devType = QStringLiteral("disk");
+    }
+
+    const bool isSetupCapable = capacityMB >= kMinVaultPartitionMB;
+
+    info.insert(QStringLiteral("valid"), isSetupCapable);
+    info.insert(QStringLiteral("capacityMB"), capacityMB);
+    info.insert(QStringLiteral("fstype"), fstype);
+    info.insert(QStringLiteral("type"), devType);
+    info.insert(QStringLiteral("label"), label);
+    info.insert(QStringLiteral("backingPath"), backing);
+    info.insert(QStringLiteral("isVault"), isVault);
+    info.insert(QStringLiteral("isRegistryLoop"), isRegistryLoop);
+    info.insert(QStringLiteral("isSetupCapable"), isSetupCapable);
+    if (!isSetupCapable) {
+        info.insert(QStringLiteral("error"),
+                    QStringLiteral("Device has no known capacity or is too small."));
+    }
+
+    return info;
+}
+
+void VaultController::applySelectedDeviceInfo(const QVariantMap &info)
+{
+    m_selectedDeviceInfo = info;
+    m_selectedDevice = info.value(QStringLiteral("path")).toString();
+    m_selectedDeviceCapacityMB = info.value(QStringLiteral("capacityMB")).toInt();
+    m_isSelectedDeviceVault = info.value(QStringLiteral("isVault")).toBool();
+}
+
+void VaultController::selectDeviceByPath(const QString &path, bool forceRefresh)
+{
+    if (path.isEmpty())
+        return;
+    if (!forceRefresh && m_selectedDevice == path)
+        return;
+
+    applySelectedDeviceInfo(resolveDeviceInfo(path));
     emit statusChanged();
-    emit notificationReceived("Device selected: " + localPath + ". Use 'Setup Vault' to format.", false);
+}
 
+QVariantMap VaultController::createSetupSession(const QString &devicePath) const
+{
+    QVariantMap session;
+    session.insert(QStringLiteral("valid"), false);
+
+    const QString path = devicePath.trimmed().isEmpty() ? m_selectedDevice : devicePath.trimmed();
+    const QVariantMap device = resolveDeviceInfo(path);
+
+    if (!device.value(QStringLiteral("valid")).toBool()) {
+        session.insert(QStringLiteral("error"),
+                       device.value(QStringLiteral("error")).toString().isEmpty()
+                           ? QStringLiteral("Select a block device with known capacity first.")
+                           : device.value(QStringLiteral("error")).toString());
+        return session;
+    }
+
+    const int capacityMB = device.value(QStringLiteral("capacityMB")).toInt();
+    const int maxVaultMB = qMax(kMinVaultPartitionMB, capacityMB - kMinNormalPartitionMB);
+    const int defaultVaultMB = qBound(kMinVaultPartitionMB,
+                                      qMin(kDefaultVaultSizeCapMB, capacityMB / 2),
+                                      maxVaultMB);
+    const bool canCreateNormalPartition =
+        (capacityMB - defaultVaultMB) >= kMinNormalPartitionMB;
+    const bool isVault = device.value(QStringLiteral("isVault")).toBool();
+
+    session.insert(QStringLiteral("valid"), true);
+    session.insert(QStringLiteral("devicePath"), path);
+    session.insert(QStringLiteral("capacityMB"), capacityMB);
+    session.insert(QStringLiteral("minVaultMB"), kMinVaultPartitionMB);
+    session.insert(QStringLiteral("minNormalMB"), kMinNormalPartitionMB);
+    session.insert(QStringLiteral("maxVaultMB"), maxVaultMB);
+    session.insert(QStringLiteral("defaultVaultMB"), defaultVaultMB);
+    session.insert(QStringLiteral("canCreateNormalPartition"), canCreateNormalPartition);
+    session.insert(QStringLiteral("requiresForceConfirmation"), isVault);
+    session.insert(QStringLiteral("isVault"), isVault);
+    session.insert(QStringLiteral("isRegistryLoop"),
+                   device.value(QStringLiteral("isRegistryLoop")));
+    session.insert(QStringLiteral("defaultVaultName"), QStringLiteral("My Vault"));
+    session.insert(QStringLiteral("defaultNormalName"), QStringLiteral("Normal"));
+    session.insert(QStringLiteral("defaultOwnerId"), 1);
+
+    return session;
+}
+
+bool VaultController::createLoopDevice(const QString &containerName, int totalSizeMB,
+                                       const QString &storageDir)
+{
+    if (m_isSetupRunning) {
+        emit notificationReceived("Another operation is already in progress!", true);
+        return false;
+    }
+
+    const QString label = sanitizeContainerName(containerName);
+    if (totalSizeMB < 16) {
+        emit notificationReceived("Minimum container size is 16 MB.", true);
+        return false;
+    }
+
+    QString dir = storageDir.trimmed();
+    if (dir.isEmpty())
+        dir = m_containersDir;
+    QDir().mkpath(dir);
+
+    const QString imagePath = QDir(dir).absoluteFilePath(label + QStringLiteral(".img"));
+    if (QFile::exists(imagePath)) {
+        emit notificationReceived("Container image already exists: " + imagePath, true);
+        return false;
+    }
+
+    m_isSetupRunning = true;
+    m_setupStatusText = QStringLiteral("Creating loop device for ") + label + QStringLiteral("...");
+    emit setupRunningChanged();
+    addLog("INFO", QStringLiteral("Creating container: ") + imagePath);
+
+    struct CreateLoopContext {
+        QString loopPath;
+        QString error;
+    };
+    auto ctx = std::make_shared<CreateLoopContext>();
+
+    const QString vaultManagerBin = m_vaultManagerBin;
+    const int sizeMb = totalSizeMB;
+
+    m_setupWatcher = new QFutureWatcher<int>(this);
+    connect(m_setupWatcher, &QFutureWatcher<int>::finished, this,
+            [this, ctx, imagePath, label, sizeMb]() {
+        const int code = m_setupWatcher->result();
+        m_isSetupRunning = false;
+        m_setupStatusText.clear();
+        emit setupRunningChanged();
+        m_setupWatcher->deleteLater();
+        m_setupWatcher = nullptr;
+
+        if (code != 0 || ctx->loopPath.isEmpty()) {
+            const QString err = ctx->error.isEmpty()
+                ? QStringLiteral("Failed to create loop device.")
+                : ctx->error;
+            addLog("ERROR", err);
+            emit loopCreateFinished(false, err);
+            emit notificationReceived(err, true);
+            return;
+        }
+
+        QJsonObject entry;
+        entry.insert(QStringLiteral("backing"), imagePath);
+        entry.insert(QStringLiteral("path"), ctx->loopPath);
+        entry.insert(QStringLiteral("label"), label);
+        entry.insert(QStringLiteral("sizeMB"), sizeMb);
+        entry.insert(QStringLiteral("isVault"), false);
+        saveRegistryEntry(entry);
+
+        addLog("SUCCESS", QStringLiteral("Loop device ready: ") + ctx->loopPath
+               + QStringLiteral(" (") + imagePath + QStringLiteral(")"));
+        refreshStorageDevices();
+        selectDeviceByPath(ctx->loopPath, true);
+        const QString msg = QStringLiteral("Loop ready at ") + ctx->loopPath
+            + QStringLiteral(" — run Setup Vault to encrypt.");
+        emit loopCreateFinished(true, msg);
+        emit notificationReceived(msg, false);
+    });
+
+    QFuture<int> future = QtConcurrent::run([vaultManagerBin, imagePath, sizeMb, ctx]() -> int {
+        QProcess proc;
+        proc.setProcessChannelMode(QProcess::MergedChannels);
+        QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+        env.insert("SUDO_UID", QString::number(::getuid()));
+        env.insert("SUDO_GID", QString::number(::getgid()));
+        proc.setProcessEnvironment(env);
+
+        QStringList launchArgs;
+        launchArgs << vaultManagerBin
+                   << QStringLiteral("createloop") << imagePath << QString::number(sizeMb);
+        proc.start(QStringLiteral("pkexec"), launchArgs);
+        if (!proc.waitForStarted(5000)) {
+            ctx->error = QStringLiteral("Could not start vault_manager (pkexec).");
+            return -1;
+        }
+        if (!proc.waitForFinished(120000)) {
+            proc.kill();
+            ctx->error = QStringLiteral("Create loop timed out.");
+            return -1;
+        }
+        const int exitCode = proc.exitCode();
+        const QString output = QString::fromUtf8(proc.readAll()).trimmed();
+        for (const QString &line : output.split('\n')) {
+            const QString t = line.trimmed();
+            if (t.startsWith(QStringLiteral("/dev/loop"))) {
+                ctx->loopPath = t;
+                break;
+            }
+        }
+        if (exitCode == 2)
+            ctx->error = QStringLiteral("Container image already exists.");
+        else if (ctx->loopPath.isEmpty())
+            ctx->error = output.isEmpty() ? QStringLiteral("createloop failed.") : output;
+        return (exitCode == 0 && !ctx->loopPath.isEmpty()) ? 0 : exitCode;
+    });
+
+    m_setupWatcher->setFuture(future);
+    return true;
+}
+
+QString VaultController::registryBackingForDevice(const QString &devicePath) const
+{
+    for (const QJsonValue &v : loadRegistryArray()) {
+        const QJsonObject o = v.toObject();
+        if (o.value(QStringLiteral("path")).toString() == devicePath)
+            return o.value(QStringLiteral("backing")).toString();
+    }
+    return QString();
+}
+
+bool VaultController::removeRegistryEntry(const QString &devicePath, QString *removedBacking)
+{
+    const QJsonArray arr = loadRegistryArray();
+    QJsonArray out;
+    bool found = false;
+    QString backing;
+
+    for (const QJsonValue &v : arr) {
+        const QJsonObject o = v.toObject();
+        if (o.value(QStringLiteral("path")).toString() == devicePath) {
+            found = true;
+            backing = o.value(QStringLiteral("backing")).toString();
+            continue;
+        }
+        out.append(v);
+    }
+    if (!found)
+        return false;
+
+    if (removedBacking)
+        *removedBacking = backing;
+
+    QFile f(m_registryPath);
+    if (!f.open(QIODevice::WriteOnly))
+        return false;
+    f.write(QJsonDocument(out).toJson(QJsonDocument::Indented));
+    return true;
+}
+
+bool VaultController::deleteDevice(const QString &devicePath)
+{
+    if (m_isSetupRunning) {
+        emit notificationReceived("Another operation is already in progress!", true);
+        return false;
+    }
+
+    const QString path = devicePath.trimmed();
+    if (path.isEmpty()) {
+        emit notificationReceived("No device selected.", true);
+        return false;
+    }
+
+    if (isVaultRuntimeOpen()) {
+        addLog("INFO", QStringLiteral("Locking vault before deleting device..."));
+        if (!emergencyClose()) {
+            emit notificationReceived(
+                "Could not lock the vault before delete. Close apps using the mount point.", true);
+            return false;
+        }
+    }
+
+    if (!isRegistryLoopDevice(path)) {
+        emit notificationReceived("Only DigitalVault loop devices can be deleted here.", true);
+        return false;
+    }
+
+    const QString backing = registryBackingForDevice(path);
+    if (backing.isEmpty()) {
+        emit notificationReceived("No backing image path in registry for this device.", true);
+        return false;
+    }
+
+    m_isSetupRunning = true;
+    m_setupStatusText = QStringLiteral("Deleting ") + path + QStringLiteral("...");
+    emit setupRunningChanged();
+    addLog("INFO", QStringLiteral("Deleting loop device: ") + path);
+
+    struct DeleteContext {
+        QString deletedBacking;
+        QString error;
+    };
+    auto ctx = std::make_shared<DeleteContext>();
+
+    const QString vaultManagerBin = m_vaultManagerBin;
+    const QString backingPath = backing;
+
+    m_setupWatcher = new QFutureWatcher<int>(this);
+    connect(m_setupWatcher, &QFutureWatcher<int>::finished, this,
+            [this, ctx, path, backing]() {
+        const int code = m_setupWatcher->result();
+        m_isSetupRunning = false;
+        m_setupStatusText.clear();
+        emit setupRunningChanged();
+        m_setupWatcher->deleteLater();
+        m_setupWatcher = nullptr;
+
+        if (code != 0 || ctx->deletedBacking.isEmpty()) {
+            const QString err = ctx->error.isEmpty()
+                ? QStringLiteral("Failed to delete loop device.")
+                : ctx->error;
+            addLog("ERROR", err);
+            emit deviceDeleteFinished(false, err);
+            emit notificationReceived(err, true);
+            return;
+        }
+
+        removeRegistryEntry(path, nullptr);
+
+        if (m_selectedDevice == path) {
+            m_selectedDevice.clear();
+            m_selectedDeviceCapacityMB = 0;
+            m_isSelectedDeviceVault = false;
+            emit statusChanged();
+        }
+
+        refreshStorageDevices();
+        addLog("SUCCESS", QStringLiteral("Deleted loop device: ") + path);
+        const QString msg = QStringLiteral("Device deleted: ") + path;
+        emit deviceDeleteFinished(true, msg);
+        emit notificationReceived(msg, false);
+    });
+
+    QFuture<int> future = QtConcurrent::run([vaultManagerBin, path, backingPath, ctx]() -> int {
+        QProcess proc;
+        proc.setProcessChannelMode(QProcess::MergedChannels);
+        QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+        env.insert("SUDO_UID", QString::number(::getuid()));
+        env.insert("SUDO_GID", QString::number(::getgid()));
+        proc.setProcessEnvironment(env);
+
+        QStringList launchArgs;
+        launchArgs << vaultManagerBin << QStringLiteral("destroyloop") << path << backingPath;
+        proc.start(QStringLiteral("pkexec"), launchArgs);
+        if (!proc.waitForFinished(60000)) {
+            proc.kill();
+            ctx->error = QStringLiteral("destroyloop timed out.");
+            return -1;
+        }
+
+        const QByteArray output = proc.readAllStandardOutput();
+        const int exitCode = proc.exitCode();
+
+        for (const QByteArray &line : output.split('\n')) {
+            const QByteArray trimmed = line.trimmed();
+            if (trimmed.startsWith("DELETED:")) {
+                ctx->deletedBacking = QString::fromUtf8(trimmed.mid(8));
+                break;
+            }
+        }
+
+        if (exitCode != 0 || ctx->deletedBacking.isEmpty()) {
+            ctx->error = QString::fromUtf8(output).trimmed();
+            if (ctx->error.isEmpty())
+                ctx->error = QStringLiteral("destroyloop failed (exit %1).").arg(exitCode);
+            return exitCode != 0 ? exitCode : 1;
+        }
+        return 0;
+    });
+
+    m_setupWatcher->setFuture(future);
     return true;
 }
 
 void VaultController::setSelectedDevice(const QString &path)
 {
-    if (m_selectedDevice == path) return;
-    
-    m_selectedDevice = path;
-    m_isSelectedDeviceVault = false;
-    m_selectedDeviceCapacityMB = 0;
-
-    /* Bu cihazın LUKS olup olmadığını ve kapasitesini kontrol et */
-    QProcess lsblk;
-    lsblk.start("lsblk", {"-Jbno", "FSTYPE,SIZE", path});
-    if (lsblk.waitForFinished(2000)) {
-        QJsonDocument doc = QJsonDocument::fromJson(lsblk.readAllStandardOutput());
-        if (doc.isObject()) {
-            QJsonArray devs = doc.object()["blockdevices"].toArray();
-            if (!devs.isEmpty()) {
-                QJsonObject obj = devs.at(0).toObject();
-                QString fstype = obj["fstype"].toString();
-                if (fstype == "crypto_LUKS") {
-                    m_isSelectedDeviceVault = true;
-                }
-                
-                qlonglong bytes = obj["size"].toVariant().toLongLong();
-                m_selectedDeviceCapacityMB = static_cast<int>(bytes / (1024 * 1024));
-            }
-        }
-    }
-
-    emit statusChanged();
+    selectDeviceByPath(path, false);
 }
 
 void VaultController::addLog(const QString &level, const QString &msg)
@@ -871,6 +1751,16 @@ QVariantList VaultController::getSecurityLogsPage(int page, int pageSize)
         result.append(array.at(i).toVariant());
     }
     return result;
+}
+
+void VaultController::notifyUser(const QString &message, bool isError)
+{
+    emit notificationReceived(message, isError);
+}
+
+void VaultController::navigateToPage(const QString &pageFile)
+{
+    emit navigationRequested(pageFile);
 }
 
 void VaultController::clearLogs()
@@ -923,8 +1813,8 @@ void VaultController::renameFingerprint(int index, const QString &newName)
 
 void VaultController::openInFileManager()
 {
-    if (m_isLocked) {
-        emit notificationReceived("Unlock the vault first!", true);
+    if (!isVaultUnlockedForDevice(m_selectedDevice)) {
+        emit notificationReceived("Unlock this vault first!", true);
         return;
     }
 
@@ -935,8 +1825,8 @@ void VaultController::openInFileManager()
 
 void VaultController::openInTerminal()
 {
-    if (m_isLocked) {
-        emit notificationReceived("Unlock the vault first!", true);
+    if (!isVaultUnlockedForDevice(m_selectedDevice)) {
+        emit notificationReceived("Unlock this vault first!", true);
         return;
     }
     resetAutoLockTimer();
@@ -1074,39 +1964,126 @@ bool VaultController::revokeAccess(int ownerFingerId, int slotNumber)
     return false;
 }
 
-QVariantList VaultController::getKeyslots()
+QVariantList VaultController::fetchKeyslotsForDevice(const QString &devicePath) const
 {
     QVariantList slotList;
+    if (devicePath.isEmpty())
+        return slotList;
 
-    if (m_selectedDevice.isEmpty()) return slotList;
-
-    /* vault_manager listslots çıktısını oku */
-    QString bin = findVaultManager();
-    if (bin.isEmpty()) return slotList;
+    const QString bin = findVaultManager();
+    if (bin.isEmpty())
+        return slotList;
 
     QProcess proc;
-    proc.start("pkexec", QStringList() << bin << "listslots" << m_selectedDevice);
-    if (!proc.waitForFinished(10000)) return slotList;
+    proc.start(QStringLiteral("pkexec"), QStringList() << bin << QStringLiteral("listslots") << devicePath);
+    if (!proc.waitForFinished(10000))
+        return slotList;
 
-    QString output = proc.readAllStandardOutput();
-    QStringList lines = output.split('\n', Qt::SkipEmptyParts);
+    const QString output = QString::fromUtf8(proc.readAllStandardOutput());
+    const QStringList lines = output.split(QLatin1Char('\n'), Qt::SkipEmptyParts);
 
     for (const QString &line : lines) {
-        /* Format: SLOT:0:luks2 */
-        if (line.startsWith("SLOT:")) {
-            QStringList parts = line.mid(5).split(':');
-            if (parts.size() >= 2) {
-                QVariantMap slot;
-                slot["number"] = parts[0].toInt();
-                slot["type"] = parts[1];
-                slot["label"] = (parts[0] == "0") ? "Owner (Primary)" : "User Slot " + parts[0];
-                slot["isOwner"] = (parts[0] == "0");
-                slotList << slot;
-            }
-        }
+        if (!line.startsWith(QStringLiteral("SLOT:")))
+            continue;
+        const QStringList parts = line.mid(5).split(QLatin1Char(':'));
+        if (parts.size() < 2)
+            continue;
+        QVariantMap slot;
+        const int slotNum = parts[0].toInt();
+        slot.insert(QStringLiteral("number"), slotNum);
+        slot.insert(QStringLiteral("type"), parts[1]);
+        slot.insert(QStringLiteral("label"),
+                    slotNum == 0 ? QStringLiteral("Owner (Primary)")
+                                 : QStringLiteral("User Slot %1").arg(slotNum));
+        slot.insert(QStringLiteral("isOwner"), slotNum == 0);
+        slotList << slot;
     }
 
     return slotList;
+}
+
+QVariantList VaultController::getKeyslots()
+{
+    return getKeyslotsForDevice(m_selectedDevice);
+}
+
+QVariantList VaultController::getKeyslotsForDevice(const QString &devicePath)
+{
+    return fetchKeyslotsForDevice(devicePath);
+}
+
+QVariantMap VaultController::enrichVaultEntry(const QVariantMap &entry) const
+{
+    QVariantMap out = entry;
+    const QString path = entry.value(QStringLiteral("path")).toString();
+    const QJsonObject reg = registryEntryForDevice(path);
+
+    QString displayName = reg.value(QStringLiteral("vaultName")).toString();
+    if (displayName.isEmpty())
+        displayName = reg.value(QStringLiteral("label")).toString();
+    if (displayName.isEmpty())
+        displayName = entry.value(QStringLiteral("name")).toString();
+    out.insert(QStringLiteral("displayName"), displayName);
+
+    QString sizeLabel = entry.value(QStringLiteral("luksSize")).toString();
+    if (sizeLabel.isEmpty()) {
+        const int capacityMB = entry.value(QStringLiteral("capacityMB")).toInt();
+        if (capacityMB > 0)
+            sizeLabel = QStringLiteral("%1 GB").arg(capacityMB / 1024.0, 0, 'f', 1);
+    }
+    out.insert(QStringLiteral("sizeLabel"), sizeLabel);
+    out.insert(QStringLiteral("encryptionLabel"), QStringLiteral("AES-256-XTS (LUKS2)"));
+    out.insert(QStringLiteral("devicePath"), path);
+
+    const bool selected = (path == m_selectedDevice);
+    out.insert(QStringLiteral("isSelected"), selected);
+    out.insert(QStringLiteral("isUnlocked"), isVaultUnlockedForDevice(path));
+    return out;
+}
+
+QVariantList VaultController::registeredVaults() const
+{
+    QVariantList vaults;
+    for (const QVariant &v : m_storageDevices) {
+        const QVariantMap entry = v.toMap();
+        if (!entry.value(QStringLiteral("isVault")).toBool())
+            continue;
+        vaults << enrichVaultEntry(entry);
+    }
+    return vaults;
+}
+
+QVariantMap VaultController::vaultDetailForDevice(const QString &devicePath) const
+{
+    QVariantMap detail;
+    if (devicePath.isEmpty())
+        return detail;
+
+    for (const QVariant &v : m_storageDevices) {
+        const QVariantMap entry = v.toMap();
+        if (entry.value(QStringLiteral("path")).toString() != devicePath)
+            continue;
+        detail = enrichVaultEntry(entry);
+        break;
+    }
+
+    if (detail.isEmpty()) {
+        detail = enrichVaultEntry(resolveDeviceInfo(devicePath));
+    }
+
+    const QVariantList keyslotList = fetchKeyslotsForDevice(devicePath);
+    detail.insert(QStringLiteral("accessCount"), keyslotList.size());
+    detail.insert(QStringLiteral("keyslots"), keyslotList);
+    detail.insert(QStringLiteral("path"), devicePath);
+    detail.insert(QStringLiteral("isUnlocked"), isVaultUnlockedForDevice(devicePath));
+    return detail;
+}
+
+bool VaultController::isVaultUnlockedForDevice(const QString &devicePath) const
+{
+    if (devicePath.isEmpty() || m_unlockedDevice.isEmpty())
+        return false;
+    return devicePath == m_unlockedDevice && isVaultRuntimeOpen();
 }
 
 void VaultController::setAutoLockTimeout(int minutes)
@@ -1132,8 +2109,8 @@ void VaultController::resetAutoLockTimer()
 
 void VaultController::handleAutoLock()
 {
-    if (!m_isLocked && !m_isToggling) {
-        addLog("WARNING", "Inactivity timeout reached. Auto-locking vault...");
-        toggleVault();
-    }
+    if (m_isToggling || !isVaultRuntimeOpen())
+        return;
+    addLog("WARNING", "Inactivity timeout reached. Auto-locking vault...");
+    beginLockVault();
 }

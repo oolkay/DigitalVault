@@ -9,7 +9,12 @@
 #include <QTimer>
 #include <QFutureWatcher>
 
+#include <atomic>
+
 #include <QtQml/qqmlregistration.h>
+
+class VaultController;
+extern VaultController *g_vaultController;
 
 class VaultController : public QObject
 {
@@ -20,6 +25,7 @@ class VaultController : public QObject
     Q_PROPERTY(int fingerprintCount   READ fingerprintCount   NOTIFY fingerprintsChanged)
     Q_PROPERTY(bool simulatorRunning  READ simulatorRunning   NOTIFY statusChanged)
     Q_PROPERTY(QString selectedDevice READ selectedDevice    NOTIFY statusChanged)
+    Q_PROPERTY(QString unlockedDevice READ unlockedDevice    NOTIFY statusChanged)
     Q_PROPERTY(QVariantList securityLogs READ securityLogs    NOTIFY logsChanged)
     Q_PROPERTY(bool isSetupRunning    READ isSetupRunning     NOTIFY setupRunningChanged)
     Q_PROPERTY(bool isToggling        READ isToggling        NOTIFY togglingChanged)
@@ -27,6 +33,9 @@ class VaultController : public QObject
     Q_PROPERTY(QString setupStatusText READ setupStatusText   NOTIFY setupRunningChanged)
     Q_PROPERTY(bool isSelectedDeviceVault READ isSelectedDeviceVault NOTIFY statusChanged)
     Q_PROPERTY(int selectedDeviceCapacityMB READ selectedDeviceCapacityMB NOTIFY statusChanged)
+    Q_PROPERTY(QVariantMap selectedDeviceInfo READ selectedDeviceInfo NOTIFY statusChanged)
+    Q_PROPERTY(QVariantList storageDevices READ storageDevices NOTIFY devicesChanged)
+    Q_PROPERTY(QVariantList registeredVaults READ registeredVaults NOTIFY devicesChanged)
 
 public:
     explicit VaultController(QObject *parent = nullptr);
@@ -38,11 +47,15 @@ public:
     QString mountPoint()      const { return m_mountPoint; }
     QString lastActivity()    const { return m_lastActivity; }
     QString selectedDevice()  const { return m_selectedDevice; }
+    QString unlockedDevice()  const { return m_unlockedDevice; }
     QVariantList securityLogs() const { return m_securityLogs; }
     bool    isSetupRunning()  const { return m_isSetupRunning; }
     QString setupStatusText() const { return m_setupStatusText; }
     bool    isSelectedDeviceVault() const { return m_isSelectedDeviceVault; }
     int     selectedDeviceCapacityMB() const { return m_selectedDeviceCapacityMB; }
+    QVariantMap selectedDeviceInfo() const { return m_selectedDeviceInfo; }
+    QVariantList storageDevices() const { return m_storageDevices; }
+    QVariantList registeredVaults() const;
 
     void    addLog(const QString &level, const QString &msg);
     bool    simulatorRunning() const;
@@ -57,7 +70,17 @@ public:
     Q_INVOKABLE void        startSimulator();
     Q_INVOKABLE void        stopSimulator();
     Q_INVOKABLE void        setSelectedDevice(const QString &path);
-    Q_INVOKABLE bool        createNewVault(const QString &path);
+    Q_INVOKABLE QVariantMap createSetupSession(const QString &devicePath = QString()) const;
+    Q_INVOKABLE QString     defaultContainersDir() const;
+    Q_INVOKABLE bool        createLoopDevice(const QString &containerName, int totalSizeMB,
+                                             const QString &storageDir = QString());
+    Q_INVOKABLE bool        deleteDevice(const QString &devicePath);
+    Q_INVOKABLE QString     registryBackingForDevice(const QString &devicePath) const;
+    Q_INVOKABLE bool        emergencyClose();
+    Q_INVOKABLE bool        vaultRuntimeOpen() const;
+    const char *cachedVaultManagerBin() const;
+    const char *cachedMountPoint() const;
+    static int posixEmergencyClose(const char *vaultManagerBin, const char *mountPoint);
     Q_INVOKABLE bool        setupVault(const QString &device, bool force, int ownerId, int vaultSizeMB, 
                                        const QString &vaultName, const QString &normalName, const QString &normalFs);
     Q_INVOKABLE void        openInFileManager();
@@ -73,8 +96,13 @@ public:
     Q_INVOKABLE bool        grantAccess(int ownerFingerId, int newFingerId);
     Q_INVOKABLE bool        revokeAccess(int ownerFingerId, int slotNumber);
     Q_INVOKABLE QVariantList getKeyslots();
+    Q_INVOKABLE QVariantList getKeyslotsForDevice(const QString &devicePath);
+    Q_INVOKABLE QVariantMap vaultDetailForDevice(const QString &devicePath) const;
+    Q_INVOKABLE bool isVaultUnlockedForDevice(const QString &devicePath) const;
     Q_INVOKABLE QVariantList getSecurityLogsPage(int page, int pageSize);
     Q_INVOKABLE void        clearLogs();
+    Q_INVOKABLE void        notifyUser(const QString &message, bool isError = false);
+    Q_INVOKABLE void        navigateToPage(const QString &pageFile);
 
 signals:
     void statusChanged();
@@ -83,8 +111,12 @@ signals:
     void notificationReceived(const QString &message, bool isError);
     void setupRunningChanged();
     void setupFinished(bool success, QString message);
+    void loopCreateFinished(bool success, QString message);
+    void deviceDeleteFinished(bool success, QString message);
+    void devicesChanged();
     void togglingChanged();
     void autoLockTimeoutChanged();
+    void navigationRequested(const QString &pageFile);
 
 private slots:
     void onSimFinished(int exitCode, QProcess::ExitStatus exitStatus);
@@ -93,6 +125,8 @@ private slots:
 private:
     void resetAutoLockTimer();
     void handleAutoLock();
+    void beginLockVault();
+    void beginUnlockVault();
 
     bool         m_isLocked;
     int          m_autoLockTimeout; // minutes, 0 = never
@@ -102,15 +136,23 @@ private:
     QString      m_setupStatusText;
     QVariantList m_fingerprints;
     QVariantList m_securityLogs;
+    QVariantList m_storageDevices;
     QString      m_mountPoint;
     QString      m_lastActivity;
     QString      m_socketPath;
     QString      m_projectDir;
     QString      m_selectedDevice;
+    QString      m_unlockedDevice;
     bool         m_isSelectedDeviceVault;
     int          m_selectedDeviceCapacityMB;
+    QVariantMap  m_selectedDeviceInfo;
     QString      m_vaultManagerBin;
     QString      m_logFilePath;
+    QString      m_registryPath;
+    QString      m_containersDir;
+    QString      m_statePath;
+    QByteArray   m_vaultManagerBinCache;
+    QByteArray   m_mountPointCache;
 
     QProcess    *m_simProcess;
     QTimer      *m_pollTimer;
@@ -126,6 +168,28 @@ private:
 
     /* vault_manager komutunu pkexec (veya sudo fallback) ile çalıştır */
     int runVaultManager(const QStringList &args, int timeoutMs = 15000);
+
+    QString sanitizeContainerName(const QString &name) const;
+    QJsonArray loadRegistryArray() const;
+    bool saveRegistryEntry(const QJsonObject &entry);
+    void syncRegistryWithLosetup();
+    bool isRegistryLoopDevice(const QString &devPath) const;
+    QString registryLabelForDevice(const QString &devPath) const;
+    QJsonObject registryEntryForDevice(const QString &devPath) const;
+    QVariantMap resolveDeviceInfo(const QString &path) const;
+    void applySelectedDeviceInfo(const QVariantMap &info);
+    void selectDeviceByPath(const QString &path, bool forceRefresh = false);
+    void refreshStorageDevices();
+    static bool deviceListsEqual(const QVariantList &a, const QVariantList &b);
+    QVariantMap enrichVaultEntry(const QVariantMap &entry) const;
+    QVariantList fetchKeyslotsForDevice(const QString &devicePath) const;
+
+    void startupRecovery();
+    bool isVaultRuntimeOpen() const;
+    void saveState(const QString &lastKnownState, bool setupInProgress);
+    QJsonObject loadState() const;
+    bool removeRegistryEntry(const QString &devicePath, QString *removedBacking = nullptr);
+    static std::atomic<bool> s_emergencyClosing;
 };
 
 #endif // VAULT_CONTROLLER_H

@@ -27,6 +27,8 @@
 #include <sys/wait.h>
 #include <sys/stat.h>
 #include <errno.h>
+#include <signal.h>
+#include <ctype.h>
 
 #include "hal.h"
 
@@ -36,6 +38,10 @@
 #define MAPPER_PATH     "/dev/mapper/" MAPPER_NAME
 #define HAL_KEY_LEN     32      /* HAL'dan gelen master key boyutu */
 #define HAL_SOCKET      "simulator:/tmp/biometric_vault.sock"
+#define SETUP_TMPDIR    "/tmp/_vault_setup"
+
+/* close / forceclose exit codes */
+#define EXIT_CLOSE_MOUNT_BUSY   2
 
 /* ─── Utility: Secure Memory Wipe ────────────────────────────────────────── */
 
@@ -187,31 +193,249 @@ static int is_luks_device(const char *device)
  */
 static void resolve_vault_device(const char *input, char *output, size_t maxlen)
 {
-    /* 1. Önce doğrudan girişi dene */
+    if (maxlen == 0)
+        return;
+    output[maxlen - 1] = '\0';
+
     if (is_luks_device(input) == 0) {
-        strncpy(output, input, maxlen);
+        strncpy(output, input, maxlen - 1);
         return;
     }
 
-    /* 2. Bölüm 1'i dene (sdb -> sdb1) */
-    char p1[256];
-    snprintf(p1, sizeof(p1), "%s1", input);
-    if (is_luks_device(p1) == 0) {
-        printf("[vault_manager] Found LUKS on partition: %s\n", p1);
-        strncpy(output, p1, maxlen);
-        return;
+    const int is_loop = (strncmp(input, "/dev/loop", 9) == 0);
+    char alt[256];
+
+    if (is_loop) {
+        snprintf(alt, sizeof(alt), "%sp1", input);
+        if (is_luks_device(alt) == 0) {
+            printf("[vault_manager] Found LUKS on loop partition: %s\n", alt);
+            strncpy(output, alt, maxlen - 1);
+            return;
+        }
+    } else {
+        snprintf(alt, sizeof(alt), "%s1", input);
+        if (is_luks_device(alt) == 0) {
+            printf("[vault_manager] Found LUKS on partition: %s\n", alt);
+            strncpy(output, alt, maxlen - 1);
+            return;
+        }
     }
 
-    /* 3. Loop cihazı bölümünü dene (loop0 -> loop0p1) */
-    snprintf(p1, sizeof(p1), "%sp1", input);
-    if (is_luks_device(p1) == 0) {
-        printf("[vault_manager] Found LUKS on loop partition: %s\n", p1);
-        strncpy(output, p1, maxlen);
+    strncpy(output, input, maxlen - 1);
+}
+
+typedef enum {
+    VAULT_STATE_CLEAN = 0,
+    VAULT_STATE_MAPPER_ONLY,
+    VAULT_STATE_MOUNTED_OURS,
+    VAULT_STATE_MOUNTED_FOREIGN
+} VaultRuntimeState;
+
+static int mapper_exists(const char *mapper_path)
+{
+    return mapper_path && access(mapper_path, F_OK) == 0;
+}
+
+static int is_mountpoint_path(const char *path)
+{
+    if (!path || !*path)
+        return 0;
+    const char *args[] = {"mountpoint", "-q", path, NULL};
+    return run_cmd(args) == 0;
+}
+
+static int read_mount_source(const char *mount_point, char *source, size_t source_len)
+{
+    if (!mount_point || !source || source_len == 0)
+        return 0;
+
+    source[0] = '\0';
+    char cmd[512];
+    snprintf(cmd, sizeof(cmd), "findmnt -no SOURCE --target %s 2>/dev/null", mount_point);
+
+    FILE *fp = popen(cmd, "r");
+    if (!fp)
+        return 0;
+
+    if (!fgets(source, (int)source_len, fp)) {
+        pclose(fp);
+        return 0;
+    }
+    pclose(fp);
+    source[strcspn(source, "\n")] = '\0';
+    return source[0] != '\0';
+}
+
+static int mount_source_matches_mapper(const char *mount_point, const char *mapper_path)
+{
+    char source[256];
+    if (!read_mount_source(mount_point, source, sizeof(source)))
+        return 0;
+
+    if (strcmp(source, mapper_path) == 0)
+        return 1;
+
+    /* findmnt may report /dev/dm-N; accept our mapper name */
+    if (strstr(source, MAPPER_NAME) != NULL)
+        return 1;
+
+    return 0;
+}
+
+static int is_our_vault_mount(const char *mount_point, const char *mapper_path)
+{
+    return is_mountpoint_path(mount_point)
+        && mount_source_matches_mapper(mount_point, mapper_path);
+}
+
+static VaultRuntimeState probe_vault_state(const char *mount_point, const char *mapper_path)
+{
+    const int mapper_open = mapper_exists(mapper_path);
+    const int mounted = is_mountpoint_path(mount_point);
+
+    if (!mapper_open && !mounted)
+        return VAULT_STATE_CLEAN;
+    if (mapper_open && !mounted)
+        return VAULT_STATE_MAPPER_ONLY;
+    if (mounted && mount_source_matches_mapper(mount_point, mapper_path))
+        return VAULT_STATE_MOUNTED_OURS;
+    if (mounted)
+        return VAULT_STATE_MOUNTED_FOREIGN;
+    return VAULT_STATE_CLEAN;
+}
+
+static int close_mapper_path(const char *mapper_path)
+{
+    if (!mapper_path || !mapper_exists(mapper_path))
+        return 0;
+    char mapper_name[128];
+    const char *slash = strrchr(mapper_path, '/');
+    const char *name = slash ? slash + 1 : mapper_path;
+    snprintf(mapper_name, sizeof(mapper_name), "%s", name);
+    const char *close_args[] = {"cryptsetup", "close", mapper_name, NULL};
+    return run_cmd(close_args);
+}
+
+static int close_mapper(void)
+{
+    return close_mapper_path(MAPPER_PATH);
+}
+
+static void report_mount_busy(const char *mount_point, const char *mapper_path)
+{
+    fprintf(stderr, "[vault_manager] Mount point is busy: %s\n", mount_point);
+    if (!is_our_vault_mount(mount_point, mapper_path)) {
+        fprintf(stderr, "[vault_manager] Path is not our vault mount; skipping fuser report.\n");
         return;
     }
+    const char *fuser_args[] = {"fuser", "-M", "-vm", mount_point, NULL};
+    run_cmd(fuser_args);
+}
 
-    /* Bulunamadıysa orijinali bırak (hata mesajı cryptsetup'tan gelecek) */
-    strncpy(output, input, maxlen);
+static int kill_pids_from_fuser(const char *mount_point, int use_sigkill)
+{
+    char cmd[512];
+    snprintf(cmd, sizeof(cmd), "fuser -M -m %s 2>/dev/null", mount_point);
+
+    FILE *fp = popen(cmd, "r");
+    if (!fp)
+        return -1;
+
+    char buf[4096] = {0};
+    const size_t n = fread(buf, 1, sizeof(buf) - 1, fp);
+    const int popen_status = pclose(fp);
+    if (n == 0 || popen_status != 0)
+        return 0;
+
+    const pid_t self = getpid();
+    const pid_t parent = getppid();
+    const int sig = use_sigkill ? SIGKILL : SIGTERM;
+
+    char *save = NULL;
+    for (char *tok = strtok_r(buf, " \t\n", &save); tok; tok = strtok_r(NULL, " \t\n", &save)) {
+        if (!isdigit((unsigned char)tok[0]))
+            continue;
+        const pid_t pid = (pid_t)atoi(tok);
+        if (pid <= 1 || pid == self || pid == parent)
+            continue;
+        kill(pid, sig);
+    }
+
+    return 0;
+}
+
+static int kill_mount_holders(const char *mount_point, const char *mapper_path)
+{
+    if (!is_our_vault_mount(mount_point, mapper_path)) {
+        fprintf(stderr,
+                "[vault_manager] Refusing to kill processes: %s is not a verified vault mount.\n",
+                mount_point);
+        return -1;
+    }
+
+    fprintf(stderr, "[vault_manager] Stopping processes on vault mount %s\n", mount_point);
+    kill_pids_from_fuser(mount_point, 0);
+    usleep(400000);
+    kill_pids_from_fuser(mount_point, 1);
+    return 0;
+}
+
+static int unmount_mount_point(const char *mount_point)
+{
+    const char *umount_args[] = {"umount", mount_point, NULL};
+    return run_cmd(umount_args);
+}
+
+static int mapper_still_open(void)
+{
+    return mapper_exists(MAPPER_PATH);
+}
+
+static int lock_vault_after_unmount(const char *mount_point, const char *mapper_path, int allow_kill)
+{
+    if (unmount_mount_point(mount_point) == 0)
+        return close_mapper_path(mapper_path);
+
+    if (!allow_kill) {
+        report_mount_busy(mount_point, mapper_path);
+        return -1;
+    }
+
+    fprintf(stderr, "[vault_manager] Vault mount busy — force-stopping holders\n");
+    if (kill_mount_holders(mount_point, mapper_path) != 0)
+        return -1;
+
+    usleep(300000);
+    if (unmount_mount_point(mount_point) != 0) {
+        report_mount_busy(mount_point, mapper_path);
+        return -1;
+    }
+
+    return close_mapper_path(mapper_path);
+}
+
+static int finalize_setup_mapper(int had_temp_mount)
+{
+    if (had_temp_mount) {
+        const char *umount_args[] = {"umount", SETUP_TMPDIR, NULL};
+        if (run_cmd(umount_args) != 0) {
+            fprintf(stderr, "[vault_manager] Setup cleanup: failed to unmount %s\n", SETUP_TMPDIR);
+            close_mapper();
+            return 1;
+        }
+    }
+
+    if (close_mapper() != 0) {
+        fprintf(stderr, "[vault_manager] Setup cleanup: failed to close mapper\n");
+        return 1;
+    }
+
+    if (mapper_still_open()) {
+        fprintf(stderr, "[vault_manager] Setup cleanup: mapper still present at %s\n", MAPPER_PATH);
+        return 1;
+    }
+
+    return 0;
 }
 
 /* ─── Commands ───────────────────────────────────────────────────────────── */
@@ -450,39 +674,36 @@ static int cmd_setup(const char *device, int finger_id, int force, int partition
     }
 
     /* 5. Geçici mount → kullanıcı izinlerini ayarla → unmount */
-    const char *tmpdir = "/tmp/_vault_setup";
-    mkdir(tmpdir, 0755);
+    int had_temp_mount = 0;
+    mkdir(SETUP_TMPDIR, 0755);
 
-    const char *mount_args[] = {"mount", MAPPER_PATH, tmpdir, NULL};
+    const char *mount_args[] = {"mount", MAPPER_PATH, SETUP_TMPDIR, NULL};
     if (run_cmd(mount_args) == 0) {
-        /* SUDO_UID/SUDO_GID ile gerçek kullanıcıyı bul */
+        had_temp_mount = 1;
         const char *sudo_uid = getenv("SUDO_UID");
         const char *sudo_gid = getenv("SUDO_GID");
 
         if (sudo_uid && sudo_gid) {
             const char *chown_args[] = {
                 "chown", "-R",
-                /* uid:gid formatında */
-                NULL, tmpdir, NULL
+                NULL, SETUP_TMPDIR, NULL
             };
             char ownership[64];
             snprintf(ownership, sizeof(ownership), "%s:%s", sudo_uid, sudo_gid);
             chown_args[2] = ownership;
             run_cmd(chown_args);
         } else {
-            /* Root olarak çalıştırılmış, chown gereksiz */
-            chmod(tmpdir, 0777);
+            chmod(SETUP_TMPDIR, 0777);
         }
-
-        const char *umount_args[] = {"umount", tmpdir, NULL};
-        run_cmd(umount_args);
     }
 
-    rmdir(tmpdir);
+    if (finalize_setup_mapper(had_temp_mount) != 0) {
+        fprintf(stderr, "[vault_manager] Setup failed: vault mapper was left open.\n");
+        rmdir(SETUP_TMPDIR);
+        return 1;
+    }
 
-    /* 6. LUKS kapat */
-    const char *close_args[] = {"cryptsetup", "close", MAPPER_NAME, NULL};
-    run_cmd(close_args);
+    rmdir(SETUP_TMPDIR);
 
     printf("[vault_manager] ═══════════════════════════════════════\n");
     printf("[vault_manager] Vault setup complete!\n");
@@ -581,47 +802,92 @@ static int cmd_open(const char *device, const char *mount_point, int finger_id)
 }
 
 /**
- * CLOSE: Unmount → LUKS kapat.
+ * CLOSE: Normal unmount, then cryptsetup close. Does not kill processes.
+ * Returns EXIT_CLOSE_MOUNT_BUSY when the mount point is in use.
  */
 static int cmd_close(const char *mount_point)
 {
     printf("[vault_manager] Locking vault...\n");
 
-    /* 1. Önce normal unmount dene */
-    printf("[vault_manager] Unmounting %s\n", mount_point);
-    const char *umount_args[] = {"umount", mount_point, NULL};
+    const VaultRuntimeState st = probe_vault_state(mount_point, MAPPER_PATH);
 
-    if (run_cmd(umount_args) != 0) {
-        /* 2. Meşgulse, meşgul eden süreçleri öldür (fuser -mk) */
-        printf("[vault_manager] Vault is busy. Terminating processes using the mount point...\n");
-        const char *fuser_args[] = {"fuser", "-mk", mount_point, NULL};
-        run_cmd(fuser_args);
-
-        /* Biraz bekle ve tekrar dene */
-        usleep(500000); // 0.5s
-
-        if (run_cmd(umount_args) != 0) {
-            fprintf(stderr, "[vault_manager] Error: Could not unmount device even after forcing.\n");
+    switch (st) {
+    case VAULT_STATE_CLEAN:
+        printf("[vault_manager] Vault is already locked.\n");
+        return 0;
+    case VAULT_STATE_MAPPER_ONLY:
+        printf("[vault_manager] Mapper open without mount — closing mapper.\n");
+        if (close_mapper() != 0) {
+            fprintf(stderr, "[vault_manager] Could not close mapper.\n");
             return 1;
         }
-    }
-
-    /* 3. LUKS kapat — kernel'daki key de silinir */
-    printf("[vault_manager] Closing LUKS container...\n");
-    
-    /* 
-     * NOT: --deferred KULLANMIYORUZ. 
-     * Çünkü kullanıcı kilitlediğinde anahtarın anında RAM'den silinmesini istiyoruz.
-     */
-    const char *close_args[] = {"cryptsetup", "close", MAPPER_NAME, NULL};
-
-    if (run_cmd(close_args) != 0) {
-        fprintf(stderr, "[vault_manager] Warning: LUKS container is busy and could not be closed.\n");
+        printf("[vault_manager] Vault locked.\n");
+        return 0;
+    case VAULT_STATE_MOUNTED_FOREIGN:
+        fprintf(stderr,
+                "[vault_manager] Mount point %s is in use by another filesystem; refusing to lock.\n",
+                mount_point);
+        return 1;
+    case VAULT_STATE_MOUNTED_OURS:
+        printf("[vault_manager] Unmounting %s\n", mount_point);
+        if (unmount_mount_point(mount_point) != 0) {
+            report_mount_busy(mount_point, MAPPER_PATH);
+            return EXIT_CLOSE_MOUNT_BUSY;
+        }
+        printf("[vault_manager] Closing encrypted vault mapper...\n");
+        if (close_mapper() != 0) {
+            fprintf(stderr, "[vault_manager] Could not close mapper (device may still be busy).\n");
+            return 1;
+        }
+        printf("[vault_manager] Vault locked and encryption keys wiped from memory.\n");
+        return 0;
+    default:
         return 1;
     }
+}
 
-    printf("[vault_manager] ✓ Vault locked and encryption keys wiped from memory.\n");
-    return 0;
+/**
+ * FORCECLOSE: Terminate processes holding the verified vault mount, unmount, close mapper.
+ * Used for HAL loss, app shutdown, and startup recovery.
+ */
+static int cmd_forceclose(const char *mount_point)
+{
+    printf("[vault_manager] Force-locking vault...\n");
+
+    const VaultRuntimeState st = probe_vault_state(mount_point, MAPPER_PATH);
+
+    switch (st) {
+    case VAULT_STATE_CLEAN:
+        printf("[vault_manager] Vault is already locked.\n");
+        return 0;
+    case VAULT_STATE_MAPPER_ONLY:
+        printf("[vault_manager] Mapper open without mount — closing mapper.\n");
+        if (close_mapper() != 0) {
+            fprintf(stderr, "[vault_manager] Force close: could not close mapper.\n");
+            return 1;
+        }
+        printf("[vault_manager] Vault force-locked.\n");
+        return 0;
+    case VAULT_STATE_MOUNTED_FOREIGN:
+        fprintf(stderr,
+                "[vault_manager] Mount point %s is not our vault mount; refusing force close.\n",
+                mount_point);
+        return 1;
+    case VAULT_STATE_MOUNTED_OURS:
+        if (lock_vault_after_unmount(mount_point, MAPPER_PATH, 1) != 0) {
+            fprintf(stderr, "[vault_manager] Force close: could not unmount %s\n", mount_point);
+            return 1;
+        }
+        if (mapper_still_open()) {
+            fprintf(stderr, "[vault_manager] Force close: mapper still present at %s\n",
+                    MAPPER_PATH);
+            return 1;
+        }
+        printf("[vault_manager] Vault force-locked.\n");
+        return 0;
+    default:
+        return 1;
+    }
 }
 
 /**
@@ -870,6 +1136,146 @@ static int cmd_status(void)
     }
 }
 
+/* ─── CREATELOOP: sparse image + losetup ─────────────────────────────────── */
+
+static int mkdir_parents(const char *file_path)
+{
+    char dir[512];
+    strncpy(dir, file_path, sizeof(dir) - 1);
+    dir[sizeof(dir) - 1] = '\0';
+    char *slash = strrchr(dir, '/');
+    if (!slash) return 0;
+    *slash = '\0';
+    if (dir[0] == '\0') return 0;
+
+    char tmp[512];
+    strncpy(tmp, dir, sizeof(tmp) - 1);
+    tmp[sizeof(tmp) - 1] = '\0';
+    for (char *p = tmp + 1; *p; p++) {
+        if (*p == '/') {
+            *p = '\0';
+            if (mkdir(tmp, 0755) != 0 && errno != EEXIST) return -1;
+            *p = '/';
+        }
+    }
+    if (mkdir(tmp, 0755) != 0 && errno != EEXIST) return -1;
+    return 0;
+}
+
+static int cmd_createloop(const char *image_path, int size_mb)
+{
+    if (!image_path || size_mb < 16) {
+        fprintf(stderr, "[vault_manager] createloop: invalid path or size (min 16 MB)\n");
+        return 1;
+    }
+
+    if (access(image_path, F_OK) == 0) {
+        fprintf(stderr, "[vault_manager] createloop: image already exists: %s\n", image_path);
+        return 2;
+    }
+
+    if (mkdir_parents(image_path) != 0) {
+        perror("[vault_manager] createloop: mkdir");
+        return 1;
+    }
+
+    char size_arg[32];
+    snprintf(size_arg, sizeof(size_arg), "%dM", size_mb);
+    const char *truncate_args[] = {"truncate", "-s", size_arg, image_path, NULL};
+    if (run_cmd(truncate_args) != 0) {
+        fprintf(stderr, "[vault_manager] createloop: truncate failed\n");
+        return 1;
+    }
+
+    char cmd[768];
+    snprintf(cmd, sizeof(cmd), "losetup -f --show '%s'", image_path);
+    FILE *fp = popen(cmd, "r");
+    if (!fp) {
+        perror("[vault_manager] createloop: popen");
+        return 1;
+    }
+
+    char loop_dev[128] = {0};
+    if (!fgets(loop_dev, sizeof(loop_dev), fp)) {
+        pclose(fp);
+        fprintf(stderr, "[vault_manager] createloop: losetup produced no output\n");
+        return 1;
+    }
+    pclose(fp);
+
+    loop_dev[strcspn(loop_dev, "\n")] = '\0';
+    if (strncmp(loop_dev, "/dev/loop", 9) != 0) {
+        fprintf(stderr, "[vault_manager] createloop: unexpected losetup output: %s\n", loop_dev);
+        return 1;
+    }
+
+    printf("%s\n", loop_dev);
+    printf("[vault_manager] createloop: %s -> %s (%d MB)\n", image_path, loop_dev, size_mb);
+    return 0;
+}
+
+static int backing_path_allowed(const char *backing_path)
+{
+    if (!backing_path || backing_path[0] != '/')
+        return 0;
+
+    size_t len = strlen(backing_path);
+    if (len < 5 || strcmp(backing_path + len - 4, ".img") != 0)
+        return 0;
+
+    if (strstr(backing_path, "/DigitalVault/containers/") != NULL)
+        return 1;
+    if (strstr(backing_path, "/.local/share/DigitalVault/containers/") != NULL)
+        return 1;
+
+    return 0;
+}
+
+/**
+ * DESTROYLOOP: Detach loop device and delete backing sparse image.
+ * Backing path is supplied by the GUI registry (not parsed from losetup -J).
+ */
+static int cmd_destroyloop(const char *device_path, const char *backing_path)
+{
+    if (!device_path || strncmp(device_path, "/dev/loop", 9) != 0) {
+        fprintf(stderr, "[vault_manager] destroyloop: invalid loop device path\n");
+        return 1;
+    }
+
+    if (!backing_path || backing_path[0] == '\0') {
+        fprintf(stderr, "[vault_manager] destroyloop: missing backing image path\n");
+        return 2;
+    }
+
+    if (!backing_path_allowed(backing_path)) {
+        fprintf(stderr, "[vault_manager] destroyloop: backing path not allowed: %s\n",
+                backing_path);
+        return 2;
+    }
+
+    if (access(MAPPER_PATH, F_OK) == 0) {
+        fprintf(stderr, "[vault_manager] destroyloop: vault is open (%s)\n", MAPPER_PATH);
+        return 1;
+    }
+
+    const char *detach_args[] = {"losetup", "-d", device_path, NULL};
+    if (run_cmd(detach_args) != 0) {
+        fprintf(stderr, "[vault_manager] destroyloop: losetup -d failed\n");
+        return 1;
+    }
+
+    if (unlink(backing_path) != 0) {
+        fprintf(stderr, "[vault_manager] destroyloop: could not delete %s: %s\n",
+                backing_path, strerror(errno));
+        return 3;
+    }
+
+    printf("DELETED:%s\n", backing_path);
+    printf("[vault_manager] destroyloop: removed %s and detached %s\n",
+           backing_path, device_path);
+    return 0;
+}
+
 /* ─── Main ───────────────────────────────────────────────────────────────── */
 
 static void print_usage(const char *prog)
@@ -880,13 +1286,16 @@ static void print_usage(const char *prog)
         "Usage:\n"
         "  %s setup     <device> [finger_id]                — First-time LUKS setup\n"
         "  %s open      <device> <mountpoint> [finger_id]   — Unlock vault\n"
-        "  %s close     <mountpoint>                        — Lock vault\n"
+        "  %s close     <mountpoint>                        — Lock vault (no process kill)\n"
+        "  %s forceclose <mountpoint>                      — Force lock vault\n"
+        "  %s createloop <image_path> <size_mb>             — Create sparse image + loop device\n"
+        "  %s destroyloop <device_path> <backing_path>      — Detach loop + delete backing image\n"
         "  %s addkey    <device> <owner_fid> <new_fid>      — Grant access\n"
         "  %s killslot  <device> <owner_fid> <slot_num>     — Revoke access\n"
         "  %s listslots <device>                            — List active keyslots\n"
         "  %s status                                        — Check vault status\n"
         "\n",
-        prog, prog, prog, prog, prog, prog, prog);
+        prog, prog, prog, prog, prog, prog, prog, prog, prog, prog);
 }
 
 int main(int argc, char *argv[])
@@ -944,6 +1353,13 @@ int main(int argc, char *argv[])
         }
         return cmd_close(argv[2]);
     }
+    else if (strcmp(cmd, "forceclose") == 0) {
+        if (argc < 3) {
+            fprintf(stderr, "Usage: %s forceclose <mountpoint>\n", argv[0]);
+            return 1;
+        }
+        return cmd_forceclose(argv[2]);
+    }
     else if (strcmp(cmd, "addkey") == 0) {
         if (argc < 5) {
             fprintf(stderr, "Usage: %s addkey <device> <owner_fid> <new_fid>\n", argv[0]);
@@ -967,6 +1383,20 @@ int main(int argc, char *argv[])
     }
     else if (strcmp(cmd, "status") == 0) {
         return cmd_status();
+    }
+    else if (strcmp(cmd, "createloop") == 0) {
+        if (argc < 4) {
+            fprintf(stderr, "Usage: %s createloop <image_path> <size_mb>\n", argv[0]);
+            return 1;
+        }
+        return cmd_createloop(argv[2], atoi(argv[3]));
+    }
+    else if (strcmp(cmd, "destroyloop") == 0) {
+        if (argc < 4) {
+            fprintf(stderr, "Usage: %s destroyloop <device_path> <backing_path>\n", argv[0]);
+            return 1;
+        }
+        return cmd_destroyloop(argv[2], argv[3]);
     }
     else {
         fprintf(stderr, "[vault_manager] Unknown command: %s\n", cmd);

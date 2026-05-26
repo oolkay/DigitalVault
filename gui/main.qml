@@ -6,6 +6,16 @@ import DigitalVault
     id: root
     width: 1160
     height: 740
+    property bool isShuttingDown: false
+
+    onClosing: function(close) {
+        isShuttingDown = true
+        if (vaultController && vaultController.vaultRuntimeOpen()) {
+            close.accepted = false
+            vaultController.emergencyClose()
+            close.accepted = true
+        }
+    }
     minimumWidth: 940
     minimumHeight: 600
     visible: true
@@ -15,6 +25,32 @@ import DigitalVault
 
     // ── Resizing Logic ────────────────────────────────────────
     property int edgeMargin: 6
+
+    readonly property var navPages: [
+        { label: "Dashboard",      icon: "⬡", page: "Dashboard.qml" },
+        { label: "Create Vault",   icon: "➕", page: "CreateVault.qml" },
+        { label: "Fingerprints",   icon: "☝", page: "FingerprintManager.qml" },
+        { label: "Access Manager", icon: "🔑", page: "AccessManager.qml" },
+        { label: "Security Log",   icon: "📋", page: "SecurityLog.qml" },
+        { label: "Settings",       icon: "⚙", page: "Settings.qml" }
+    ]
+
+    function navigateToPageFile(pageFile) {
+        for (let i = 0; i < navPages.length; ++i) {
+            if (navPages[i].page === pageFile) {
+                navRepeater.currentIndex = i
+                break
+            }
+        }
+        stackView.replace(pageFile)
+    }
+
+    Connections {
+        target: vaultController
+        function onNavigationRequested(pageFile) {
+            navigateToPageFile(pageFile)
+        }
+    }
 
     // ── Main Background with Rounded Corners ──────────────────
     Rectangle {
@@ -112,11 +148,6 @@ import DigitalVault
         MouseArea { width: edgeMargin*2; height: edgeMargin*2; anchors.left: parent.left; anchors.top: parent.top; cursorShape: Qt.SizeBDiagCursor; onPressed: root.startSystemResize(Qt.LeftEdge | Qt.TopEdge) }
 
 
-    // ── Backend Controller ────────────────────────────────────
-    VaultController {
-        id: vaultController
-    }
-
     // ── Smooth theme transition ───────────────────────────────
     Behavior on color { ColorAnimation { duration: 250 } }
 
@@ -188,11 +219,13 @@ import DigitalVault
 
             // ── Nav label ────────────────────────────
             Text {
+                width: parent.width
                 leftPadding: 22
                 bottomPadding: 6
                 text: "MAIN MENU"
                 color: Theme.textMuted
-                font { pixelSize: 10; bold: true; letterSpacing: 1.5; family: "Inter" }
+                font { pixelSize: 10; bold: true; family: "Inter" }
+                font.letterSpacing: 1.5
                 Behavior on color { ColorAnimation { duration: 250 } }
             }
 
@@ -200,14 +233,7 @@ import DigitalVault
             Repeater {
                 id: navRepeater
                 property int currentIndex: 0
-                model: [
-                    { label: "Dashboard",      icon: "⬡", page: "Dashboard.qml" },
-                    { label: "Fingerprints",   icon: "☝", page: "FingerprintManager.qml" },
-                    { label: "Access Manager", icon: "🔑", page: "AccessManager.qml" },
-                    { label: "Security Log",   icon: "📋", page: "SecurityLog.qml" },
-                    { label: "Device Guide",   icon: "🔍", page: "DeviceGuide.qml" },
-                    { label: "Settings",       icon: "⚙", page: "Settings.qml" }
-                ]
+                model: root.navPages
 
                 delegate: Item {
                     width: parent.width

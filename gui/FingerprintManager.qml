@@ -181,7 +181,7 @@ Item {
                         color: editMouse.containsMouse ? Theme.bgOverlay : "transparent"
                         Text {
                             anchors.centerIn: parent
-                            text: editing ? "💾" : "✏️"
+                            text: editing ? "OK" : "Edit"
                             font.pixelSize: 14
                         }
                         MouseArea {
