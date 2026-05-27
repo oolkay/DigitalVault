@@ -11,13 +11,6 @@ bin/
 vault_fs
 DigitalVaultGUI
 
-# CMake Dosyaları (İsteğe özel)
-CMakeLists.txt
-CMakeCache.txt
-CMakeFiles/
-cmake_install.cmake
-Makefile
-*.cmake
 
 # Markdown Dosyaları (İsteğe özel)
 *.md

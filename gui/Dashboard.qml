@@ -102,7 +102,7 @@ Item {
                                     width: parent.width
                                     horizontalAlignment: Text.AlignHCenter
                                     wrapMode: Text.Wrap
-                                    text: "Create a container and set up encryption on the Create Vault page."
+                                    text: "Set up encryption or create a container on the Vault Manager page."
                                     color: Theme.textSecondary
                                     font { pixelSize: 12; family: "Inter" }
                                 }
@@ -124,7 +124,7 @@ Item {
                                         anchors.fill: parent
                                         hoverEnabled: true
                                         cursorShape: Qt.PointingHandCursor
-                                        onClicked: vaultController.navigateToPage("CreateVault.qml")
+                                        onClicked: vaultController.navigateToPage("VaultManager.qml")
                                     }
                                 }
                             }

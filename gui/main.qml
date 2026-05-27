@@ -28,7 +28,7 @@ import DigitalVault
 
     readonly property var navPages: [
         { label: "Dashboard",      icon: "⬡", page: "Dashboard.qml" },
-        { label: "Create Vault",   icon: "➕", page: "CreateVault.qml" },
+        { label: "Vault Manager",  icon: "🗄", page: "VaultManager.qml" },
         { label: "Fingerprints",   icon: "☝", page: "FingerprintManager.qml" },
         { label: "Access Manager", icon: "🔑", page: "AccessManager.qml" },
         { label: "Security Log",   icon: "📋", page: "SecurityLog.qml" },

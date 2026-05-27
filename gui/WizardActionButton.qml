@@ -8,7 +8,8 @@ Rectangle {
     property string variant: "secondary" // secondary | danger | primary
     signal clicked()
 
-    implicitWidth: 100
+    clip: true
+    implicitWidth: Math.max(88, label.implicitWidth + 28)
     implicitHeight: 36
     radius: 8
     color: {
@@ -22,6 +23,7 @@ Rectangle {
     border.width: 1
 
     Text {
+        id: label
         anchors.centerIn: parent
         text: root.text
         color: variant === "secondary" ? Theme.textPrimary : "white"

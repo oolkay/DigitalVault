@@ -36,6 +36,8 @@ class VaultController : public QObject
     Q_PROPERTY(QVariantMap selectedDeviceInfo READ selectedDeviceInfo NOTIFY statusChanged)
     Q_PROPERTY(QVariantList storageDevices READ storageDevices NOTIFY devicesChanged)
     Q_PROPERTY(QVariantList registeredVaults READ registeredVaults NOTIFY devicesChanged)
+    Q_PROPERTY(QVariantList managedDevices READ managedDevices NOTIFY devicesChanged)
+    Q_PROPERTY(QVariantList discoveredStorageDevices READ discoveredStorageDevices NOTIFY devicesChanged)
 
 public:
     explicit VaultController(QObject *parent = nullptr);
@@ -56,6 +58,8 @@ public:
     QVariantMap selectedDeviceInfo() const { return m_selectedDeviceInfo; }
     QVariantList storageDevices() const { return m_storageDevices; }
     QVariantList registeredVaults() const;
+    QVariantList managedDevices() const;
+    QVariantList discoveredStorageDevices() const;
 
     void    addLog(const QString &level, const QString &msg);
     bool    simulatorRunning() const;
@@ -75,6 +79,19 @@ public:
     Q_INVOKABLE bool        createLoopDevice(const QString &containerName, int totalSizeMB,
                                              const QString &storageDir = QString());
     Q_INVOKABLE bool        deleteDevice(const QString &devicePath);
+    Q_INVOKABLE bool        deleteVault(const QString &devicePath);
+    Q_INVOKABLE QVariantMap previewDeleteVault(const QString &devicePath) const;
+    Q_INVOKABLE bool        renameVaultDisplayName(const QString &devicePath, const QString &newName);
+    Q_INVOKABLE bool        reconcileVaultRuntime();
+    Q_INVOKABLE QVariantMap storageLayoutForDevice(const QString &diskPath) const;
+    Q_INVOKABLE QVariantList availablePartitionActions(const QString &diskPath,
+                                                       const QString &partPath = QString()) const;
+    Q_INVOKABLE QVariantMap buildStoragePlan(const QString &actionId,
+                                             const QVariantMap &params) const;
+    Q_INVOKABLE QVariantMap previewStoragePlan(const QVariantMap &plan) const;
+    Q_INVOKABLE bool        applyStoragePlan(const QVariantMap &plan);
+    Q_INVOKABLE QStringList supportedFilesystems() const;
+    Q_INVOKABLE QString     resolveManagedDiskPath(const QString &registryPath) const;
     Q_INVOKABLE QString     registryBackingForDevice(const QString &devicePath) const;
     Q_INVOKABLE bool        emergencyClose();
     Q_INVOKABLE bool        vaultRuntimeOpen() const;
@@ -113,6 +130,7 @@ signals:
     void setupFinished(bool success, QString message);
     void loopCreateFinished(bool success, QString message);
     void deviceDeleteFinished(bool success, QString message);
+    void storagePlanFinished(bool success, QString message);
     void devicesChanged();
     void togglingChanged();
     void autoLockTimeoutChanged();
@@ -186,6 +204,11 @@ private:
 
     void startupRecovery();
     bool isVaultRuntimeOpen() const;
+    bool isMapperPresent() const;
+    bool isUserVaultMounted() const;
+    void syncRuntimeFromKernel();
+    QString findLuksPartitionPath(const QString &devicePath) const;
+    bool isRegistryManagedPath(const QString &path) const;
     void saveState(const QString &lastKnownState, bool setupInProgress);
     QJsonObject loadState() const;
     bool removeRegistryEntry(const QString &devicePath, QString *removedBacking = nullptr);
