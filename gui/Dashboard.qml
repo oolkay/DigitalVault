@@ -5,6 +5,8 @@ import DigitalVault
 
 Item {
     id: dashboardPage
+    width: parent ? parent.width : 0
+    height: parent ? parent.height : 0
 
     Component.onCompleted: {
         if (vaultController.selectedDevice === ""
@@ -14,10 +16,12 @@ Item {
         }
     }
 
-    SetupProgressOverlay { anchors.fill: parent }
-
-    ScrollView {
+    Item {
+        id: pageContent
         anchors.fill: parent
+
+        ScrollView {
+            anchors.fill: parent
         contentWidth: availableWidth
         clip: true
 
@@ -165,5 +169,11 @@ Item {
                 }
             }
         }
+        }
+    }
+
+    SetupProgressOverlay {
+        anchors.fill: parent
+        blurSource: pageContent
     }
 }

@@ -5,25 +5,62 @@ import DigitalVault
 
 Item {
     id: vaultManagerPage
+    width: parent ? parent.width : 0
+    height: parent ? parent.height : 0
 
-    property string selectedManagedPath: ""
+    property string activeDetailPath: ""
     property string selectedPartitionPath: ""
     property var currentLayout: ({})
 
+    readonly property bool anyDialogOpen:
+        deleteVaultDialog.visible || renameDialog.visible
+        || createLoopDialog.visible || setupWarningDialog.visible
+    readonly property bool blockingOp: vaultController.isSetupRunning
+
+    function closeVisibleDialogs() {
+        if (setupWarningDialog.visible)
+            setupWarningDialog.close()
+        if (deleteVaultDialog.visible)
+            deleteVaultDialog.close()
+        if (renameDialog.visible)
+            renameDialog.close()
+        if (createLoopDialog.visible)
+            createLoopDialog.close()
+    }
+
     function refreshLayout() {
-        if (!selectedManagedPath)
+        if (!activeDetailPath)
             currentLayout = {}
         else
-            currentLayout = vaultController.storageLayoutForDevice(selectedManagedPath)
+            currentLayout = vaultController.storageLayoutForDevice(activeDetailPath)
+    }
+
+    function popToHome() {
+        while (vmStack.depth > 1)
+            vmStack.pop()
+        activeDetailPath = ""
+        selectedPartitionPath = ""
+    }
+
+    function openAddVault() {
+        vmStack.push(addComp)
+    }
+
+    function openVaultDetail(path) {
+        activeDetailPath = path
+        selectedPartitionPath = ""
+        vaultController.setSelectedDevice(path)
+        refreshLayout()
+        vmStack.push(detailComp)
     }
 
     function openSetupWizard(devicePath) {
-        var path = devicePath || ""
-        if (!path) {
+        var p = devicePath || ""
+        if (!p) {
             vaultController.notifyUser("Select a device to set up first.", true)
             return
         }
-        var session = vaultController.createSetupSession(path)
+        var session = vaultController.createSetupSession(p)
         if (!session.valid) {
             vaultController.notifyUser(session.error || "Device is not suitable for setup.", true)
             return
@@ -39,13 +76,53 @@ Item {
         deleteVaultDialog.open()
     }
 
-  function openRename(devicePath, currentName) {
+    function openRename(devicePath, currentName) {
         renameDialog.targetPath = devicePath
         renameNameField.text = currentName || ""
         renameDialog.open()
     }
 
-    SetupProgressOverlay { anchors.fill: parent }
+    Item {
+        id: pageContent
+        anchors.fill: parent
+
+        StackView {
+            id: vmStack
+            anchors.fill: parent
+
+            pushEnter: Transition {
+                PropertyAnimation { property: "opacity"; from: 0; to: 1; duration: 220; easing.type: Easing.OutCubic }
+                PropertyAnimation { property: "y"; from: 10; to: 0; duration: 220; easing.type: Easing.OutCubic }
+            }
+            pushExit: Transition {
+                PropertyAnimation { property: "opacity"; from: 1; to: 0; duration: 140 }
+            }
+            popEnter: Transition {
+                PropertyAnimation { property: "opacity"; from: 0; to: 1; duration: 180 }
+            }
+            popExit: Transition {
+                PropertyAnimation { property: "opacity"; from: 1; to: 0; duration: 140 }
+                PropertyAnimation { property: "y"; from: 0; to: 8; duration: 140 }
+            }
+
+            Component.onCompleted: vmStack.push(homeComp)
+        }
+    }
+
+    ModalScrim {
+        anchors.fill: parent
+        sourceItem: pageContent
+        active: anyDialogOpen || blockingOp
+        dismissible: anyDialogOpen && !blockingOp
+        blocking: blockingOp
+        onBackdropClicked: closeVisibleDialogs()
+    }
+
+    SetupProgressOverlay {
+        anchors.fill: parent
+        blurSource: pageContent
+        backdropEnabled: false
+    }
 
     Connections {
         target: vaultController
@@ -53,6 +130,8 @@ Item {
             setupChrome.resultText.text = message
             setupChrome.resultText.color = success ? Theme.success : Theme.danger
             setupChrome.resultText.visible = true
+            if (success)
+                vaultManagerPage.popToHome()
         }
         function onLoopCreateFinished(success, message) {
             createChrome.resultText.text = message
@@ -60,264 +139,57 @@ Item {
             createChrome.resultText.visible = true
             if (success)
                 createLoopDialog.close()
+            if (success)
+                vaultManagerPage.popToHome()
         }
         function onDeviceDeleteFinished(success, message) {
             if (success) {
                 deleteVaultDialog.close()
-                if (selectedManagedPath === deleteVaultDialog.targetPath)
-                    selectedManagedPath = ""
-                refreshLayout()
+                vaultManagerPage.popToHome()
             }
         }
         function onDevicesChanged() {
-            refreshLayout()
+            if (activeDetailPath)
+                refreshLayout()
         }
         function onStatusChanged() {
-            if (selectedManagedPath !== "")
+            if (activeDetailPath)
                 refreshLayout()
         }
     }
 
-    ScrollView {
-        anchors.fill: parent
-        contentWidth: availableWidth
-        clip: true
+    Component {
+        id: homeComp
+        VaultManagerHome {
+            onAddVaultRequested: vaultManagerPage.openAddVault()
+            onVaultOpenRequested: function(path) { vaultManagerPage.openVaultDetail(path) }
+        }
+    }
 
-        Column {
-            width: parent.width - 24
-            spacing: 24
-            leftPadding: 12
-            rightPadding: 12
-            topPadding: 12
-            bottomPadding: 24
+    Component {
+        id: addComp
+        VaultManagerAddVault {
+            onBackRequested: vmStack.pop()
+            onSetupRequested: function(path) { vaultManagerPage.openSetupWizard(path) }
+            onCreateLoopRequested: createLoopDialog.open()
+        }
+    }
 
-            Column {
-                width: parent.width
-                spacing: 6
-                Text {
-                    text: "Vault Manager"
-                    color: Theme.textPrimary
-                    font { pixelSize: 26; bold: true; family: "Inter" }
-                }
-                Text {
-                    width: parent.width
-                    wrapMode: Text.Wrap
-                    text: "Set up storage, edit layout, rename vaults, or delete encrypted data. Daily unlock lives on the Dashboard."
-                    color: Theme.textSecondary
-                    font { pixelSize: 13; family: "Inter" }
-                }
+    Component {
+        id: detailComp
+        VaultManagerVaultDetail {
+            devicePath: vaultManagerPage.activeDetailPath
+            layoutData: vaultManagerPage.currentLayout
+            selectedPartitionPath: vaultManagerPage.selectedPartitionPath
+            onPartitionPathChanged: function(path) {
+                vaultManagerPage.selectedPartitionPath = path
             }
-
-            // ── Connected storage ─────────────────────────────
-            Column {
-                width: parent.width
-                spacing: 10
-                Text {
-                    text: "Connected storage"
-                    color: Theme.textPrimary
-                    font { pixelSize: 16; bold: true; family: "Inter" }
-                }
-                Repeater {
-                    model: vaultController.discoveredStorageDevices
-                    delegate: DiscoveredStorageRow {
-                        width: parent.width
-                        deviceData: modelData
-                        onSetupRequested: vaultManagerPage.openSetupWizard(modelData.path)
-                    }
-                }
-                Text {
-                    width: parent.width
-                    visible: vaultController.discoveredStorageDevices.length === 0
-                    text: "No additional disks detected"
-                    color: Theme.textMuted
-                    font { pixelSize: 12; family: "Inter" }
-                }
-            }
-
-            // ── Managed vaults ────────────────────────────────
-            Column {
-                width: parent.width
-                spacing: 10
-                Row {
-                    width: parent.width
-                    spacing: 12
-                    Text {
-                        text: "Managed vaults"
-                        color: Theme.textPrimary
-                        font { pixelSize: 16; bold: true; family: "Inter" }
-                    }
-                    Text {
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: "Unlock on Dashboard →"
-                        color: Theme.accent
-                        font { pixelSize: 11; family: "Inter" }
-                        MouseArea {
-                            anchors.fill: parent
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: vaultController.navigateToPage("Dashboard.qml")
-                        }
-                    }
-                }
-
-                Repeater {
-                    model: vaultController.managedDevices
-                    delegate: ManagedDeviceRow {
-                        width: parent.width
-                        deviceData: modelData
-                        isSelected: vaultManagerPage.selectedManagedPath === modelData.path
-                        onRowClicked: {
-                            vaultManagerPage.selectedManagedPath = modelData.path
-                            vaultManagerPage.selectedPartitionPath = ""
-                            vaultManagerPage.refreshLayout()
-                            vaultController.setSelectedDevice(modelData.path)
-                        }
-                        onRenameRequested: vaultManagerPage.openRename(
-                            modelData.path, modelData.displayName)
-                        onDeleteRequested: vaultManagerPage.openDeleteVault(modelData.path)
-                    }
-                }
-
-                Text {
-                    width: parent.width
-                    visible: vaultController.managedDevices.length === 0
-                    text: "No managed vaults yet. Connect a disk or create a virtual container below."
-                    color: Theme.textMuted
-                    font { pixelSize: 12; family: "Inter" }
-                    wrapMode: Text.Wrap
-                }
-            }
-
-            // ── Layout editor (selected managed) ──────────────
-            Rectangle {
-                width: parent.width
-                visible: selectedManagedPath !== ""
-                radius: Theme.radius
-                color: Theme.bgCard
-                border.color: Theme.border
-                border.width: 1
-                implicitHeight: layoutCol.implicitHeight + 32
-
-                Column {
-                    id: layoutCol
-                    anchors.fill: parent
-                    anchors.margins: 16
-                    spacing: 14
-
-                    Text {
-                        text: "Layout editor"
-                        color: Theme.textPrimary
-                        font { pixelSize: 14; bold: true; family: "Inter" }
-                    }
-
-                    PartitionLayoutView {
-                        width: parent.width
-                        layoutData: vaultManagerPage.currentLayout
-                        selectedPartitionPath: vaultManagerPage.selectedPartitionPath
-                        onPartitionSelected: function(path) {
-                            vaultManagerPage.selectedPartitionPath = path
-                        }
-                    }
-
-                    PartitionLayoutTable {
-                        width: parent.width
-                        visible: (vaultManagerPage.currentLayout.partitions || []).length > 0
-                        partitions: vaultManagerPage.currentLayout.partitions || []
-                        selectedPartitionPath: vaultManagerPage.selectedPartitionPath
-                        onRowClicked: function(path) {
-                            vaultManagerPage.selectedPartitionPath = path
-                        }
-                    }
-
-                    StorageActionPanel {
-                        width: parent.width
-                        actions: vaultController.availablePartitionActions(
-                            selectedManagedPath, selectedPartitionPath)
-                        onActionTriggered: function(actionId) {
-                            if (actionId === "setup_encryption") {
-                                openSetupWizard(selectedManagedPath)
-                                return
-                            }
-                            if (actionId === "delete_vault") {
-                                openDeleteVault(selectedManagedPath)
-                                return
-                            }
-                            vaultController.notifyUser(
-                                "This action will be available in a future update.", false)
-                        }
-                    }
-
-                    Rectangle {
-                        width: parent.width
-                        height: 36
-                        radius: 18
-                        color: delLayoutMouse.containsMouse ? Theme.dangerBg : Theme.dangerBg
-                        border.color: Theme.danger
-                        Text {
-                            anchors.centerIn: parent
-                            text: "Delete vault"
-                            color: Theme.danger
-                            font { pixelSize: 12; bold: true; family: "Inter" }
-                        }
-                        MouseArea {
-                            id: delLayoutMouse
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: openDeleteVault(selectedManagedPath)
-                        }
-                    }
-                }
-            }
-
-            // ── Virtual containers (v1.1 section) ─────────────
-            Rectangle {
-                width: parent.width
-                radius: Theme.radius
-                color: Theme.bgCard
-                border.color: Theme.border
-                border.width: 1
-                implicitHeight: virtualCol.implicitHeight + 32
-
-                Column {
-                    id: virtualCol
-                    anchors.fill: parent
-                    anchors.margins: 16
-                    spacing: 10
-
-                    Text {
-                        text: "Virtual containers"
-                        color: Theme.textPrimary
-                        font { pixelSize: 14; bold: true; family: "Inter" }
-                    }
-                    Text {
-                        width: parent.width
-                        wrapMode: Text.Wrap
-                        text: "Sparse image + loop device. Encrypt via Set up encryption on the managed entry."
-                        color: Theme.textSecondary
-                        font { pixelSize: 11; family: "Inter" }
-                    }
-                    Rectangle {
-                        width: loopBtnLbl.implicitWidth + 28
-                        height: 36
-                        radius: 18
-                        color: loopBtnMouse.containsMouse ? Theme.accentHover : Theme.accent
-                        Text {
-                            id: loopBtnLbl
-                            anchors.centerIn: parent
-                            text: "+ Create loop device"
-                            color: "white"
-                            font { pixelSize: 12; bold: true; family: "Inter" }
-                        }
-                        MouseArea {
-                            id: loopBtnMouse
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: createLoopDialog.open()
-                        }
-                    }
-                }
-            }
+            onBackRequested: vaultManagerPage.popToHome()
+            onRenameRequested: vaultManagerPage.openRename(
+                vaultManagerPage.activeDetailPath,
+                deviceData.displayName || deviceData.name || "")
+            onDeleteRequested: vaultManagerPage.openDeleteVault(vaultManagerPage.activeDetailPath)
+            onSetupEncryptionRequested: vaultManagerPage.openSetupWizard(vaultManagerPage.activeDetailPath)
         }
     }
 
@@ -328,6 +200,8 @@ Item {
         width: 480
         modal: true
         padding: 0
+        z: 220
+        closePolicy: Popup.CloseOnEscape
 
         property string targetPath: ""
         property var preview: ({})
@@ -395,7 +269,11 @@ Item {
                             var typed = deleteConfirmField.text.trim().toUpperCase()
                             return typed === "DELETE" || typed === hint.toUpperCase()
                         }
-                        onClicked: vaultController.deleteVault(deleteVaultDialog.targetPath)
+                        onClicked: {
+                            const path = deleteVaultDialog.targetPath
+                            deleteVaultDialog.close()
+                            vaultController.deleteVault(path)
+                        }
                     }
 
                     WizardActionButton {
@@ -418,6 +296,8 @@ Item {
         width: 400
         modal: true
         padding: 0
+        z: 220
+        closePolicy: Popup.CloseOnEscape
 
         property string targetPath: ""
 
@@ -496,6 +376,8 @@ Item {
         width: 500
         modal: true
         padding: 0
+        z: 220
+        closePolicy: Popup.CloseOnEscape
 
         background: Rectangle {
             color: Theme.bgSurface
@@ -601,6 +483,8 @@ Item {
         implicitHeight: setupChrome.implicitHeight + 24
         modal: true
         padding: 0
+        z: 220
+        closePolicy: Popup.CloseOnEscape
 
         property var setupSession: ({ valid: false })
         property int setupLogicalStep: 0

@@ -1,6 +1,141 @@
 [
     {
         "level": "SUCCESS",
+        "message": "Vault setup complete: /dev/loop20",
+        "time": "2026-05-27 14:58:36"
+    },
+    {
+        "level": "INFO",
+        "message": "Formatting new encrypted vault on: /dev/loop20 ",
+        "time": "2026-05-27 14:58:22"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Loop device ready: /dev/loop20 (/home/oolkay/.local/share/DigitalVault/containers/myvault3.img)",
+        "time": "2026-05-27 14:58:12"
+    },
+    {
+        "level": "INFO",
+        "message": "Creating container: /home/oolkay/.local/share/DigitalVault/containers/myvault3.img",
+        "time": "2026-05-27 14:58:12"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault locked. Encryption keys cleared from kernel.",
+        "time": "2026-05-27 14:57:54"
+    },
+    {
+        "level": "INFO",
+        "message": "Locking vault and clearing kernel keys...",
+        "time": "2026-05-27 14:57:54"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault decrypted and mounted at /home/oolkay/VaultMount",
+        "time": "2026-05-27 14:57:50"
+    },
+    {
+        "level": "INFO",
+        "message": "Encryption key cleared from memory",
+        "time": "2026-05-27 14:57:50"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Biometric verification passed",
+        "time": "2026-05-27 14:57:50"
+    },
+    {
+        "level": "INFO",
+        "message": "Starting vault unlock for: /dev/loop19",
+        "time": "2026-05-27 14:57:47"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault decrypted and mounted at /home/oolkay/VaultMount",
+        "time": "2026-05-27 14:38:08"
+    },
+    {
+        "level": "INFO",
+        "message": "Encryption key cleared from memory",
+        "time": "2026-05-27 14:38:08"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Biometric verification passed",
+        "time": "2026-05-27 14:38:08"
+    },
+    {
+        "level": "INFO",
+        "message": "Starting vault unlock for: /dev/loop19",
+        "time": "2026-05-27 14:38:02"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Deleted vault: /dev/loop20",
+        "time": "2026-05-27 14:33:38"
+    },
+    {
+        "level": "INFO",
+        "message": "Deleting loop vault: /dev/loop20",
+        "time": "2026-05-27 14:33:38"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault setup complete: /dev/loop20",
+        "time": "2026-05-27 14:33:13"
+    },
+    {
+        "level": "INFO",
+        "message": "Formatting new encrypted vault on: /dev/loop20 ",
+        "time": "2026-05-27 14:32:57"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Loop device ready: /dev/loop20 (/home/oolkay/.local/share/DigitalVault/containers/myvault2.img)",
+        "time": "2026-05-27 14:32:37"
+    },
+    {
+        "level": "INFO",
+        "message": "Creating container: /home/oolkay/.local/share/DigitalVault/containers/myvault2.img",
+        "time": "2026-05-27 14:32:37"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault locked. Encryption keys cleared from kernel.",
+        "time": "2026-05-27 14:32:24"
+    },
+    {
+        "level": "WARNING",
+        "message": "Vault was closed externally",
+        "time": "2026-05-27 14:32:24"
+    },
+    {
+        "level": "INFO",
+        "message": "Locking vault and clearing kernel keys...",
+        "time": "2026-05-27 14:32:24"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault decrypted and mounted at /home/oolkay/VaultMount",
+        "time": "2026-05-27 14:32:02"
+    },
+    {
+        "level": "INFO",
+        "message": "Encryption key cleared from memory",
+        "time": "2026-05-27 14:32:02"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Biometric verification passed",
+        "time": "2026-05-27 14:32:02"
+    },
+    {
+        "level": "INFO",
+        "message": "Starting vault unlock for: /dev/loop19",
+        "time": "2026-05-27 14:31:59"
+    },
+    {
+        "level": "SUCCESS",
         "message": "Vault setup complete: /dev/loop19",
         "time": "2026-05-27 14:16:13"
     },

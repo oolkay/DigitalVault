@@ -40,6 +40,10 @@ qt_add_qml_module(DigitalVaultGUI
         Dashboard.qml
         CreateVault.qml
         VaultManager.qml
+        VaultManagerNavBar.qml
+        VaultManagerHome.qml
+        VaultManagerAddVault.qml
+        VaultManagerVaultDetail.qml
         ManagedDeviceRow.qml
         DiscoveredStorageRow.qml
         PartitionLayoutView.qml
@@ -51,6 +55,7 @@ qt_add_qml_module(DigitalVaultGUI
         VaultListItem.qml
         VaultDetailPanel.qml
         VaultStatusBadge.qml
+        ModalScrim.qml
         SetupProgressOverlay.qml
         AccessManager.qml
         FingerprintManager.qml

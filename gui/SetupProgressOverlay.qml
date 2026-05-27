@@ -1,12 +1,28 @@
 import QtQuick
 import DigitalVault
 
-Rectangle {
+Item {
     id: root
+
+    property Item blurSource: null
+  property bool backdropEnabled: true
+
     anchors.fill: parent
     visible: vaultController.isSetupRunning
-    color: Qt.rgba(0, 0, 0, 0.72)
-    z: 200
+    z: 250
+
+    ModalScrim {
+        anchors.fill: parent
+        sourceItem: root.blurSource
+        active: root.visible && root.backdropEnabled
+        blocking: true
+        dismissible: false
+    }
+
+    MouseArea {
+        anchors.fill: parent
+        enabled: root.visible
+    }
 
     Rectangle {
         anchors.centerIn: parent
@@ -16,6 +32,7 @@ Rectangle {
         color: Theme.bgSurface
         border.color: Theme.border
         border.width: 1
+        z: 1
 
         Column {
             anchors.centerIn: parent

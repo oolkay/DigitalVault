@@ -1,5 +1,4 @@
 import QtQuick
-import QtQuick.Controls
 import DigitalVault
 
 Rectangle {
@@ -7,31 +6,29 @@ Rectangle {
     width: parent ? parent.width : 400
     height: 72
     radius: Theme.radius
-    color: isSelected ? Theme.bgHover : Theme.bgCard
-    border.color: isSelected ? Theme.accent : Theme.border
+    color: rowMouse.containsMouse ? Theme.bgHover : Theme.bgCard
+    border.color: Theme.border
     border.width: 1
 
     property var deviceData: ({})
-    property bool isSelected: false
 
     signal rowClicked()
-    signal renameRequested()
-    signal deleteRequested()
 
     MouseArea {
+        id: rowMouse
         anchors.fill: parent
-        z: -1
+        hoverEnabled: true
+        cursorShape: Qt.PointingHandCursor
         onClicked: root.rowClicked()
     }
 
     Row {
-        id: row
         anchors.fill: parent
         anchors.margins: 14
         spacing: 12
 
         Column {
-            width: Math.max(120, parent.width - statusBadge.width - actionRow.width - 24)
+            width: Math.max(120, parent.width - statusBadge.width - chevron.width - 24)
             anchors.verticalCenter: parent.verticalCenter
             spacing: 4
 
@@ -73,54 +70,12 @@ Rectangle {
             }
         }
 
-        Row {
-            id: actionRow
+        Text {
+            id: chevron
             anchors.verticalCenter: parent.verticalCenter
-            spacing: 8
-
-            Rectangle {
-                width: renameLbl.implicitWidth + 20
-                height: 30
-                radius: 15
-                color: renameMouse.containsMouse ? Theme.bgHover : Theme.bgOverlay
-                border.color: Theme.border
-                Text {
-                    id: renameLbl
-                    anchors.centerIn: parent
-                    text: "Rename"
-                    color: Theme.textPrimary
-                    font { pixelSize: 11; family: "Inter" }
-                }
-                MouseArea {
-                    id: renameMouse
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: root.renameRequested()
-                }
-            }
-
-            Rectangle {
-                width: delLbl.implicitWidth + 20
-                height: 30
-                radius: 15
-                color: delMouse.containsMouse ? Theme.dangerBg : Theme.dangerBg
-                border.color: Theme.danger
-                Text {
-                    id: delLbl
-                    anchors.centerIn: parent
-                    text: "Delete vault"
-                    color: Theme.danger
-                    font { pixelSize: 11; bold: true; family: "Inter" }
-                }
-                MouseArea {
-                    id: delMouse
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: root.deleteRequested()
-                }
-            }
+            text: "→"
+            color: Theme.textMuted
+            font { pixelSize: 16; family: "Inter" }
         }
     }
 }
