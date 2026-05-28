@@ -172,6 +172,61 @@ Item {
                     }
                 }
 
+                // ── Hardware / Simulator ─────────────────────────
+                SettingsSection {
+                    title: "Hardware / Simulator"
+                    icon: "H"
+                    width: parent.width
+
+                    SettingsRow {
+                        width: parent.width
+                        label: "Fingerprint sensor (UART)"
+                        description: vaultController.sensorConnected
+                            ? "Connected — enroll and unlock use serial bridge"
+                            : "Not connected — start simulator or reconnect below"
+                        control: Text {
+                            text: vaultController.sensorConnected ? "Bağlı" : "Bağlı değil"
+                            color: vaultController.sensorConnected ? Theme.success : Theme.danger
+                            font { pixelSize: 13; bold: true; family: "Inter" }
+                        }
+                    }
+
+                    SettingsRow {
+                        width: parent.width
+                        label: "Simulator daemon"
+                        description: vaultController.simulatorRunning
+                            ? "Socket or process active"
+                            : "Not running"
+                        control: Text {
+                            text: vaultController.simulatorRunning ? "Çalışıyor" : "Kapalı"
+                            color: vaultController.simulatorRunning ? Theme.success : Theme.textSecondary
+                            font { pixelSize: 13; family: "Inter" }
+                        }
+                    }
+
+                    SettingsRow {
+                        width: parent.width
+                        label: "Start simulator"
+                        description: "socat + python3 sim + UART connect (stop manual sim first if open)"
+                        control: WizardActionButton {
+                            text: "Başlat"
+                            variant: "primary"
+                            onClicked: vaultController.startSimulator()
+                        }
+                    }
+
+                    SettingsRow {
+                        width: parent.width
+                        label: "Reconnect sensor"
+                        description: "/tmp/biometric_vault_tty_host (or saved port in settings)"
+                        control: WizardActionButton {
+                            text: "Bağlan"
+                            variant: "secondary"
+                            onClicked: vaultController.reconnectSerial()
+                        }
+                    }
+                }
+
                 // ── Storage ──────────────────────────────────────
                 SettingsSection {
                     title: "Storage"

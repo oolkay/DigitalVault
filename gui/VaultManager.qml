@@ -517,7 +517,8 @@ Item {
                 return
             setupChrome.resultText.visible = false
             vaultNameField.text = setupSession.defaultVaultName || "My Vault"
-            ownerIdField.text = String(setupSession.defaultOwnerId || 1)
+            if (setupSession.devicePath)
+                vaultController.prepareSetupOwnerSlot(setupSession.devicePath)
             if (normalStepLoader.item) {
                 normalStepLoader.item.partitionFields.normalName =
                     setupSession.defaultNormalName || "Normal"
@@ -572,24 +573,39 @@ Item {
                     }
                     Column {
                         width: parent.width
-                        spacing: 6
-                        WizardFieldLabel { label: "Owner Finger ID" }
-                        Rectangle {
+                        spacing: 8
+                        WizardFieldLabel { label: "Owner fingerprint" }
+                        Text {
                             width: parent.width
-                            height: 38
-                            radius: 8
-                            color: Theme.bgInput
-                            border.color: Theme.border
-                            border.width: 1
-                            TextInput {
-                                id: ownerIdField
+                            wrapMode: Text.Wrap
+                            text: vaultController.setupOwnerFingerId > 0
+                                  ? ("Registered on sensor slot #" + vaultController.setupOwnerFingerId)
+                                  : ("Enroll the owner fingerprint on sensor slot #"
+                                     + (setupWarningDialog.setupSession.proposedOwnerSlot || "?")
+                                     + " before continuing.")
+                            color: vaultController.setupOwnerFingerId > 0 ? Theme.success : Theme.textSecondary
+                            font { pixelSize: 12; family: "Inter" }
+                        }
+                        Rectangle {
+                            width: enrollBtnLbl.implicitWidth + 28
+                            height: 36
+                            radius: 18
+                            color: enrollMouse.containsMouse ? Theme.accentHover : Theme.accent
+                            Text {
+                                id: enrollBtnLbl
+                                anchors.centerIn: parent
+                                text: vaultController.setupOwnerFingerId > 0
+                                      ? "Re-enroll owner" : "Enroll owner fingerprint"
+                                color: "white"
+                                font { pixelSize: 12; bold: true; family: "Inter" }
+                            }
+                            MouseArea {
+                                id: enrollMouse
                                 anchors.fill: parent
-                                anchors.margins: 12
-                                verticalAlignment: TextInput.AlignVCenter
-                                color: Theme.textPrimary
-                                font { pixelSize: 14; family: "Inter" }
-                                text: "1"
-                                validator: IntValidator { bottom: 1; top: 127 }
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: vaultController.beginSetupOwnerEnrollForDevice(
+                                               setupWarningDialog.setupSession.devicePath)
                             }
                         }
                     }
@@ -648,6 +664,15 @@ Item {
                         width: parent.width
                         Text { text: "Target: " + setupWarningDialog.setupSession.devicePath; color: Theme.textPrimary; font { pixelSize: 12 } }
                         Text { text: "Vault: " + vaultNameField.text; color: Theme.textPrimary; font { pixelSize: 12 } }
+                        Text {
+                            text: vaultController.setupOwnerFingerId > 0
+                                  ? ("Owner sensor slot: #" + vaultController.setupOwnerFingerId)
+                                  : ("Owner sensor slot: #"
+                                     + (setupWarningDialog.setupSession.proposedOwnerSlot || "?")
+                                     + " (enroll required)")
+                            color: Theme.textPrimary
+                            font { pixelSize: 12 }
+                        }
                         Text { text: "Size: " + (setupVaultSizeSlider.value / 1024).toFixed(1) + " GB"; color: Theme.textPrimary; font { pixelSize: 12 } }
                     }
                     Rectangle {
@@ -683,7 +708,15 @@ Item {
 
         function handlePrimary() {
             if (setupLogicalStep < setupStepCount - 1) {
+                if (setupLogicalStep === 0 && vaultController.setupOwnerFingerId < 1) {
+                    vaultController.notifyUser("Enroll the owner fingerprint before continuing.", true)
+                    return
+                }
                 applyLogicalStep(setupLogicalStep + 1)
+                return
+            }
+            if (vaultController.setupOwnerFingerId < 1) {
+                vaultController.notifyUser("Enroll the owner fingerprint before setup.", true)
                 return
             }
             if (!forceCheckbox.checked) {
@@ -697,10 +730,9 @@ Item {
                 normalName = normalStepLoader.item.partitionFields.normalName
                 normalFs = normalStepLoader.item.partitionFields.filesystemCombo.currentText
             }
-            vaultController.setupVault(
+            vaultController.beginVaultSetupBiometric(
                 setupSession.devicePath,
                 setupSession.requiresForceConfirmation,
-                parseInt(ownerIdField.text),
                 parseInt(setupVaultSizeSlider.value),
                 vaultNameField.text,
                 normalName,
@@ -717,5 +749,9 @@ Item {
             if (forceCheckbox)
                 forceCheckbox.checked = false
         }
+    }
+
+    FingerprintWizard {
+        anchors.fill: parent
     }
 }

@@ -12,6 +12,8 @@ set(PROJECT_SOURCES
     main.cpp
     vault_controller.h
     vault_controller.cpp
+    serial_bridge.h
+    serial_bridge.cpp
 )
 
 qt_add_executable(DigitalVaultGUI
@@ -57,6 +59,7 @@ qt_add_qml_module(DigitalVaultGUI
         VaultStatusBadge.qml
         ModalScrim.qml
         SetupProgressOverlay.qml
+        FingerprintWizard.qml
         AccessManager.qml
         FingerprintManager.qml
         SecurityLog.qml

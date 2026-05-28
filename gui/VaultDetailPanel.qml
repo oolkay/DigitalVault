@@ -183,7 +183,7 @@ Rectangle {
 
             Text {
                 visible: accessListExpanded && (!detail.keyslots || detail.keyslots.length === 0)
-                text: "No active keyslots found (vault may need to be set up again)."
+                text: "No one in the access list yet."
                 color: Theme.textMuted
                 font { pixelSize: 11; family: "Inter" }
             }

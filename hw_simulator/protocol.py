@@ -21,9 +21,12 @@ SOCKET_PATH = "/tmp/biometric_vault.sock"
 
 class Command(str, Enum):
     """STM32'ye gönderilebilecek komutlar."""
-    ENROLL      = "enroll"       # Yeni parmak izi kaydet
-    VERIFY      = "verify"       # Parmak izi doğrula → key döndür
-    DELETE      = "delete"       # Kayıtlı parmak izini sil
+    ENROLL       = "enroll"        # Yeni parmak izi kaydet
+    VERIFY       = "verify"        # (legacy) finger_id ile doğrula
+    VERIFY_START = "verify_start"  # 1:N doğrula → finger_id (key ayrı)
+    GET_KEY      = "get_key"       # verify sonrası 10s içinde key
+    CANCEL       = "cancel"        # İşlemi iptal
+    DELETE       = "delete"       # Kayıtlı parmak izini sil
     LIST        = "list"         # Kayıtlı parmak izlerini listele
     STATUS      = "status"       # Cihaz durumunu sorgula
     DISCONNECT  = "disconnect"   # Cihaz çekilmesini simüle et

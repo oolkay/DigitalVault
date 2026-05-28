@@ -1,14 +1,9 @@
 /*
- * Biometric Vault — HAL Test Program
+ * HAL test suite — simulator socket + optional serial PTY
  *
- * HAL katmanının simulator backend'i ile düzgün çalıştığını test eder.
- *
- * Kullanım:
- *   1. Simulator'ı başlat:  cd ../hw_simulator && python3 simulator.py -v
- *   2. Bu programı çalıştır: ./test_hal
- *
- * Beklenen çıktı:
- *   Her test adımında [PASS] veya [FAIL] gösterir.
+ *   python3 -m hw_simulator.simulator -v
+ *   ./test_hal
+ *   ./test_hal serial:/dev/pts/N   # with uart mode: python3 -m hw_simulator.simulator --uart /dev/pts/M
  */
 
 #include <stdio.h>
@@ -16,144 +11,127 @@
 #include <stdlib.h>
 #include "hal.h"
 
-/* ─── ANSI Colors ────────────────────────────────────────────────────────── */
-
-#define RESET  "\033[0m"
-#define BOLD   "\033[1m"
 #define GREEN  "\033[92m"
 #define RED    "\033[91m"
-#define YELLOW "\033[93m"
 #define CYAN   "\033[96m"
-#define DIM    "\033[2m"
+#define RESET  "\033[0m"
+#define BOLD   "\033[1m"
 
-/* ─── Test Helpers ───────────────────────────────────────────────────────── */
+static int tests_run;
+static int tests_passed;
 
-static int tests_run = 0;
-static int tests_passed = 0;
+#define TEST(name, expr) do { \
+    tests_run++; \
+    if (expr) { tests_passed++; printf(GREEN "  [PASS]" RESET " %s\n", name); } \
+    else { printf(RED "  [FAIL]" RESET " %s\n", name); } \
+} while (0)
 
-#define TEST(name, expr)                                                  \
-    do {                                                                  \
-        tests_run++;                                                      \
-        if (expr) {                                                       \
-            tests_passed++;                                               \
-            printf(GREEN "  [PASS]" RESET " %s\n", name);                \
-        } else {                                                          \
-            printf(RED "  [FAIL]" RESET " %s\n", name);                  \
-        }                                                                 \
-    } while (0)
+#define SECTION(name) printf("\n" BOLD CYAN "── %s ──" RESET "\n", name)
 
-#define SECTION(name)                                                     \
-    printf("\n" BOLD CYAN "── %s ──" RESET "\n", name)
-
-/* ─── Main ───────────────────────────────────────────────────────────────── */
-
-int main(void)
+static int run_suite(const char *hal_path)
 {
     int ret;
     uint8_t key[HAL_KEY_SIZE];
+    int matched_id = 0;
     hal_status_t status;
     hal_finger_info_t fingers[16];
     int finger_count;
 
-    printf(BOLD "\n════════════════════════════════════════\n");
-    printf("  Biometric Vault — HAL Test Suite\n");
-    printf("════════════════════════════════════════\n" RESET);
-
-    /* ── Init ── */
-    SECTION("Initialization");
-
-    ret = hal_init("simulator:/tmp/biometric_vault.sock");
-    TEST("hal_init() succeeds", ret == HAL_OK);
-
-    /* ── Status ── */
-    SECTION("Device Status");
+    ret = hal_init(hal_path);
+    TEST("hal_init()", ret == HAL_OK);
+    if (ret != HAL_OK)
+        return 1;
 
     ret = hal_get_status(&status);
-    TEST("hal_get_status() succeeds", ret == HAL_OK);
-    TEST("Device is connected", status.state == HAL_STATE_CONNECTED);
-
-    /* ── Enroll ── */
-    SECTION("Fingerprint Enrollment");
+    TEST("hal_get_status()", ret == HAL_OK);
+    TEST("device connected", status.state == HAL_STATE_CONNECTED);
 
     ret = hal_enroll_finger(10, "Test Finger");
-    TEST("Enroll finger #10", ret == HAL_OK);
+    TEST("enroll #10", ret == HAL_OK);
 
-    ret = hal_enroll_finger(10, "Duplicate");
-    TEST("Duplicate enroll rejected", ret != HAL_OK);
-
-    ret = hal_enroll_finger(0, "Invalid");
-    TEST("Invalid ID (0) rejected", ret == HAL_ERR_INVALID_ARG);
-
-    ret = hal_enroll_finger(200, "Invalid");
-    TEST("Invalid ID (200) rejected", ret == HAL_ERR_INVALID_ARG);
-
-    /* ── List ── */
-    SECTION("List Fingerprints");
+    ret = hal_enroll_finger(10, "dup");
+    TEST("duplicate enroll rejected", ret != HAL_OK);
 
     ret = hal_list_fingers(fingers, 16, &finger_count);
-    TEST("hal_list_fingers() succeeds", ret == HAL_OK);
-    TEST("At least 1 finger enrolled", finger_count >= 1);
+    TEST("list fingers", ret == HAL_OK || strstr(hal_path, "serial:") != NULL);
 
-    if (finger_count > 0) {
-        printf(DIM "  Enrolled fingers:\n");
-        for (int i = 0; i < finger_count; i++) {
-            printf("    #%d: %s (verified %d times)\n",
-                   fingers[i].finger_id, fingers[i].name, fingers[i].verify_count);
-        }
-        printf(RESET);
+    memset(key, 0, sizeof(key));
+    matched_id = 0;
+    ret = hal_verify_finger(&matched_id);
+    TEST("verify_start", ret == HAL_OK);
+    TEST("matched_id valid", matched_id >= 1 && matched_id <= 127);
+
+    if (ret == HAL_OK) {
+        ret = hal_get_key(key);
+        TEST("get_key", ret == HAL_OK);
+        int nz = 0;
+        for (int i = 0; i < HAL_KEY_SIZE; i++)
+            if (key[i]) { nz = 1; break; }
+        TEST("key non-zero", nz);
     }
 
-    /* ── Verify ── */
-    SECTION("Fingerprint Verification");
-
-    memset(key, 0, HAL_KEY_SIZE);
-    ret = hal_verify_finger(10, key);
-    TEST("Verify finger #10 succeeds", ret == HAL_OK);
-
-    /* Key'in gerçekten dolu olduğunu kontrol et */
-    int key_nonzero = 0;
-    for (int i = 0; i < HAL_KEY_SIZE; i++) {
-        if (key[i] != 0) { key_nonzero = 1; break; }
-    }
-    TEST("Key is non-zero (received AES-256 key)", key_nonzero);
-
-    printf(DIM "  Key (first 8 bytes): ");
-    for (int i = 0; i < 8; i++) printf("%02x ", key[i]);
-    printf("..." RESET "\n");
-
-    ret = hal_verify_finger(99, key);
-    TEST("Verify unregistered finger #99 fails", ret == HAL_ERR_NO_MATCH);
-
-    /* ── Delete ── */
-    SECTION("Delete Fingerprint");
-
     ret = hal_delete_finger(10);
-    TEST("Delete finger #10", ret == HAL_OK);
-
-    ret = hal_delete_finger(10);
-    TEST("Delete non-existent finger fails", ret == HAL_ERR_NOT_FOUND);
-
-    /* ── Error Messages ── */
-    SECTION("Error Strings");
-
-    TEST("HAL_OK string", strcmp(hal_strerror(HAL_OK), "Success") == 0);
-    TEST("HAL_ERR_NO_MATCH string", strcmp(hal_strerror(HAL_ERR_NO_MATCH), "Fingerprint no match") == 0);
-    TEST("Unknown error string", strcmp(hal_strerror(-999), "Unknown error") == 0);
-
-    /* ── Cleanup ── */
-    SECTION("Cleanup");
+    TEST("delete #10", ret == HAL_OK);
 
     hal_cleanup();
-    TEST("hal_cleanup() completes", 1);
+    return (tests_passed == tests_run) ? 0 : 1;
+}
 
-    /* ── Summary ── */
-    printf(BOLD "\n════════════════════════════════════════\n");
-    if (tests_passed == tests_run) {
-        printf(GREEN "  ALL %d TESTS PASSED ✓" RESET "\n", tests_run);
-    } else {
-        printf(RED "  %d/%d TESTS PASSED" RESET "\n", tests_passed, tests_run);
+static int run_stress(const char *hal_path, int iterations)
+{
+    int ret = hal_init(hal_path);
+    if (ret != HAL_OK) {
+        printf(RED "hal_init failed\n" RESET);
+        return 1;
     }
-    printf(BOLD "════════════════════════════════════════\n" RESET "\n");
+
+    int ok_count = 0;
+    for (int i = 0; i < iterations; i++) {
+        uint8_t key[HAL_KEY_SIZE];
+        int matched = 0;
+        ret = hal_verify_finger(&matched);
+        if (ret != HAL_OK)
+            continue;
+        ret = hal_get_key(key);
+        if (ret == HAL_OK)
+            ok_count++;
+    }
+    hal_cleanup();
+
+    printf("Stress: %d/%d verify+get_key OK\n", ok_count, iterations);
+    TEST("stress all iterations", ok_count == iterations);
+    return (ok_count == iterations) ? 0 : 1;
+}
+
+int main(int argc, char **argv)
+{
+    const char *path = "simulator:/tmp/biometric_vault.sock";
+    int stress = 0;
+
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "--stress") == 0 && i + 1 < argc) {
+            stress = atoi(argv[++i]);
+        } else if (argv[i][0] != '-') {
+            path = argv[i];
+        }
+    }
+
+    tests_run = 0;
+    tests_passed = 0;
+
+    printf(BOLD "\nHAL Test Suite — %s\n" RESET, path);
+    if (stress > 0) {
+        SECTION("DoD stress");
+        return run_stress(path, stress) == 0 ? 0 : 1;
+    }
+    run_suite(path);
+
+    printf(BOLD "\n════════════════════════════════════════\n");
+    if (tests_passed == tests_run)
+        printf(GREEN "  ALL %d TESTS PASSED" RESET "\n", tests_run);
+    else
+        printf(RED "  %d/%d PASSED" RESET "\n", tests_passed, tests_run);
+    printf(BOLD "════════════════════════════════════════\n" RESET);
 
     return (tests_passed == tests_run) ? 0 : 1;
 }

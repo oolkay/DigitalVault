@@ -11,13 +11,29 @@ Item {
 
     function refreshSlots() {
         isLoading = true
-        keyslotList = vaultController.getKeyslots()
+        keyslotList = vaultController.accessListForDevice(vaultController.selectedDevice)
         isLoading = false
     }
 
     Component.onCompleted: refreshSlots()
 
     StackView.onActivated: refreshSlots()
+
+    Connections {
+        target: vaultController
+        function onFingerprintUnlockActiveChanged() {
+            if (!vaultController.fingerprintUnlockActive) {
+                refreshSlots()
+                if (wizardLayout)
+                    wizardLayout.currentStep = 0
+            }
+        }
+    }
+
+    FingerprintWizard {
+        anchors.fill: parent
+        z: 400
+    }
 
     ScrollView {
         anchors.fill: parent
@@ -43,7 +59,7 @@ Item {
                     Behavior on color { ColorAnimation { duration: 250 } }
                 }
                 Text {
-                    text: "Manage who can unlock the vault selected on the Dashboard. Each keyslot is an authorized unlock credential."
+                    text: "Manage who can unlock the selected vault. Access is stored in the PC registry (no LUKS keyslot changes)."
                     color: Theme.textSecondary
                     font { pixelSize: 13; family: "Inter" }
                     width: parent.width
@@ -309,11 +325,10 @@ Item {
                                             onClicked: {
                                                 var nid = parseInt(step2NewIdInput.text)
                                                 if (isNaN(nid)) return
-                                                
-                                                if(vaultController.grantAccess(wizardLayout.verifiedOwnerId, nid)) {
-                                                    wizardLayout.currentStep = 0
-                                                    refreshSlots()
-                                                }
+                                                vaultController.beginGrantAccessEnroll(
+                                                    wizardLayout.verifiedOwnerId,
+                                                    nid,
+                                                    step2NewNameInput.text)
                                             }
                                         }
                                     }
@@ -351,7 +366,7 @@ Item {
                             spacing: 10
                             Text { text: "🔑"; font.pixelSize: 18; anchors.verticalCenter: parent.verticalCenter }
                             Text {
-                                text: "Active Keyslots"
+                                text: "Access list"
                                 color: Theme.textPrimary
                                 font { pixelSize: 15; bold: true; family: "Inter" }
                                 anchors.verticalCenter: parent.verticalCenter

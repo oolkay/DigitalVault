@@ -50,6 +50,8 @@ class FingerprintDB:
 
     def __init__(self):
         self._db: dict[int, Fingerprint] = {}
+        self._last_enrolled_id: Optional[int] = None
+        self._match_scores: dict[int, int] = {}
 
     def load(self) -> None:
         """Veritabanını diskten yükle."""
@@ -100,8 +102,33 @@ class FingerprintDB:
             enrolled_at=time.strftime("%Y-%m-%dT%H:%M:%S"),
         )
         self._db[finger_id] = fp
+        self._last_enrolled_id = finger_id
+        self._match_scores[finger_id] = self._match_scores.get(finger_id, 0) + 100
         self.save()
         return fp
+
+    def list_enrolled_ids(self) -> list[int]:
+        """Return sorted AS608 page IDs with stored templates."""
+        return sorted(self._db.keys())
+
+    def verify_any(self) -> Optional[int]:
+        """
+        1:N search simulation (AS608 FingerSearch).
+
+        Prefer the most recently enrolled template, then highest match score;
+        tie-break on highest page ID (not lowest).
+        """
+        if not self._db:
+            return None
+        if self._last_enrolled_id is not None and self._last_enrolled_id in self._db:
+            self.verify(self._last_enrolled_id)
+            return self._last_enrolled_id
+        finger_id = max(
+            self._db.keys(),
+            key=lambda i: (self._match_scores.get(i, 0), i),
+        )
+        self.verify(finger_id)
+        return finger_id
 
     def verify(self, finger_id: int) -> bool:
         """
@@ -125,6 +152,7 @@ class FingerprintDB:
         fp = self._db[finger_id]
         fp.verify_count += 1
         fp.last_verified_at = time.strftime("%Y-%m-%dT%H:%M:%S")
+        self._match_scores[finger_id] = self._match_scores.get(finger_id, 0) + 1
         self.save()
         return True
 
@@ -142,6 +170,9 @@ class FingerprintDB:
             return False
 
         del self._db[finger_id]
+        self._match_scores.pop(finger_id, None)
+        if self._last_enrolled_id == finger_id:
+            self._last_enrolled_id = None
         self.save()
         return True
 

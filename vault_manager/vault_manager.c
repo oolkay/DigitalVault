@@ -150,6 +150,25 @@ static int cryptsetup_with_key(const char *argv[],
  * @param key_out    32 byte key çıktısı
  * @return 0 başarılı, -1 hata
  */
+static int read_key_from_stdin(uint8_t *key_out)
+{
+    size_t got = 0;
+    while (got < HAL_KEY_LEN) {
+        ssize_t n = read(STDIN_FILENO, key_out + got, HAL_KEY_LEN - got);
+        if (n < 0) {
+            perror("[vault_manager] read stdin key");
+            return -1;
+        }
+        if (n == 0) {
+            fprintf(stderr, "[vault_manager] EOF reading key from stdin (%zu/%d bytes)\n",
+                    got, HAL_KEY_LEN);
+            return -1;
+        }
+        got += (size_t)n;
+    }
+    return 0;
+}
+
 static int get_biometric_key(int finger_id, uint8_t *key_out)
 {
     printf("[vault_manager] Connecting to biometric sensor...\n");
@@ -160,9 +179,8 @@ static int get_biometric_key(int finger_id, uint8_t *key_out)
         return -1;
     }
 
-    printf("[vault_manager] Verifying fingerprint (ID: %d)...\n", finger_id);
-
-    int ret = hal_verify_finger(finger_id, key_out);
+    int matched_id = 0;
+    int ret = hal_verify_and_get_key(&matched_id, key_out);
     if (ret != HAL_OK) {
         fprintf(stderr, "[vault_manager] Fingerprint verification failed: %s\n",
                 hal_strerror(ret));
@@ -170,7 +188,15 @@ static int get_biometric_key(int finger_id, uint8_t *key_out)
         return -1;
     }
 
-    printf("[vault_manager] Fingerprint verified successfully!\n");
+    if (finger_id > 0 && matched_id != finger_id) {
+        fprintf(stderr, "[vault_manager] Matched finger %d but expected %d\n",
+                matched_id, finger_id);
+        secure_wipe(key_out, HAL_KEY_LEN);
+        hal_cleanup();
+        return -1;
+    }
+
+    printf("[vault_manager] Fingerprint #%d verified successfully!\n", matched_id);
     hal_cleanup();
     return 0;
 }
@@ -572,6 +598,7 @@ static int check_device_status(const char *device)
  *   6. cryptsetup close
  */
 static int cmd_setup(const char *device, int finger_id, int force, int partition_size_mb,
+                     int key_from_stdin,
                      const char *vault_name, const char *normal_name, const char *normal_fs)
 {
     if (!vault_name) vault_name = "DigitalVault";
@@ -679,7 +706,12 @@ static int cmd_setup(const char *device, int finger_id, int force, int partition
 
     /* 1. Biyometrik key al */
     uint8_t key[HAL_KEY_LEN];
-    if (get_biometric_key(finger_id, key) != 0) return 1;
+    if (key_from_stdin) {
+        if (read_key_from_stdin(key) != 0)
+            return 1;
+    } else if (get_biometric_key(finger_id, key) != 0) {
+        return 1;
+    }
 
     /* 2. LUKS formatla */
     printf("[vault_manager] Formatting LUKS2 container (AES-256-XTS)...\n");
@@ -782,7 +814,7 @@ static int cmd_setup(const char *device, int finger_id, int force, int partition
 /**
  * OPEN: Parmak izi doğrula → LUKS aç → ext4 mount.
  */
-static int cmd_open(const char *device, const char *mount_point, int finger_id)
+static int cmd_open(const char *device, const char *mount_point, int finger_id, int key_from_stdin)
 {
     char resolved_device[256];
     resolve_vault_device(device, resolved_device, sizeof(resolved_device));
@@ -797,7 +829,12 @@ static int cmd_open(const char *device, const char *mount_point, int finger_id)
 
     /* 1. Biyometrik key al */
     uint8_t key[HAL_KEY_LEN];
-    if (get_biometric_key(finger_id, key) != 0) return 1;
+    if (key_from_stdin) {
+        if (read_key_from_stdin(key) != 0)
+            return 1;
+    } else if (get_biometric_key(finger_id, key) != 0) {
+        return 1;
+    }
 
     /* 2. LUKS aç */
     printf("[vault_manager] Decrypting LUKS container...\n");
@@ -1360,8 +1397,8 @@ static void print_usage(const char *prog)
         "DigitalVault — Vault Manager (LUKS + ext4)\n"
         "\n"
         "Usage:\n"
-        "  %s setup     <device> [finger_id]                — First-time LUKS setup\n"
-        "  %s open      <device> <mountpoint> [finger_id]   — Unlock vault\n"
+        "  %s setup     <device> [finger_id] [--key-from-stdin] — First-time LUKS setup\n"
+        "  %s open      <device> <mountpoint> [--key-from-stdin] — Unlock vault\n"
         "  %s close     <mountpoint>                        — Lock vault (no process kill)\n"
         "  %s forceclose <mountpoint>                      — Force lock vault\n"
         "  %s reconcile <mountpoint>                        — Release orphan mapper/setup mounts\n"
@@ -1392,6 +1429,7 @@ int main(int argc, char *argv[])
         }
         int fid = 1;
         int force = 0;
+        int key_from_stdin = 0;
         int partition_size = 0;
         const char *vault_name = "DigitalVault";
         const char *normal_name = "Normal";
@@ -1399,7 +1437,9 @@ int main(int argc, char *argv[])
 
         /* Parse optional arguments */
         for (int i = 3; i < argc; i++) {
-            if (strcmp(argv[i], "--force") == 0) {
+            if (strcmp(argv[i], "--key-from-stdin") == 0) {
+                key_from_stdin = 1;
+            } else if (strcmp(argv[i], "--force") == 0) {
                 force = 1;
             } else if (strcmp(argv[i], "--partition") == 0 && i + 1 < argc) {
                 partition_size = atoi(argv[++i]);
@@ -1414,15 +1454,23 @@ int main(int argc, char *argv[])
             }
         }
 
-        return cmd_setup(argv[2], fid, force, partition_size, vault_name, normal_name, normal_fs);
+        return cmd_setup(argv[2], fid, force, partition_size, key_from_stdin,
+                         vault_name, normal_name, normal_fs);
     }
     else if (strcmp(cmd, "open") == 0) {
         if (argc < 4) {
-            fprintf(stderr, "Usage: %s open <device> <mountpoint> [finger_id]\n", argv[0]);
+            fprintf(stderr, "Usage: %s open <device> <mountpoint> [--key-from-stdin]\n", argv[0]);
             return 1;
         }
-        int fid = (argc >= 5) ? atoi(argv[4]) : 1;
-        return cmd_open(argv[2], argv[3], fid);
+        int fid = 1;
+        int key_from_stdin = 0;
+        for (int i = 4; i < argc; i++) {
+            if (strcmp(argv[i], "--key-from-stdin") == 0)
+                key_from_stdin = 1;
+            else
+                fid = atoi(argv[i]);
+        }
+        return cmd_open(argv[2], argv[3], fid, key_from_stdin);
     }
     else if (strcmp(cmd, "close") == 0) {
         if (argc < 3) {

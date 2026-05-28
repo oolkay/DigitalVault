@@ -34,6 +34,28 @@ from protocol import (
 )
 from crypto_key import KeyManager
 from fingerprint_db import FingerprintDB
+from binary_protocol import (
+    CMD_ENROLL_START,
+    CMD_VERIFY_START,
+    CMD_LIST_ENROLLED,
+    CMD_DELETE,
+    CMD_CANCEL,
+    CMD_GET_KEY,
+    EVT_WAITING_FINGER,
+    EVT_FINGER_DETECTED,
+    EVT_REMOVE_FINGER,
+    EVT_PLACE_AGAIN,
+    EVT_PROCESSING,
+    RES_SUCCESS,
+    RES_FAIL_NO_MATCH,
+    RES_FAIL_ALREADY_EXISTS,
+    RES_FAIL_SLOT_FULL,
+    RES_FAIL_INVALID_ID,
+    RES_KEY_DATA,
+    RES_CANCELLED,
+    build_packet,
+    PacketReader,
+)
 
 # ─── Logging ─────────────────────────────────────────────────────────────────
 
@@ -71,6 +93,8 @@ class HardwareSimulator:
         self._request_count = 0
         self._verify_success_count = 0
         self._verify_fail_count = 0
+        self._key_window_until: float = 0.0
+        self._cancel_requested = False
 
     def initialize(self) -> None:
         """Simülatörü başlat, key ve DB'yi yükle."""
@@ -105,6 +129,13 @@ class HardwareSimulator:
                     return self._handle_enroll(request)
                 case Command.VERIFY:
                     return self._handle_verify(request)
+                case Command.VERIFY_START:
+                    return self._handle_verify_start()
+                case Command.GET_KEY:
+                    return self._handle_get_key()
+                case Command.CANCEL:
+                    self._cancel_requested = True
+                    return make_ok_response()
                 case Command.DELETE:
                     return self._handle_delete(request)
                 case Command.LIST:
@@ -144,29 +175,128 @@ class HardwareSimulator:
             return make_error_response(str(e))
 
     def _handle_verify(self, request: Request) -> Response:
-        """
-        Parmak izi doğrula.
-        Başarılıysa AES-256 key'i döndürür.
-
-        Gerçek donanımda:
-        - AS608 parmağı tarar (~0.5s)
-        - Template ile karşılaştırır (~0.3s)
-        - STM32 sonucu değerlendirir
-        - Başarılıysa key'i UART'tan gönderir
-        """
+        """Legacy: verify specific finger_id (no key — use get_key)."""
         if request.finger_id is None:
             return make_error_response("finger_id required")
-
-        matched = self._fingerprint_db.verify(request.finger_id)
-
-        if matched:
+        if self._fingerprint_db.verify(request.finger_id):
             self._verify_success_count += 1
-            logger.info(f"✓ Finger #{request.finger_id} verified — key released")
-            return make_ok_response(key=self._key_manager.key_b64)
-        else:
+            self._key_window_until = time.time() + 10.0
+            return make_ok_response(finger_id=request.finger_id)
+        self._verify_fail_count += 1
+        return make_error_response("no_match")
+
+    def _handle_verify_start(self) -> Response:
+        """1:N verify — opens 10s GET_KEY window on success."""
+        if not self._key_manager.is_available():
+            return make_error_response("device_disconnected")
+        matched = self._fingerprint_db.verify_any()
+        if matched is None:
             self._verify_fail_count += 1
-            logger.warning(f"✗ Finger #{request.finger_id} — no match")
             return make_error_response("no_match")
+        self._verify_success_count += 1
+        self._key_window_until = time.time() + 10.0
+        logger.info(f"✓ verify_start matched finger #{matched}")
+        return make_ok_response(finger_id=matched)
+
+    def _handle_get_key(self) -> Response:
+        if time.time() > self._key_window_until:
+            return make_error_response("key_window_expired")
+        if not self._key_manager.is_available():
+            return make_error_response("device_disconnected")
+        self._key_window_until = 0.0
+        return make_ok_response(key=self._key_manager.key_b64)
+
+    async def _emit_scan_events(self, writer, need_remove: bool = False) -> None:
+        """UART event sequence for enroll/verify."""
+        for code in (EVT_WAITING_FINGER, EVT_FINGER_DETECTED):
+            writer.write(build_packet(code))
+            await writer.drain()
+            await asyncio.sleep(0.05)
+        if need_remove:
+            writer.write(build_packet(EVT_REMOVE_FINGER))
+            await writer.drain()
+            await asyncio.sleep(0.05)
+            writer.write(build_packet(EVT_PLACE_AGAIN))
+            await writer.drain()
+            await asyncio.sleep(0.05)
+        writer.write(build_packet(EVT_PROCESSING))
+        await writer.drain()
+        await asyncio.sleep(0.1)
+
+    async def handle_uart_packets(self, code: int, payload: bytes, writer) -> None:
+        """Process one binary command; write response packets to writer."""
+        self._cancel_requested = False
+        if self._state == DeviceState.DISCONNECTED:
+            writer.write(build_packet(RES_FAIL_NO_MATCH))
+            await writer.drain()
+            return
+
+        if code == CMD_CANCEL:
+            self._cancel_requested = True
+            writer.write(build_packet(RES_CANCELLED))
+            await writer.drain()
+            return
+
+        if code == CMD_VERIFY_START:
+            await self._emit_scan_events(writer)
+            matched = self._fingerprint_db.verify_any()
+            if matched is None:
+                writer.write(build_packet(RES_FAIL_NO_MATCH))
+            else:
+                self._key_window_until = time.time() + 10.0
+                writer.write(build_packet(RES_SUCCESS, bytes([matched])))
+            await writer.drain()
+            return
+
+        if code == CMD_GET_KEY:
+            if time.time() > self._key_window_until or not self._key_manager.is_available():
+                writer.write(build_packet(RES_FAIL_NO_MATCH))
+            else:
+                self._key_window_until = 0.0
+                writer.write(build_packet(RES_KEY_DATA, self._key_manager.key))
+            await writer.drain()
+            return
+
+        if code == CMD_ENROLL_START:
+            if len(payload) < 1:
+                writer.write(build_packet(RES_FAIL_INVALID_ID))
+                await writer.drain()
+                return
+            finger_id = payload[0]
+            await self._emit_scan_events(writer, need_remove=True)
+            try:
+                self._fingerprint_db.enroll(finger_id, f"Finger_{finger_id}")
+                writer.write(build_packet(RES_SUCCESS, bytes([finger_id])))
+            except ValueError as e:
+                msg = str(e)
+                if "already" in msg:
+                    writer.write(build_packet(RES_FAIL_ALREADY_EXISTS, bytes([finger_id])))
+                elif "full" in msg:
+                    writer.write(build_packet(RES_FAIL_SLOT_FULL))
+                else:
+                    writer.write(build_packet(RES_FAIL_INVALID_ID))
+            await writer.drain()
+            return
+
+        if code == CMD_DELETE:
+            if len(payload) < 1:
+                writer.write(build_packet(RES_FAIL_INVALID_ID))
+                await writer.drain()
+                return
+            fid = payload[0]
+            if self._fingerprint_db.delete(fid):
+                writer.write(build_packet(RES_SUCCESS, bytes([fid])))
+            else:
+                writer.write(build_packet(RES_FAIL_NO_MATCH))
+            await writer.drain()
+            return
+
+        if code == CMD_LIST_ENROLLED:
+            ids = self._fingerprint_db.list_enrolled_ids()
+            body = bytes([len(ids)]) + bytes(ids)
+            writer.write(build_packet(RES_SUCCESS, body))
+            await writer.drain()
+            return
 
     def _handle_delete(self, request: Request) -> Response:
         """Kayıtlı parmak izini sil."""
@@ -307,35 +437,116 @@ class SimulatorServer:
         logger.info("Server stopped")
 
 
+# ─── UART (binary protocol) ──────────────────────────────────────────────────
+
+class _UartWriter:
+    """Async write helper for binary UART responses."""
+
+    def __init__(self, fd: int):
+        self._fd = fd
+
+    def write(self, data: bytes) -> None:
+        os.write(self._fd, data)
+
+    async def drain(self) -> None:
+        await asyncio.sleep(0)
+
+
+class UartServer:
+    """Binary protocol on a PTY or serial device (stdlib only)."""
+
+    def __init__(self, simulator: HardwareSimulator, port: str):
+        self._simulator = simulator
+        self._port = port
+        self._pkt_reader = PacketReader()
+        self._stop = asyncio.Event()
+        self._fd: int | None = None
+
+    def _configure_tty(self, fd: int) -> None:
+        """Raw 8N1-ish mode. PTY ignores baud; skip cfsetispeed (BSD-only in Python)."""
+        import termios
+
+        attrs = termios.tcgetattr(fd)
+        attrs[0] = attrs[0] & ~(termios.IGNBRK | termios.BRKINT | termios.PARMRK
+                              | termios.ISTRIP | termios.INLCR | termios.IGNCR
+                              | termios.ICRNL | termios.IXON)
+        attrs[1] = attrs[1] & ~termios.OPOST
+        attrs[2] = attrs[2] | (termios.CS8 | termios.CLOCAL | termios.CREAD)
+        attrs[2] = attrs[2] & ~(termios.PARENB | termios.CSTOPB)
+        attrs[3] = attrs[3] & ~(termios.ECHO | termios.ECHONL | termios.ICANON
+                              | termios.ISIG | termios.IEXTEN)
+        attrs[6][termios.VMIN] = 0
+        attrs[6][termios.VTIME] = 1
+        termios.tcsetattr(fd, termios.TCSANOW, attrs)
+
+    def _on_readable(self) -> None:
+        if self._fd is None:
+            return
+        try:
+            data = os.read(self._fd, 512)
+        except OSError:
+            self._stop.set()
+            return
+        if not data:
+            return
+        for code, payload in self._pkt_reader.feed(data):
+            asyncio.create_task(
+                self._simulator.handle_uart_packets(code, payload, _UartWriter(self._fd))
+            )
+
+    async def run(self) -> None:
+        import fcntl
+
+        logger.info(f"UART binary protocol on {self._port}")
+        fd = os.open(self._port, os.O_RDWR | os.O_NOCTTY | os.O_SYNC)
+        self._fd = fd
+        flags = fcntl.fcntl(fd, fcntl.F_GETFL)
+        fcntl.fcntl(fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
+        self._configure_tty(fd)
+
+        loop = asyncio.get_running_loop()
+        loop.add_reader(fd, self._on_readable)
+        try:
+            await self._stop.wait()
+        finally:
+            loop.remove_reader(fd)
+            os.close(fd)
+            self._fd = None
+
+
 # ─── Main ────────────────────────────────────────────────────────────────────
 
 async def main(args: argparse.Namespace) -> None:
     """Ana çalıştırma döngüsü."""
-    # Simülatörü oluştur ve başlat
     simulator = HardwareSimulator(persist_key=not args.no_persist)
     simulator.initialize()
 
-    # Sunucuyu oluştur ve başlat
+    uart_port = args.uart or os.environ.get("BIOMETRIC_UART")
+
     server = SimulatorServer(simulator)
     await server.start()
 
-    # Graceful shutdown handler
     loop = asyncio.get_running_loop()
     stop_event = asyncio.Event()
+    uart_server: UartServer | None = None
+
+    if uart_port:
+        uart_server = UartServer(simulator, uart_port)
+        asyncio.create_task(uart_server.run())
+        logger.info(f"UART binary protocol enabled on {uart_port}")
 
     def signal_handler():
         logger.info("\nShutdown signal received...")
         stop_event.set()
+        if uart_server:
+            uart_server._stop.set()
 
     for sig in (signal.SIGINT, signal.SIGTERM):
         loop.add_signal_handler(sig, signal_handler)
 
     logger.info("Ready — waiting for connections (Ctrl+C to stop)")
-
-    # Çalışmaya devam et
     await stop_event.wait()
 
-    # Temiz kapanış
     await server.stop()
     logger.info("Goodbye!")
 
@@ -360,6 +571,11 @@ Examples:
         "-v", "--verbose",
         action="store_true",
         help="Enable verbose (DEBUG) logging",
+    )
+    parser.add_argument(
+        "--uart",
+        metavar="DEVICE",
+        help="Binary UART protocol on serial device (e.g. /dev/pts/3)",
     )
     return parser.parse_args()
 
