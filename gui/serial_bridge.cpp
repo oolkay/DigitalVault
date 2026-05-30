@@ -35,6 +35,8 @@ constexpr quint8 kResFailInvalidId = 0x26;
 constexpr quint8 kResCancelled = 0x27;
 constexpr quint8 kResTimeout = 0x28;
 constexpr quint8 kResKey = 0x29;
+constexpr quint8 kResBusy = 0x2A;
+constexpr quint8 kResSensorError = 0x2B;
 
 QString enrollErrorMessage(quint8 code, const QByteArray &payload)
 {
@@ -58,6 +60,10 @@ QString enrollErrorMessage(quint8 code, const QByteArray &payload)
         return QStringLiteral("Operation cancelled");
     case kResTimeout:
         return QStringLiteral("Sensor operation timed out");
+    case kResBusy:
+        return QStringLiteral("Sensor busy — operation already in progress");
+    case kResSensorError:
+        return QStringLiteral("Sensor not responding — retry or power-cycle the module");
     default:
         return QStringLiteral("Enroll failed (sensor code 0x%1)").arg(code, 2, 16, QChar('0'));
     }
@@ -76,6 +82,10 @@ QString verifyErrorMessage(quint8 code)
         return QStringLiteral("Verification cancelled");
     case kResTimeout:
         return QStringLiteral("Verification timed out");
+    case kResBusy:
+        return QStringLiteral("Sensor busy — operation already in progress");
+    case kResSensorError:
+        return QStringLiteral("Sensor not responding — retry or power-cycle the module");
     default:
         return QStringLiteral("Verification failed (sensor code 0x%1)").arg(code, 2, 16, QChar('0'));
     }

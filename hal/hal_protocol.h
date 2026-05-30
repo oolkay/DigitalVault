@@ -13,12 +13,13 @@
 #define HAL_PKT_MAX_SIZE      (4 + HAL_PKT_MAX_PAYLOAD)
 
 /* PC → STM */
-#define HAL_CMD_ENROLL_START  0x01
+#define HAL_CMD_ENROLL_START  0x01  /* payload[0]: 1-127, or 0 = first free slot */
 #define HAL_CMD_VERIFY_START  0x02
 #define HAL_CMD_DELETE        0x03
 #define HAL_CMD_CANCEL        0x04
 #define HAL_CMD_GET_KEY       0x05
 #define HAL_CMD_LIST_ENROLLED 0x06  /* STM32: AS608 template scan → [count][id…] */
+#define HAL_CMD_STATUS        0x07  /* ping → SUCCESS [connected][tpl_lo][tpl_hi] */
 
 /* STM → PC events */
 #define HAL_EVT_WAITING_FINGER 0x10
@@ -38,6 +39,8 @@
 #define HAL_RES_CANCELLED         0x27
 #define HAL_RES_TIMEOUT           0x28
 #define HAL_RES_KEY_DATA          0x29
+#define HAL_RES_BUSY              0x2A  /* operation in progress */
+#define HAL_RES_SENSOR_ERROR      0x2B  /* AS608 comm / recovery failed */
 
 typedef struct {
     uint8_t  code;

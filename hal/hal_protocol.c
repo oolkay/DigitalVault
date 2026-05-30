@@ -121,6 +121,10 @@ int hal_res_to_error(uint8_t res_code)
         return HAL_ERR_INVALID_ARG;
     case HAL_RES_CANCELLED:
         return HAL_ERR_UNKNOWN;
+    case HAL_RES_BUSY:
+        return HAL_ERR_UNKNOWN;
+    case HAL_RES_SENSOR_ERROR:
+        return HAL_ERR_CONNECT;
     case HAL_RES_TIMEOUT:
         return HAL_ERR_TIMEOUT;
     case HAL_RES_FAIL_NO_FINGER:

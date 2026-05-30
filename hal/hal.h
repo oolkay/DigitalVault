@@ -75,10 +75,14 @@ int  hal_cancel_operation(void);
 /** Blocking verify + get_key; wipes key_out on get_key failure. */
 int  hal_verify_and_get_key(int *matched_id_out, uint8_t *key_out);
 
-int  hal_enroll_finger(int finger_id, const char *name);
+/** finger_id 0 = auto; assigned_slot_out optional (actual slot 1-127 on success). */
+int  hal_enroll_finger(int finger_id, const char *name, int *assigned_slot_out);
 int  hal_delete_finger(int finger_id);
 int  hal_list_fingers(hal_finger_info_t *fingers, int max_count, int *out_count);
 int  hal_get_status(hal_status_t *status);
+
+/** Device ping (serial STATUS cmd); template_count_out may be NULL. */
+int  hal_ping(int *template_count_out);
 
 const char *hal_strerror(int err);
 

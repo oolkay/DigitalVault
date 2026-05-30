@@ -17,10 +17,11 @@ typedef struct hal_backend {
     int  (*verify)(int *matched_id_out);
     int  (*get_key)(uint8_t *key_out);
     int  (*cancel)(void);
-    int  (*enroll)(int finger_id, const char *name);
+    int  (*enroll)(int finger_id, const char *name, int *assigned_slot_out);
     int  (*delete_finger)(int finger_id);
     int  (*list)(hal_finger_info_t *fingers, int max_count, int *out_count);
     int  (*status)(hal_status_t *status);
+    int  (*ping)(int *template_count_out);
 } hal_backend_t;
 
 extern const hal_backend_t *g_hal_backend;

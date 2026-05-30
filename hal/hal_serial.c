@@ -8,12 +8,14 @@
 #include <fcntl.h>
 #include <poll.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <termios.h>
 #include <unistd.h>
 
-#define VERIFY_TIMEOUT_MS  15000
+#define VERIFY_TIMEOUT_MS  30000
 #define ENROLL_TIMEOUT_MS  60000
+#define LIST_TIMEOUT_MS    120000
 #define IO_TIMEOUT_MS      2000
 #define GET_KEY_WINDOW_MS  10000
 
@@ -21,13 +23,46 @@ static int g_fd = -1;
 static int g_initialized = 0;
 static int g_key_window_open = 0;
 
+static int g_trace = -1;
+
+static int serial_trace_enabled(void)
+{
+    if (g_trace < 0) {
+        const char *e = getenv("HAL_SERIAL_TRACE");
+        g_trace = (e && e[0] == '1') ? 1 : 0;
+    }
+    return g_trace;
+}
+
+static void serial_trace_pkt(const char *dir, uint8_t code)
+{
+    if (serial_trace_enabled())
+        fprintf(stderr, "[HAL serial] %s 0x%02X\n", dir, code);
+}
+
+static void serial_flush_io(void)
+{
+    if (g_fd >= 0)
+        (void)tcflush(g_fd, TCIOFLUSH);
+}
+
+static void serial_drain_rx(void)
+{
+    if (g_fd < 0)
+        return;
+    uint8_t discard[64];
+    while (read(g_fd, discard, sizeof(discard)) > 0)
+        ;
+}
+
 static int serial_configure(int fd)
 {
     struct termios tio;
     if (tcgetattr(fd, &tio) < 0)
         return -1;
     cfmakeraw(&tio);
-    /* PTY ignores baud; cfsetispeed can fail on Linux pseudo-ttys */
+    cfsetispeed(&tio, B115200);
+    cfsetospeed(&tio, B115200);
     tio.c_cc[VMIN] = 0;
     tio.c_cc[VTIME] = 1;
     if (tcsetattr(fd, TCSANOW, &tio) < 0)
@@ -80,25 +115,26 @@ static int recv_packet(hal_packet_t *pkt, int overall_timeout_ms)
 
 static int send_cmd(uint8_t code, const uint8_t *payload, uint8_t plen)
 {
+    serial_drain_rx();
     uint8_t buf[HAL_PKT_MAX_SIZE];
     size_t len = 0;
     int ret = hal_pkt_build(code, payload, plen, buf, sizeof(buf), &len);
     if (ret != HAL_OK)
         return ret;
+    serial_trace_pkt("TX", code);
     ssize_t w = write(g_fd, buf, len);
     if (w != (ssize_t)len)
         return HAL_ERR_SEND;
     return HAL_OK;
 }
 
-static int wait_result(uint8_t *matched_id, int timeout_ms)
+static int wait_packet(hal_packet_t *out_pkt, int timeout_ms)
 {
-    hal_packet_t pkt;
     int deadline = timeout_ms;
 
     while (deadline > 0) {
         int chunk = deadline > IO_TIMEOUT_MS ? IO_TIMEOUT_MS : deadline;
-        int ret = recv_packet(&pkt, chunk);
+        int ret = recv_packet(out_pkt, chunk);
         if (ret == HAL_ERR_TIMEOUT) {
             deadline -= chunk;
             continue;
@@ -106,25 +142,42 @@ static int wait_result(uint8_t *matched_id, int timeout_ms)
         if (ret != HAL_OK)
             return ret;
 
-        if (pkt.code >= HAL_EVT_WAITING_FINGER && pkt.code <= HAL_EVT_PROCESSING) {
-            hal_emit_event(pkt.code);
+        if (out_pkt->code >= HAL_EVT_WAITING_FINGER && out_pkt->code <= HAL_EVT_PROCESSING) {
+            hal_emit_event(out_pkt->code);
             continue;
         }
 
-        if (pkt.code == HAL_RES_KEY_DATA)
+        if (out_pkt->code == HAL_RES_KEY_DATA)
             continue;
 
-        if (pkt.code == HAL_RES_SUCCESS) {
-            if (matched_id && pkt.len >= 1)
-                *matched_id = pkt.payload[0];
-            g_key_window_open = 1;
-            return HAL_OK;
+        if (out_pkt->code == HAL_RES_BUSY) {
+            deadline -= chunk;
+            continue;
         }
 
-        return hal_res_to_error(pkt.code);
+        serial_trace_pkt("RX", out_pkt->code);
+        return HAL_OK;
     }
     (void)send_cmd(HAL_CMD_CANCEL, NULL, 0);
     return HAL_ERR_TIMEOUT;
+}
+
+static int wait_result(uint8_t *matched_id, int timeout_ms, int open_key_window)
+{
+    hal_packet_t pkt;
+    int ret = wait_packet(&pkt, timeout_ms);
+    if (ret != HAL_OK)
+        return ret;
+
+    if (pkt.code == HAL_RES_SUCCESS) {
+        if (matched_id && pkt.len >= 1)
+            *matched_id = pkt.payload[0];
+        if (open_key_window)
+            g_key_window_open = 1;
+        return HAL_OK;
+    }
+
+    return hal_res_to_error(pkt.code);
 }
 
 static int serial_init(const char *path)
@@ -141,6 +194,7 @@ static int serial_init(const char *path)
         close(fd);
         return HAL_ERR_CONNECT;
     }
+    serial_flush_io();
 
     g_fd = fd;
     g_initialized = 1;
@@ -170,7 +224,7 @@ static int serial_verify(int *matched_id_out)
         return ret;
 
     uint8_t mid = 0;
-    ret = wait_result(&mid, VERIFY_TIMEOUT_MS);
+    ret = wait_result(&mid, VERIFY_TIMEOUT_MS, 1);
     if (ret != HAL_OK)
         return ret;
     *matched_id_out = (int)mid;
@@ -210,12 +264,12 @@ static int serial_cancel(void)
     return HAL_OK;
 }
 
-static int serial_enroll(int finger_id, const char *name)
+static int serial_enroll(int finger_id, const char *name, int *assigned_slot_out)
 {
     (void)name;
     if (!g_initialized)
         return HAL_ERR_CONNECT;
-    if (finger_id < 1 || finger_id > HAL_MAX_FINGERS)
+    if (finger_id < 0 || finger_id > HAL_MAX_FINGERS)
         return HAL_ERR_INVALID_ARG;
 
     uint8_t pl[1] = { (uint8_t)finger_id };
@@ -224,10 +278,14 @@ static int serial_enroll(int finger_id, const char *name)
         return ret;
 
     uint8_t mid = 0;
-    ret = wait_result(&mid, ENROLL_TIMEOUT_MS);
-    if (ret == HAL_OK && mid != (uint8_t)finger_id)
+    ret = wait_result(&mid, ENROLL_TIMEOUT_MS, 0);
+    if (ret != HAL_OK)
+        return ret;
+    if (finger_id != 0 && mid != (uint8_t)finger_id)
         return HAL_ERR_PROTOCOL;
-    return ret;
+    if (assigned_slot_out)
+        *assigned_slot_out = (int)mid;
+    return HAL_OK;
 }
 
 static int serial_delete(int finger_id)
@@ -242,7 +300,7 @@ static int serial_delete(int finger_id)
     if (ret != HAL_OK)
         return ret;
     uint8_t mid = 0;
-    return wait_result(&mid, IO_TIMEOUT_MS * 5);
+    return wait_result(&mid, IO_TIMEOUT_MS * 5, 0);
 }
 
 static int serial_list(hal_finger_info_t *fingers, int max_count, int *out_count)
@@ -258,12 +316,14 @@ static int serial_list(hal_finger_info_t *fingers, int max_count, int *out_count
         return ret;
 
     hal_packet_t pkt;
-    ret = recv_packet(&pkt, VERIFY_TIMEOUT_MS);
+    ret = wait_packet(&pkt, LIST_TIMEOUT_MS);
     if (ret != HAL_OK)
         return ret;
 
     if (pkt.code != HAL_RES_SUCCESS || pkt.len < 1)
-        return HAL_ERR_PROTOCOL;
+        return (pkt.code >= HAL_RES_FAIL_BAD_IMAGE)
+                   ? hal_res_to_error(pkt.code)
+                   : HAL_ERR_PROTOCOL;
 
     const uint8_t count = pkt.payload[0];
     int n = 0;
@@ -290,6 +350,31 @@ static int serial_status(hal_status_t *status)
     return HAL_OK;
 }
 
+static int serial_ping(int *template_count_out)
+{
+    if (!g_initialized)
+        return HAL_ERR_CONNECT;
+
+    int ret = send_cmd(HAL_CMD_STATUS, NULL, 0);
+    if (ret != HAL_OK)
+        return ret;
+
+    hal_packet_t pkt;
+    ret = wait_packet(&pkt, IO_TIMEOUT_MS * 5);
+    if (ret != HAL_OK)
+        return ret;
+
+    if (pkt.code != HAL_RES_SUCCESS || pkt.len < 1)
+        return HAL_ERR_PROTOCOL;
+
+    if (template_count_out && pkt.len >= 3)
+        *template_count_out = (int)(pkt.payload[1] | (pkt.payload[2] << 8));
+    else if (template_count_out)
+        *template_count_out = 0;
+
+    return HAL_OK;
+}
+
 const hal_backend_t hal_serial_backend = {
     .init = serial_init,
     .cleanup = serial_cleanup,
@@ -300,4 +385,5 @@ const hal_backend_t hal_serial_backend = {
     .delete_finger = serial_delete,
     .list = serial_list,
     .status = serial_status,
+    .ping = serial_ping,
 };

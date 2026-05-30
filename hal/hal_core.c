@@ -91,11 +91,11 @@ int hal_cancel_operation(void)
     return g_hal_backend->cancel();
 }
 
-int hal_enroll_finger(int finger_id, const char *name)
+int hal_enroll_finger(int finger_id, const char *name, int *assigned_slot_out)
 {
     if (!g_hal_backend)
         return HAL_ERR_CONNECT;
-    return g_hal_backend->enroll(finger_id, name);
+    return g_hal_backend->enroll(finger_id, name, assigned_slot_out);
 }
 
 int hal_delete_finger(int finger_id)
@@ -117,6 +117,15 @@ int hal_get_status(hal_status_t *status)
     if (!g_hal_backend)
         return HAL_ERR_CONNECT;
     return g_hal_backend->status(status);
+}
+
+int hal_ping(int *template_count_out)
+{
+    if (!g_hal_backend)
+        return HAL_ERR_CONNECT;
+    if (!g_hal_backend->ping)
+        return HAL_ERR_INVALID_ARG;
+    return g_hal_backend->ping(template_count_out);
 }
 
 /* Convenience: verify + get_key with wipe on failure */

@@ -70,6 +70,13 @@ class FingerprintDB:
         }
         DB_PATH.write_text(json.dumps(data, indent=2))
 
+    def find_first_free_id(self) -> int:
+        """First empty AS608 page ID (1-127)."""
+        for i in range(1, MAX_FINGERPRINTS + 1):
+            if i not in self._db:
+                return i
+        raise ValueError(f"Database full (max {MAX_FINGERPRINTS})")
+
     def enroll(self, finger_id: int, name: Optional[str] = None) -> Fingerprint:
         """
         Yeni parmak izi kaydet.
@@ -87,6 +94,8 @@ class FingerprintDB:
         Raises:
             ValueError: Geçersiz ID veya kapasite doluysa
         """
+        if finger_id == 0:
+            finger_id = self.find_first_free_id()
         if not 1 <= finger_id <= MAX_FINGERPRINTS:
             raise ValueError(f"finger_id must be between 1 and {MAX_FINGERPRINTS}")
 

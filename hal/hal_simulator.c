@@ -216,11 +216,11 @@ static int sim_cancel(void)
     return ret;
 }
 
-static int sim_enroll(int finger_id, const char *name)
+static int sim_enroll(int finger_id, const char *name, int *assigned_slot_out)
 {
     if (!g_initialized)
         return HAL_ERR_CONNECT;
-    if (finger_id < 1 || finger_id > HAL_MAX_FINGERS)
+    if (finger_id < 0 || finger_id > HAL_MAX_FINGERS)
         return HAL_ERR_INVALID_ARG;
 
     cJSON *req = cJSON_CreateObject();
@@ -232,6 +232,11 @@ static int sim_enroll(int finger_id, const char *name)
     cJSON *resp = NULL;
     int ret = execute_command(req, &resp);
     cJSON_Delete(req);
+    if (ret == HAL_OK && assigned_slot_out && resp) {
+        cJSON *fid = cJSON_GetObjectItem(resp, "finger_id");
+        if (fid && cJSON_IsNumber(fid))
+            *assigned_slot_out = fid->valueint;
+    }
     if (resp)
         cJSON_Delete(resp);
     return ret;
@@ -326,6 +331,15 @@ static int sim_status(hal_status_t *status)
     return HAL_OK;
 }
 
+static int sim_ping(int *template_count_out)
+{
+    if (!g_initialized)
+        return HAL_ERR_CONNECT;
+    if (template_count_out)
+        *template_count_out = 0;
+    return HAL_OK;
+}
+
 const hal_backend_t hal_sim_backend = {
     .init = sim_init,
     .cleanup = sim_cleanup,
@@ -336,4 +350,5 @@ const hal_backend_t hal_sim_backend = {
     .delete_finger = sim_delete,
     .list = sim_list,
     .status = sim_status,
+    .ping = sim_ping,
 };

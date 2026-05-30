@@ -30,6 +30,8 @@ RES_FAIL_INVALID_ID = 0x26
 RES_CANCELLED = 0x27
 RES_TIMEOUT = 0x28
 RES_KEY_DATA = 0x29
+RES_BUSY = 0x2A
+RES_SENSOR_ERROR = 0x2B
 
 
 def checksum(data: bytes) -> int:

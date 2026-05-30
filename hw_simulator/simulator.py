@@ -265,8 +265,8 @@ class HardwareSimulator:
             finger_id = payload[0]
             await self._emit_scan_events(writer, need_remove=True)
             try:
-                self._fingerprint_db.enroll(finger_id, f"Finger_{finger_id}")
-                writer.write(build_packet(RES_SUCCESS, bytes([finger_id])))
+                fp = self._fingerprint_db.enroll(finger_id, None)
+                writer.write(build_packet(RES_SUCCESS, bytes([fp.finger_id])))
             except ValueError as e:
                 msg = str(e)
                 if "already" in msg:
