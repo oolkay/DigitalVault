@@ -172,57 +172,192 @@ Item {
                     }
                 }
 
-                // ── Hardware / Simulator ─────────────────────────
+                // ── Parmak izi sensörü ───────────────────────────
                 SettingsSection {
-                    title: "Hardware / Simulator"
+                    id: sensorSection
+                    title: "Parmak izi sensörü"
                     icon: "H"
                     width: parent.width
 
+                    function sensorStatusColor() {
+                        switch (vaultController.sensorStatus) {
+                        case "connected": return Theme.success
+                        case "connecting": return Theme.warning
+                        case "error": return Theme.danger
+                        default: return Theme.textSecondary
+                        }
+                    }
+
+                    function refreshPortList() {
+                        const ports = vaultController.availableSerialPorts()
+                        portCombo.model = ports
+                        const saved = vaultController.savedSerialPort()
+                        if (saved.length > 0) {
+                            const idx = ports.indexOf(saved)
+                            portCombo.currentIndex = idx >= 0 ? idx : -1
+                            if (idx < 0)
+                                customPortField.text = saved
+                        } else {
+                            portCombo.currentIndex = ports.length > 0 ? 0 : -1
+                        }
+                    }
+
+                    function selectedPortPath() {
+                        const custom = customPortField.text.trim()
+                        if (custom.length > 0)
+                            return custom
+                        if (portCombo.currentIndex >= 0 && portCombo.model.length > 0)
+                            return portCombo.model[portCombo.currentIndex]
+                        return ""
+                    }
+
+                    function connectSensor() {
+                        const path = selectedPortPath()
+                        if (path.length === 0) {
+                            vaultController.notifyUser("Seri port seçin veya girin", true)
+                            return
+                        }
+                        vaultController.connectToConfiguredPort(path)
+                    }
+
+                    Component.onCompleted: refreshPortList()
+
                     SettingsRow {
                         width: parent.width
-                        label: "Fingerprint sensor (UART)"
-                        description: vaultController.sensorConnected
-                            ? "Connected — enroll and unlock use serial bridge"
-                            : "Not connected — start simulator or reconnect below"
+                        label: "Bağlantı durumu"
+                        description: {
+                            var d = vaultController.sensorStatusText
+                            if (vaultController.sensorPortPath.length > 0)
+                                d += " — " + vaultController.sensorPortPath
+                            return d
+                        }
                         control: Text {
-                            text: vaultController.sensorConnected ? "Bağlı" : "Bağlı değil"
-                            color: vaultController.sensorConnected ? Theme.success : Theme.danger
+                            text: vaultController.sensorStatusText
+                            color: sensorSection.sensorStatusColor()
                             font { pixelSize: 13; bold: true; family: "Inter" }
                         }
                     }
 
-                    SettingsRow {
+                    Item {
                         width: parent.width
-                        label: "Simulator daemon"
-                        description: vaultController.simulatorRunning
-                            ? "Socket or process active"
-                            : "Not running"
-                        control: Text {
-                            text: vaultController.simulatorRunning ? "Çalışıyor" : "Kapalı"
-                            color: vaultController.simulatorRunning ? Theme.success : Theme.textSecondary
-                            font { pixelSize: 13; family: "Inter" }
+                        height: portBlock.implicitHeight + 20
+
+                        Column {
+                            id: portBlock
+                            width: parent.width
+                            spacing: 10
+                            topPadding: 8
+                            bottomPadding: 8
+
+                            Text {
+                                text: "Seri port"
+                                color: Theme.textPrimary
+                                font { pixelSize: 13; bold: true; family: "Inter" }
+                            }
+                            Text {
+                                width: parent.width
+                                text: "STM32 UART (ör. /dev/ttyUSB0). Listeden seçin veya özel yol girin."
+                                color: Theme.textSecondary
+                                font { pixelSize: 11; family: "Inter" }
+                                wrapMode: Text.Wrap
+                            }
+
+                            ComboBox {
+                                id: portCombo
+                                width: parent.width
+                                model: []
+                                readonly property string portPlaceholder: "Port seçin…"
+                                displayText: currentIndex >= 0 && model.length > 0
+                                    ? model[currentIndex] : portPlaceholder
+
+                                delegate: ItemDelegate {
+                                    width: portCombo.width
+                                    height: 34
+                                    contentItem: Text {
+                                        text: modelData
+                                        color: highlighted ? "white" : Theme.textPrimary
+                                        font { pixelSize: 13; family: "Inter" }
+                                        verticalAlignment: Text.AlignVCenter
+                                        leftPadding: 12
+                                        elide: Text.ElideMiddle
+                                    }
+                                    background: Rectangle {
+                                        color: highlighted ? Theme.accent : "transparent"
+                                        radius: 6
+                                        anchors { fill: parent; margins: 2 }
+                                    }
+                                }
+
+                                contentItem: Text {
+                                    leftPadding: 12
+                                    rightPadding: portCombo.indicator.width + portCombo.spacing
+                                    text: portCombo.displayText
+                                    font { pixelSize: 13; family: "Inter" }
+                                    color: portCombo.currentIndex >= 0 ? Theme.textPrimary : Theme.textSecondary
+                                    verticalAlignment: Text.AlignVCenter
+                                    elide: Text.ElideMiddle
+                                }
+
+                                background: Rectangle {
+                                    implicitHeight: 38
+                                    radius: 8
+                                    color: Theme.bgInput
+                                    border.color: Theme.border
+                                    border.width: 1
+                                }
+
+                                popup: Popup {
+                                    y: portCombo.height + 4
+                                    width: portCombo.width
+                                    padding: 1
+                                    contentItem: ListView {
+                                        clip: true
+                                        implicitHeight: Math.min(contentHeight, 240)
+                                        model: portCombo.popup.visible ? portCombo.delegateModel : null
+                                        currentIndex: portCombo.highlightedIndex
+                                        ScrollIndicator.vertical: ScrollIndicator { }
+                                    }
+                                    background: Rectangle {
+                                        color: Theme.bgCard
+                                        border.color: Theme.border
+                                        radius: 8
+                                    }
+                                }
+                            }
+
+                            WizardTextField {
+                                id: customPortField
+                                width: parent.width
+                                label: "Özel port (isteğe bağlı, örn. /dev/ttyUSB0)"
+                            }
+
+                            Row {
+                                width: parent.width
+                                spacing: 10
+
+                                WizardActionButton {
+                                    text: "Yenile"
+                                    variant: "secondary"
+                                    onClicked: sensorSection.refreshPortList()
+                                }
+                                WizardActionButton {
+                                    text: "Bağlan"
+                                    variant: "primary"
+                                    onClicked: sensorSection.connectSensor()
+                                }
+                            }
                         }
                     }
 
                     SettingsRow {
                         width: parent.width
-                        label: "Start simulator"
-                        description: "socat + python3 sim + UART connect (stop manual sim first if open)"
-                        control: WizardActionButton {
-                            text: "Başlat"
-                            variant: "primary"
-                            onClicked: vaultController.startSimulator()
-                        }
-                    }
-
-                    SettingsRow {
-                        width: parent.width
-                        label: "Reconnect sensor"
-                        description: "/tmp/biometric_vault_tty_host (or saved port in settings)"
-                        control: WizardActionButton {
-                            text: "Bağlan"
-                            variant: "secondary"
-                            onClicked: vaultController.reconnectSerial()
+                        label: "USB otomatik bul"
+                        description: "Açılışta /dev/ttyUSB* ve ttyACM* taranır (kapalıyken yalnızca kayıtlı port)"
+                        control: ToggleSwitch {
+                            checked: vaultController.autoDetectUsb
+                            onToggled: function(enabled) {
+                                vaultController.autoDetectUsb = enabled
+                            }
                         }
                     }
                 }
@@ -401,6 +536,7 @@ Item {
 
     component ToggleSwitch: Rectangle {
         property bool checked: false
+        signal toggled(bool checked)
         width: 46; height: 26; radius: 13
         color: checked ? Theme.accent : Theme.border
         Behavior on color { ColorAnimation { duration: 200 } }
@@ -413,7 +549,7 @@ Item {
         MouseArea {
             anchors.fill: parent
             cursorShape: Qt.PointingHandCursor
-            onClicked: parent.checked = !parent.checked
+            onClicked: parent.toggled(!parent.checked)
         }
     }
 }

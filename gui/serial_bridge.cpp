@@ -6,6 +6,7 @@
 #include <QTimer>
 #include <QDebug>
 #include <QThread>
+#include <QFile>
 
 #include <errno.h>
 #include <fcntl.h>
@@ -43,11 +44,11 @@ QString enrollErrorMessage(quint8 code, const QByteArray &payload)
     const int existingId = payload.isEmpty() ? -1 : static_cast<quint8>(payload.at(0));
     switch (code) {
     case kResFailNoFinger:
-        return QStringLiteral("No finger detected on sensor");
+        return QStringLiteral("Sensörde parmak algılanmadı");
     case kResFailBadImage:
-        return QStringLiteral("Fingerprint image quality too low");
+        return QStringLiteral("Parmak izi okunamadı — tekrar deneyin");
     case kResNoMatch:
-        return QStringLiteral("Fingerprint did not match");
+        return QStringLiteral("Parmak izi eşleşmedi");
     case kResFailAlreadyExists:
         if (existingId >= 0)
             return QStringLiteral("Sensor slot #%1 is already enrolled").arg(existingId);
@@ -57,13 +58,13 @@ QString enrollErrorMessage(quint8 code, const QByteArray &payload)
     case kResFailInvalidId:
         return QStringLiteral("Invalid fingerprint slot ID (use 1–127)");
     case kResCancelled:
-        return QStringLiteral("Operation cancelled");
+        return QStringLiteral("İşlem iptal edildi");
     case kResTimeout:
-        return QStringLiteral("Sensor operation timed out");
+        return QStringLiteral("Sensör zaman aşımı — tekrar deneyin");
     case kResBusy:
-        return QStringLiteral("Sensor busy — operation already in progress");
+        return QStringLiteral("Sensör meşgul — lütfen bekleyin");
     case kResSensorError:
-        return QStringLiteral("Sensor not responding — retry or power-cycle the module");
+        return QStringLiteral("Sensör yanıt vermiyor — bağlantıyı kontrol edin");
     default:
         return QStringLiteral("Enroll failed (sensor code 0x%1)").arg(code, 2, 16, QChar('0'));
     }
@@ -73,21 +74,21 @@ QString verifyErrorMessage(quint8 code)
 {
     switch (code) {
     case kResFailNoFinger:
-        return QStringLiteral("No finger detected on sensor");
+        return QStringLiteral("Sensörde parmak algılanmadı");
     case kResFailBadImage:
-        return QStringLiteral("Fingerprint image quality too low");
+        return QStringLiteral("Parmak izi okunamadı — tekrar deneyin");
     case kResNoMatch:
-        return QStringLiteral("Fingerprint did not match");
+        return QStringLiteral("Parmak izi eşleşmedi");
     case kResCancelled:
-        return QStringLiteral("Verification cancelled");
+        return QStringLiteral("Doğrulama iptal edildi");
     case kResTimeout:
-        return QStringLiteral("Verification timed out");
+        return QStringLiteral("Doğrulama zaman aşımı — tekrar deneyin");
     case kResBusy:
-        return QStringLiteral("Sensor busy — operation already in progress");
+        return QStringLiteral("Sensör meşgul — lütfen bekleyin");
     case kResSensorError:
-        return QStringLiteral("Sensor not responding — retry or power-cycle the module");
+        return QStringLiteral("Sensör yanıt vermiyor — bağlantıyı kontrol edin");
     default:
-        return QStringLiteral("Verification failed (sensor code 0x%1)").arg(code, 2, 16, QChar('0'));
+        return QStringLiteral("Doğrulama başarısız (kod 0x%1)").arg(code, 2, 16, QChar('0'));
     }
 }
 
@@ -155,6 +156,10 @@ public slots:
         m_recoveryTimer->setSingleShot(true);
         connect(m_timer, &QTimer::timeout, this, &SerialWorker::onDeadline);
         connect(m_recoveryTimer, &QTimer::timeout, this, &SerialWorker::onRecoveryDone);
+
+        m_linkWatch = new QTimer(this);
+        m_linkWatch->setInterval(750);
+        connect(m_linkWatch, &QTimer::timeout, this, &SerialWorker::checkLink);
     }
 
     void connectPort(const QString &port)
@@ -173,7 +178,7 @@ public slots:
         m_fd = ::open(path.constData(), O_RDWR | O_NOCTTY | O_SYNC);
         if (m_fd < 0) {
             const QString err = QString::fromUtf8(strerror(errno));
-            qWarning() << "SerialBridge: open failed" << port << err;
+            qDebug() << "SerialBridge: open failed" << port << err;
             m_bridge->m_connected = false;
             m_bridge->m_portName.clear();
             emit m_bridge->connectionChanged();
@@ -201,11 +206,15 @@ public slots:
         m_badChecksum = 0;
         QSettings s;
         s.setValue(QStringLiteral("hal/serialPort"), port);
+        if (m_linkWatch)
+            m_linkWatch->start();
         emit m_bridge->connectionChanged();
     }
 
     void disconnectPort()
     {
+        if (m_linkWatch)
+            m_linkWatch->stop();
         if (m_notifier) {
             m_notifier->setEnabled(false);
             delete m_notifier;
@@ -296,11 +305,75 @@ private slots:
         char buf[256];
         for (;;) {
             const ssize_t n = ::read(m_fd, buf, sizeof(buf));
-            if (n <= 0)
-                break;
+            if (n < 0) {
+                if (errno == EAGAIN || errno == EWOULDBLOCK)
+                    break;
+                reportLinkLost(QString::fromUtf8(strerror(errno)));
+                return;
+            }
+            if (n == 0) {
+                reportLinkLost(QStringLiteral("device_removed"));
+                return;
+            }
             m_rx.append(buf, static_cast<int>(n));
         }
         processRx();
+    }
+
+    void checkLink()
+    {
+        if (m_fd < 0 || !m_bridge->m_connected)
+            return;
+        if (!m_portPath.isEmpty() && !QFile::exists(m_portPath)) {
+            reportLinkLost(QStringLiteral("device_removed"));
+            return;
+        }
+        struct pollfd pfd;
+        pfd.fd = m_fd;
+        pfd.events = POLLIN | POLLERR | POLLHUP;
+        pfd.revents = 0;
+        const int pr = ::poll(&pfd, 1, 0);
+        if (pr < 0) {
+            if (errno != EINTR)
+                reportLinkLost(QString::fromUtf8(strerror(errno)));
+            return;
+        }
+        if (pr > 0 && (pfd.revents & (POLLERR | POLLHUP | POLLNVAL))) {
+            reportLinkLost(QStringLiteral("device_removed"));
+        }
+    }
+
+    void reportLinkLost(const QString &reason)
+    {
+        if (m_fd < 0 && !m_bridge->m_connected)
+            return;
+        if (m_linkWatch)
+            m_linkWatch->stop();
+        if (m_timer)
+            m_timer->stop();
+        if (m_recoveryTimer)
+            m_recoveryTimer->stop();
+        m_op = Op::None;
+        m_timeoutOp = Op::None;
+        if (m_bridge->m_busy.load(std::memory_order_acquire))
+            m_bridge->setBusy(false);
+        if (m_notifier) {
+            m_notifier->setEnabled(false);
+            delete m_notifier;
+            m_notifier = nullptr;
+        }
+        if (m_fd >= 0) {
+            ::close(m_fd);
+            m_fd = -1;
+        }
+        m_rx.clear();
+        const bool wasUp = m_bridge->m_connected;
+        m_bridge->m_connected = false;
+        m_bridge->m_portName.clear();
+        if (!wasUp)
+            return;
+        emit m_bridge->connectionChanged();
+        emit m_bridge->connectionLost(reason);
     }
 
     void onDeadline()
@@ -361,8 +434,16 @@ private:
         ssize_t left = data.size();
         while (left > 0) {
             const ssize_t w = ::write(m_fd, p, static_cast<size_t>(left));
-            if (w <= 0)
-                break;
+            if (w < 0) {
+                if (errno == EAGAIN || errno == EWOULDBLOCK)
+                    break;
+                reportLinkLost(QString::fromUtf8(strerror(errno)));
+                return;
+            }
+            if (w == 0) {
+                reportLinkLost(QStringLiteral("device_removed"));
+                return;
+            }
             p += w;
             left -= w;
         }
@@ -507,6 +588,7 @@ private:
     QByteArray m_rx;
     QTimer *m_timer = nullptr;
     QTimer *m_recoveryTimer = nullptr;
+    QTimer *m_linkWatch = nullptr;
     Op m_op = Op::None;
     Op m_timeoutOp = Op::None;
     int m_deadlineMs = kVerifyTimeoutMs;

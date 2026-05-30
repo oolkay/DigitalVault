@@ -133,93 +133,45 @@ VaultController::VaultController(QObject *parent)
     loadSensorSlotCache();
     connect(m_serialBridge, &SerialBridge::listEnrolledCompleted,
             this, &VaultController::onListEnrolledCompleted);
-    connect(m_serialBridge, &SerialBridge::verifyCompleted,
-            this, [this](bool ok, int matchedId, const QString &err) {
-        if (!m_fpUnlockActive)
-            return;
-
-        if (m_fpFlow == FpFlow::SetupVerify) {
-            if (!ok) {
-                m_fpUnlockMessage =
-                    err.isEmpty() ? QStringLiteral("Setup verification failed") : err;
-                m_fpUnlockActive = false;
-                m_fpFlow = FpFlow::None;
-                emit fingerprintUnlockActiveChanged();
-                rollbackSetupEnrollAfterVerifyFail(
-                    QStringLiteral("Setup verification failed; cleared sensor slot. "
-                                   "Please enroll the owner fingerprint again."));
-                return;
-            }
-            if (matchedId != m_setupOwnerFingerId) {
-                m_fpUnlockMessage =
-                    QStringLiteral("Verification matched slot #%1, but this setup enrolled "
-                                   "slot #%2. Use the same finger as enrollment, or clear old "
-                                   "templates on the sensor.")
-                        .arg(matchedId)
-                        .arg(m_setupOwnerFingerId);
-                m_fpUnlockActive = false;
-                m_fpFlow = FpFlow::None;
-                emit fingerprintUnlockActiveChanged();
-                rollbackSetupEnrollAfterVerifyFail(m_fpUnlockMessage);
-                return;
-            }
-            m_fpUnlockMessage = QStringLiteral("Retrieving vault key…");
-            emit fingerprintUnlockActiveChanged();
-            m_serialBridge->requestKey();
-            return;
-        }
-
-        if (m_fpFlow != FpFlow::Unlock)
-            return;
-
-        if (!ok) {
-            m_fpUnlockMessage = err.isEmpty() ? QStringLiteral("Parmak izi eşleşmedi") : err;
-            m_fpUnlockActive = false;
-            m_fpFlow = FpFlow::None;
-            emit fingerprintUnlockActiveChanged();
-            emit notificationReceived(m_fpUnlockMessage, true);
-            return;
-        }
-        if (!isFingerAllowedForSelectedVault(matchedId)) {
-            m_fpUnlockMessage = QStringLiteral("Bu kasa için yetkiniz yok (ID %1)").arg(matchedId);
-            m_fpUnlockActive = false;
-            m_fpFlow = FpFlow::None;
-            emit fingerprintUnlockActiveChanged();
-            emit notificationReceived(m_fpUnlockMessage, true);
-            return;
-        }
-        m_fpUnlockMessage = QStringLiteral("Anahtar alınıyor…");
-        emit fingerprintUnlockActiveChanged();
-        m_serialBridge->requestKey();
-    });
+    connect(m_serialBridge, &SerialBridge::verifyCompleted, this,
+            [this](bool ok, int matchedId, const QString &err) {
+                handleVerifyCompleted(ok, matchedId, err);
+            });
+    connect(m_serialBridge, &SerialBridge::sensorEvent, this,
+            [this](int code) { handleSensorEvent(code); });
     connect(m_serialBridge, &SerialBridge::enrollCompleted,
             this, [this](bool ok, int fingerId, const QString &err) {
         if (m_fpFlow == FpFlow::GrantEnroll) {
+            const QString device = m_fpContextDevice;
+            const QString label = m_pendingGrantLabel;
             m_fpUnlockActive = false;
             m_fpFlow = FpFlow::None;
             emit fingerprintUnlockActiveChanged();
-            if (ok && m_pendingGrantOwnerId > 0) {
-                QJsonObject reg = registryEntryForDevice(m_selectedDevice);
-                QJsonArray list = reg.value(QStringLiteral("accessList")).toArray();
-                QJsonObject entry;
-                entry.insert(QStringLiteral("fingerId"), fingerId);
-                entry.insert(QStringLiteral("isOwner"), false);
-                entry.insert(QStringLiteral("label"),
-                             m_pendingGrantLabel.isEmpty()
-                                 ? QStringLiteral("User %1").arg(fingerId)
-                                 : m_pendingGrantLabel);
-                list.append(entry);
-                reg.insert(QStringLiteral("accessList"), list);
-                saveRegistryEntry(reg);
-                emit notificationReceived(
-                    QStringLiteral("Access granted (sensor slot #%1)").arg(fingerId), false);
-                emit statusChanged();
+            if (ok) {
+                if (!appendAccessListEntry(device, fingerId, label, false)) {
+                    m_pendingRegistryRollbackSlot = true;
+                    if (m_serialBridge && m_serialBridge->isConnected())
+                        m_serialBridge->deleteFinger(fingerId);
+                    else
+                        m_pendingRegistryRollbackSlot = false;
+                } else {
+                    emit notificationReceived(
+                        QStringLiteral("Erişim verildi: %1 (slot %2)")
+                            .arg(label.isEmpty() ? QStringLiteral("Kullanıcı") : label)
+                            .arg(fingerId),
+                        false);
+                    emit statusChanged();
+                    emit devicesChanged();
+                    emit vaultAccessListChanged();
+                }
             } else {
                 emit notificationReceived(
-                    err.isEmpty() ? QStringLiteral("Grant enroll failed") : err, true);
+                    err.isEmpty() ? QStringLiteral("Parmak izi kaydı başarısız") : err, true);
             }
             m_pendingGrantOwnerId = -1;
             m_pendingGrantFingerId = -1;
+            m_pendingGrantLabel.clear();
+            m_fpContextDevice.clear();
             return;
         }
 
@@ -276,6 +228,25 @@ VaultController::VaultController(QObject *parent)
     });
     connect(m_serialBridge, &SerialBridge::deleteCompleted,
             this, [this](bool ok, int fingerId, const QString &err) {
+        if (m_pendingRegistryRollbackSlot) {
+            m_pendingRegistryRollbackSlot = false;
+            if (!ok) {
+                emit notificationReceived(
+                    err.isEmpty()
+                        ? QStringLiteral(
+                              "Kayıt defteri güncellenemedi; sensör slotu temizlenemedi (slot %1)")
+                              .arg(fingerId)
+                        : err,
+                    true);
+            } else {
+                markSensorSlot(fingerId, false);
+                emit notificationReceived(
+                    QStringLiteral("Kayıt defteri güncellenemedi; sensör slotu %1 temizlendi")
+                        .arg(fingerId),
+                    true);
+            }
+            return;
+        }
         if (m_pendingSetupVerifyRollback >= 0) {
             const int slot = m_pendingSetupVerifyRollback;
             m_pendingSetupVerifyRollback = -1;
@@ -308,17 +279,9 @@ VaultController::VaultController(QObject *parent)
     connect(m_serialBridge, &SerialBridge::connectionChanged,
             this, &VaultController::onSerialConnectionChanged);
     connect(m_serialBridge, &SerialBridge::connectionLost,
-            this, [this](const QString &reason) {
-        emit statusChanged();
-        if (m_fpUnlockActive) {
-            m_fpUnlockActive = false;
-            m_fpFlow = FpFlow::None;
-            emit fingerprintUnlockActiveChanged();
-        }
-        emit notificationReceived(
-            QStringLiteral("Sensör bağlantısı kesildi: %1").arg(reason), true);
-    });
+            this, &VaultController::onSerialConnectionLost);
 
+    updateSensorStatus(SensorStatus::Unconfigured);
     scheduleSerialConnectRetries();
 
     syncRegistryWithLosetup();
@@ -545,7 +508,7 @@ void VaultController::startupRecovery()
 
 bool VaultController::sensorConnected() const
 {
-    return m_serialBridge && m_serialBridge->isConnected();
+    return m_sensorStatus == QStringLiteral("connected");
 }
 
 bool VaultController::simulatorRunning() const
@@ -557,55 +520,260 @@ bool VaultController::simulatorRunning() const
     return QFile::exists(m_socketPath);
 }
 
-QString VaultController::serialPortToUse() const
+QString VaultController::resolveSerialPort()
 {
     QSettings settings;
-    QString port = settings.value(QStringLiteral("hal/serialPort")).toString();
+    QString port = settings.value(QStringLiteral("hal/serialPort")).toString().trimmed();
+    if (!port.isEmpty() && !QFile::exists(port)) {
+        settings.remove(QStringLiteral("hal/serialPort"));
+        port.clear();
+    }
     if (port.isEmpty() && QFile::exists(QString::fromUtf8(kDefaultUartHost)))
         port = QString::fromUtf8(kDefaultUartHost);
+    if (port.isEmpty()
+        && settings.value(QStringLiteral("hal/autoDetectUsb"), false).toBool()) {
+        const QDir devDir(QStringLiteral("/dev"));
+        const auto filters = QDir::System | QDir::Files | QDir::Readable;
+        const QStringList names =
+            devDir.entryList({QStringLiteral("ttyUSB*"), QStringLiteral("ttyACM*")},
+                             filters, QDir::Name);
+        if (!names.isEmpty())
+            port = QStringLiteral("/dev/") + names.first();
+    }
+    m_sensorPortPathDisplay = port;
     return port;
+}
+
+void VaultController::updateSensorStatus(SensorStatus status, const QString &customText)
+{
+    QString statusKey;
+    QString text = customText;
+    switch (status) {
+    case SensorStatus::Unconfigured:
+        statusKey = QStringLiteral("unconfigured");
+        if (text.isEmpty())
+            text = QStringLiteral("Parmak izi sensörü yapılandırılmadı");
+        break;
+    case SensorStatus::Disconnected:
+        statusKey = QStringLiteral("disconnected");
+        if (text.isEmpty())
+            text = QStringLiteral("Sensör bağlı değil");
+        break;
+    case SensorStatus::Connecting:
+        statusKey = QStringLiteral("connecting");
+        if (text.isEmpty())
+            text = QStringLiteral("Bağlanıyor…");
+        break;
+    case SensorStatus::Connected:
+        statusKey = QStringLiteral("connected");
+        if (text.isEmpty())
+            text = QStringLiteral("Sensör bağlı");
+        break;
+    case SensorStatus::Error:
+        statusKey = QStringLiteral("error");
+        if (text.isEmpty())
+            text = QStringLiteral("Sensör bağlantı hatası");
+        break;
+    }
+    if (m_sensorStatus == statusKey && m_sensorStatusText == text)
+        return;
+    m_sensorStatus = statusKey;
+    m_sensorStatusText = text;
+    emit sensorStatusChanged();
+    emit statusChanged();
+}
+
+void VaultController::endStartupConnectPhase()
+{
+    m_startupConnectPhase = false;
+}
+
+void VaultController::clearFailedSerialPortSetting()
+{
+    if (m_lastAttemptedPort.isEmpty())
+        return;
+    QSettings settings;
+    if (settings.value(QStringLiteral("hal/serialPort")).toString() == m_lastAttemptedPort)
+        settings.remove(QStringLiteral("hal/serialPort"));
+}
+
+void VaultController::onSerialConnectionLost(const QString &reason)
+{
+    const bool wasConnected = (m_sensorStatus == QStringLiteral("connected"));
+
+    if (m_fpUnlockActive) {
+        m_fpUnlockActive = false;
+        m_fpUnlockMessage.clear();
+        clearFingerprintFlowState();
+        emit fingerprintUnlockActiveChanged();
+    }
+
+    if (m_startupConnectPhase) {
+        clearFailedSerialPortSetting();
+        const QString port = resolveSerialPort();
+        updateSensorStatus(port.isEmpty() ? SensorStatus::Unconfigured : SensorStatus::Disconnected);
+        return;
+    }
+
+    if (m_manualConnectRequested) {
+        m_manualConnectRequested = false;
+        clearFailedSerialPortSetting();
+        updateSensorStatus(SensorStatus::Error,
+                           QStringLiteral("Sensör açılamadı: %1").arg(reason));
+        emit notificationReceived(
+            QStringLiteral("Sensör açılamadı: %1").arg(reason), true);
+        return;
+    }
+
+    if (!m_lastAttemptedPort.isEmpty())
+        m_sensorPortPathDisplay = m_lastAttemptedPort;
+    const QString port = resolveSerialPort();
+    updateSensorStatus(port.isEmpty() ? SensorStatus::Unconfigured : SensorStatus::Disconnected);
+
+    if (wasConnected) {
+        emit notificationReceived(QStringLiteral("Sensör bağlantısı kesildi"), true);
+    }
 }
 
 void VaultController::tryConnectSerial()
 {
     if (!m_serialBridge)
         return;
-    const QString port = serialPortToUse();
+    const QString port = resolveSerialPort();
     if (port.isEmpty()) {
-        qWarning() << "No UART port configured and" << kDefaultUartHost << "is missing";
+        updateSensorStatus(SensorStatus::Unconfigured);
         return;
     }
+    m_lastAttemptedPort = port;
+    m_sensorPortPathDisplay = port;
+    updateSensorStatus(SensorStatus::Connecting);
     m_serialBridge->connectToPort(port);
+}
+
+void VaultController::connectToConfiguredPort(const QString &port)
+{
+    const QString trimmed = port.trimmed();
+    if (trimmed.isEmpty()) {
+        emit notificationReceived(QStringLiteral("Seri port seçilmedi"), true);
+        return;
+    }
+    if (!QFile::exists(trimmed)) {
+        emit notificationReceived(
+            QStringLiteral("Port bulunamadı: %1").arg(trimmed), true);
+        updateSensorStatus(SensorStatus::Error,
+                           QStringLiteral("Port bulunamadı: %1").arg(trimmed));
+        return;
+    }
+    QSettings settings;
+    settings.setValue(QStringLiteral("hal/serialPort"), trimmed);
+    m_manualConnectRequested = true;
+    m_startupConnectPhase = false;
+    ++m_serialRetryGeneration;
+    m_lastAttemptedPort = trimmed;
+    m_sensorPortPathDisplay = trimmed;
+    updateSensorStatus(SensorStatus::Connecting);
+    if (m_serialBridge)
+        m_serialBridge->connectToPort(trimmed);
+}
+
+QStringList VaultController::availableSerialPorts()
+{
+    QStringList ports;
+    const QDir devDir(QStringLiteral("/dev"));
+    const auto filters = QDir::System | QDir::Files | QDir::Readable;
+    ports << devDir.entryList({QStringLiteral("ttyUSB*"), QStringLiteral("ttyACM*")},
+                              filters, QDir::Name);
+    for (int i = 0; i < ports.size(); ++i)
+        ports[i].prepend(QStringLiteral("/dev/"));
+    const QString saved = QSettings().value(QStringLiteral("hal/serialPort")).toString().trimmed();
+    if (!saved.isEmpty() && QFile::exists(saved) && !ports.contains(saved))
+        ports.append(saved);
+    ports.sort(Qt::CaseInsensitive);
+    return ports;
+}
+
+void VaultController::clearSerialPortSettings()
+{
+    QSettings().remove(QStringLiteral("hal/serialPort"));
+    m_lastAttemptedPort.clear();
+    m_sensorPortPathDisplay.clear();
+    updateSensorStatus(SensorStatus::Unconfigured);
+}
+
+bool VaultController::autoDetectUsb() const
+{
+    return QSettings().value(QStringLiteral("hal/autoDetectUsb"), false).toBool();
+}
+
+void VaultController::setAutoDetectUsb(bool enabled)
+{
+    QSettings settings;
+    if (settings.value(QStringLiteral("hal/autoDetectUsb"), false).toBool() == enabled)
+        return;
+    settings.setValue(QStringLiteral("hal/autoDetectUsb"), enabled);
+    emit autoDetectUsbChanged();
+}
+
+QString VaultController::savedSerialPort() const
+{
+    return QSettings().value(QStringLiteral("hal/serialPort")).toString().trimmed();
 }
 
 void VaultController::reconnectSerial()
 {
-    tryConnectSerial();
+    const QString port = resolveSerialPort();
+    if (port.isEmpty()) {
+        updateSensorStatus(SensorStatus::Unconfigured);
+        return;
+    }
+    connectToConfiguredPort(port);
 }
 
 void VaultController::scheduleSerialConnectRetries()
 {
+    if (resolveSerialPort().isEmpty()) {
+        endStartupConnectPhase();
+        return;
+    }
     const int gen = ++m_serialRetryGeneration;
-    const QList<int> delaysMs = {800, 2000, 5000};
-    for (int ms : delaysMs) {
-        QTimer::singleShot(ms, this, [this, gen]() {
+    const QList<int> delaysMs = {500, 2000};
+    for (int i = 0; i < delaysMs.size(); ++i) {
+        const int ms = delaysMs.at(i);
+        const bool isLast = (i == delaysMs.size() - 1);
+        QTimer::singleShot(ms, this, [this, gen, isLast]() {
             if (gen != m_serialRetryGeneration)
                 return;
-            if (m_serialBridge && m_serialBridge->isConnected())
+            if (m_serialBridge && m_serialBridge->isConnected()) {
+                endStartupConnectPhase();
                 return;
+            }
             tryConnectSerial();
+            if (isLast)
+                endStartupConnectPhase();
         });
     }
 }
 
 void VaultController::onSerialConnectionChanged()
 {
-    emit statusChanged();
-    if (!m_serialBridge || !m_serialBridge->isConnected())
+    if (!m_serialBridge) {
+        emit statusChanged();
         return;
-    ++m_serialRetryGeneration;
-    refreshSensorInventory();
-    emit notificationReceived(QStringLiteral("Fingerprint sensor connected"), false);
+    }
+
+    if (m_serialBridge->isConnected()) {
+        endStartupConnectPhase();
+        m_manualConnectRequested = false;
+        ++m_serialRetryGeneration;
+        m_sensorPortPathDisplay = m_serialBridge->portName();
+        updateSensorStatus(SensorStatus::Connected);
+        refreshSensorInventory();
+        emit notificationReceived(QStringLiteral("Parmak izi sensörü bağlandı"), false);
+    } else {
+        const QString port = resolveSerialPort();
+        updateSensorStatus(port.isEmpty() ? SensorStatus::Unconfigured : SensorStatus::Disconnected);
+    }
+    emit statusChanged();
 }
 
 void VaultController::beginFingerprintUnlockAfterConnect()
@@ -816,7 +984,8 @@ void VaultController::startOwnerEnrollOnSlot(int fingerId, bool deleteFirst)
     }
 
     m_fpFlow = FpFlow::SetupEnroll;
-    m_fpUnlockMessage = QStringLiteral("Place your finger twice to enroll (slot %1)…").arg(fingerId);
+    m_fpUnlockMessage =
+        QStringLiteral("Parmağınızı iki kez okutun (slot %1)…").arg(fingerId);
     m_fpUnlockActive = true;
     emit fingerprintUnlockActiveChanged();
     m_serialBridge->startEnroll(fingerId);
@@ -852,7 +1021,8 @@ void VaultController::onDeleteCompletedForEnroll(bool ok, int fingerId, const QS
     }
 
     m_fpFlow = FpFlow::SetupEnroll;
-    m_fpUnlockMessage = QStringLiteral("Place your finger twice to enroll (slot %1)…").arg(slot);
+    m_fpUnlockMessage =
+        QStringLiteral("Parmağınızı iki kez okutun (slot %1)…").arg(slot);
     m_fpUnlockActive = true;
     emit fingerprintUnlockActiveChanged();
     m_serialBridge->startEnroll(slot);
@@ -913,12 +1083,454 @@ QObject *VaultController::serialBridgeObject() const
 QString VaultController::fingerprintFlow() const
 {
     switch (m_fpFlow) {
-    case FpFlow::Unlock: return QStringLiteral("unlock");
-    case FpFlow::SetupEnroll: return QStringLiteral("setup_enroll");
-    case FpFlow::SetupVerify: return QStringLiteral("setup_verify");
-    case FpFlow::GrantEnroll: return QStringLiteral("grant_enroll");
-    default: return QString();
+    case FpFlow::Unlock:
+        return QStringLiteral("unlock");
+    case FpFlow::SetupEnroll:
+        return QStringLiteral("setup_enroll");
+    case FpFlow::SetupVerify:
+        return QStringLiteral("setup_verify");
+    case FpFlow::GrantVerify:
+        return QStringLiteral("grant_verify");
+    case FpFlow::GrantEnroll:
+        return QStringLiteral("grant_enroll");
+    case FpFlow::RevokeVerify:
+        return QStringLiteral("revoke_verify");
+    case FpFlow::DeleteVerify:
+        return QStringLiteral("delete_verify");
+    default:
+        return QString();
     }
+}
+
+void VaultController::setSetupOwnerLabel(const QString &label)
+{
+    const QString trimmed = label.trimmed();
+    if (m_setupOwnerLabel == trimmed)
+        return;
+    m_setupOwnerLabel = trimmed;
+    emit setupOwnerLabelChanged();
+}
+
+void VaultController::clearFingerprintFlowState()
+{
+    m_fpFlow = FpFlow::None;
+    m_fpContextDevice.clear();
+    m_pendingGrantOwnerId = -1;
+    m_pendingGrantFingerId = -1;
+    m_pendingGrantLabel.clear();
+    m_pendingRevokeFingerId = -1;
+    m_pendingDeleteDevicePath.clear();
+}
+
+bool VaultController::isFingerAllowedForVault(const QString &devicePath, int fingerId) const
+{
+    if (devicePath.isEmpty() || fingerId < 1)
+        return false;
+    const QJsonObject reg = registryEntryForDevice(devicePath);
+    const QJsonArray list = reg.value(QStringLiteral("accessList")).toArray();
+    if (list.isEmpty()) {
+        const int owner = reg.value(QStringLiteral("ownerFingerId")).toInt(-1);
+        return owner == fingerId;
+    }
+    for (const QJsonValue &v : list) {
+        if (v.toObject().value(QStringLiteral("fingerId")).toInt() == fingerId)
+            return true;
+    }
+    return false;
+}
+
+bool VaultController::labelExistsForVault(const QString &devicePath, const QString &label) const
+{
+    const QString want = label.trimmed();
+    if (devicePath.isEmpty() || want.isEmpty())
+        return false;
+    const QJsonObject reg = registryEntryForDevice(devicePath);
+    const QJsonArray list = reg.value(QStringLiteral("accessList")).toArray();
+    for (const QJsonValue &v : list) {
+        const QString existing = v.toObject().value(QStringLiteral("label")).toString().trimmed();
+        if (existing.compare(want, Qt::CaseInsensitive) == 0)
+            return true;
+    }
+    return false;
+}
+
+void VaultController::handleSensorEvent(int eventCode)
+{
+    if (!m_fpUnlockActive)
+        return;
+    switch (eventCode) {
+    case 0x10:
+        m_fpUnlockMessage = QStringLiteral("Lütfen parmağınızı sensöre yerleştirin…");
+        break;
+    case 0x11:
+        m_fpUnlockMessage = QStringLiteral("Parmak algılandı, lütfen bekleyin.");
+        break;
+    case 0x12:
+        m_fpUnlockMessage = QStringLiteral("Lütfen parmağınızı sensörden kaldırın.");
+        break;
+    case 0x13:
+        m_fpUnlockMessage = QStringLiteral("Lütfen aynı parmağı tekrar yerleştirin…");
+        break;
+    case 0x14:
+        m_fpUnlockMessage = QStringLiteral("Parmak izi işleniyor, lütfen sabit tutun.");
+        break;
+    default:
+        return;
+    }
+    emit fingerprintUnlockActiveChanged();
+}
+
+void VaultController::startAuthorizedVerify(FpFlow flow, const QString &devicePath,
+                                            const QString &initialMessage)
+{
+    if (!m_serialBridge || !m_serialBridge->isConnected()) {
+        emit notificationReceived(QStringLiteral("Parmak izi sensörü bağlı değil"), true);
+        return;
+    }
+    if (m_serialBridge->isBusy()) {
+        emit notificationReceived(QStringLiteral("Sensör meşgul — lütfen bekleyin"), true);
+        return;
+    }
+    m_fpContextDevice = devicePath;
+    m_fpFlow = flow;
+    m_fpUnlockMessage = initialMessage;
+    m_fpUnlockActive = true;
+    emit fingerprintUnlockActiveChanged();
+    m_serialBridge->startVerify();
+}
+
+void VaultController::handleVerifyCompleted(bool ok, int matchedId, const QString &err)
+{
+    if (!m_fpUnlockActive)
+        return;
+
+    if (m_fpFlow == FpFlow::SetupVerify) {
+        if (!ok) {
+            m_fpUnlockMessage =
+                err.isEmpty() ? QStringLiteral("Kurulum doğrulaması başarısız") : err;
+            m_fpUnlockActive = false;
+            clearFingerprintFlowState();
+            emit fingerprintUnlockActiveChanged();
+            rollbackSetupEnrollAfterVerifyFail(
+                QStringLiteral("Kurulum doğrulaması başarısız; kayıt temizlendi. "
+                               "Sahip parmağını yeniden kaydedin."));
+            return;
+        }
+        if (matchedId != m_setupOwnerFingerId) {
+            m_fpUnlockMessage =
+                QStringLiteral("Kayıt slot #%1 ile doğrulama slot #%2 uyuşmuyor. "
+                               "Kayıt sırasındaki parmağı kullanın.")
+                    .arg(m_setupOwnerFingerId)
+                    .arg(matchedId);
+            m_fpUnlockActive = false;
+            clearFingerprintFlowState();
+            emit fingerprintUnlockActiveChanged();
+            rollbackSetupEnrollAfterVerifyFail(m_fpUnlockMessage);
+            return;
+        }
+        m_fpUnlockMessage = QStringLiteral("Kasa anahtarı alınıyor…");
+        emit fingerprintUnlockActiveChanged();
+        m_serialBridge->requestKey();
+        return;
+    }
+
+    if (m_fpFlow == FpFlow::GrantVerify) {
+        const QString device = m_fpContextDevice;
+        const QString label = m_pendingGrantLabel;
+        if (!ok) {
+            m_fpUnlockMessage =
+                err.isEmpty() ? QStringLiteral("Yetkili doğrulaması başarısız") : err;
+            m_fpUnlockActive = false;
+            clearFingerprintFlowState();
+            emit fingerprintUnlockActiveChanged();
+            emit notificationReceived(m_fpUnlockMessage, true);
+            return;
+        }
+        if (!isFingerAllowedForVault(device, matchedId)) {
+            m_fpUnlockMessage =
+                QStringLiteral("Bu kasa için yetkili bir parmak izi değil (slot %1)")
+                    .arg(matchedId);
+            m_fpUnlockActive = false;
+            clearFingerprintFlowState();
+            emit fingerprintUnlockActiveChanged();
+            emit notificationReceived(m_fpUnlockMessage, true);
+            return;
+        }
+        m_fpUnlockActive = false;
+        m_fpFlow = FpFlow::None;
+        emit fingerprintUnlockActiveChanged();
+        startGrantEnrollForVault(device, label);
+        return;
+    }
+
+    if (m_fpFlow == FpFlow::RevokeVerify) {
+        const QString device = m_fpContextDevice;
+        const int fingerId = m_pendingRevokeFingerId;
+        if (!ok) {
+            m_fpUnlockMessage =
+                err.isEmpty() ? QStringLiteral("Yetkili doğrulaması başarısız") : err;
+            m_fpUnlockActive = false;
+            clearFingerprintFlowState();
+            emit fingerprintUnlockActiveChanged();
+            emit notificationReceived(m_fpUnlockMessage, true);
+            return;
+        }
+        if (!isFingerAllowedForVault(device, matchedId)) {
+            m_fpUnlockMessage =
+                QStringLiteral("Bu kasa için yetkili bir parmak izi değil (slot %1)")
+                    .arg(matchedId);
+            m_fpUnlockActive = false;
+            clearFingerprintFlowState();
+            emit fingerprintUnlockActiveChanged();
+            emit notificationReceived(m_fpUnlockMessage, true);
+            return;
+        }
+        m_fpUnlockActive = false;
+        clearFingerprintFlowState();
+        emit fingerprintUnlockActiveChanged();
+        finishRevokeAfterGate(device, fingerId);
+        return;
+    }
+
+    if (m_fpFlow == FpFlow::DeleteVerify) {
+        const QString device = m_pendingDeleteDevicePath;
+        if (!ok) {
+            m_fpUnlockMessage =
+                err.isEmpty() ? QStringLiteral("Kasa silme doğrulaması başarısız") : err;
+            m_fpUnlockActive = false;
+            clearFingerprintFlowState();
+            emit fingerprintUnlockActiveChanged();
+            emit notificationReceived(m_fpUnlockMessage, true);
+            return;
+        }
+        if (!isFingerAllowedForVault(device, matchedId)) {
+            m_fpUnlockMessage =
+                QStringLiteral("Bu kasayı silmek için yetkili parmak gerekli (okunan slot %1)")
+                    .arg(matchedId);
+            m_fpUnlockActive = false;
+            clearFingerprintFlowState();
+            emit fingerprintUnlockActiveChanged();
+            emit notificationReceived(m_fpUnlockMessage, true);
+            return;
+        }
+        m_fpUnlockActive = false;
+        m_pendingDeleteDevicePath.clear();
+        clearFingerprintFlowState();
+        emit fingerprintUnlockActiveChanged();
+        emit deleteVaultGatePassed(device);
+        return;
+    }
+
+    if (m_fpFlow != FpFlow::Unlock)
+        return;
+
+    if (!ok) {
+        m_fpUnlockMessage = err.isEmpty() ? QStringLiteral("Parmak izi eşleşmedi") : err;
+        m_fpUnlockActive = false;
+        clearFingerprintFlowState();
+        emit fingerprintUnlockActiveChanged();
+        emit notificationReceived(m_fpUnlockMessage, true);
+        return;
+    }
+    if (!isFingerAllowedForSelectedVault(matchedId)) {
+        m_fpUnlockMessage = QStringLiteral("Bu kasa için yetkiniz yok (slot %1)").arg(matchedId);
+        m_fpUnlockActive = false;
+        clearFingerprintFlowState();
+        emit fingerprintUnlockActiveChanged();
+        emit notificationReceived(m_fpUnlockMessage, true);
+        return;
+    }
+    m_fpUnlockMessage = QStringLiteral("Anahtar alınıyor…");
+    emit fingerprintUnlockActiveChanged();
+    m_serialBridge->requestKey();
+}
+
+bool VaultController::appendAccessListEntry(const QString &devicePath, int fingerId,
+                                              const QString &label, bool isOwner)
+{
+    if (devicePath.isEmpty() || fingerId < 1)
+        return false;
+
+    QJsonObject reg = registryEntryForDevice(devicePath);
+    if (reg.isEmpty())
+        reg.insert(QStringLiteral("path"), devicePath);
+
+    QJsonArray list = reg.value(QStringLiteral("accessList")).toArray();
+    for (const QJsonValue &v : list) {
+        if (v.toObject().value(QStringLiteral("fingerId")).toInt() == fingerId) {
+            emit notificationReceived(QStringLiteral("Bu slot zaten bu kasada kayıtlı"), true);
+            return false;
+        }
+    }
+    if (!isOwner && list.size() >= 4) {
+        emit notificationReceived(QStringLiteral("En fazla 4 ek erişim (MVP üstü)"), true);
+        return false;
+    }
+
+    QJsonObject entry;
+    entry.insert(QStringLiteral("fingerId"), fingerId);
+    entry.insert(QStringLiteral("isOwner"), isOwner);
+    entry.insert(QStringLiteral("label"),
+                 label.trimmed().isEmpty() ? QStringLiteral("Kullanıcı %1").arg(fingerId)
+                                           : label.trimmed());
+    list.append(entry);
+    reg.insert(QStringLiteral("accessList"), list);
+    if (isOwner)
+        reg.insert(QStringLiteral("ownerFingerId"), fingerId);
+
+    if (!saveRegistryEntry(reg)) {
+        emit notificationReceived(QStringLiteral("Kayıt defteri güncellenemedi"), true);
+        return false;
+    }
+    markSensorSlot(fingerId, true);
+    return true;
+}
+
+void VaultController::startGrantEnrollForVault(const QString &devicePath, const QString &label)
+{
+    if (!m_serialBridge || !m_serialBridge->isConnected()) {
+        emit notificationReceived(QStringLiteral("Parmak izi sensörü bağlı değil"), true);
+        return;
+    }
+    if (m_serialBridge->isBusy()) {
+        emit notificationReceived(QStringLiteral("Sensör meşgul — lütfen bekleyin"), true);
+        return;
+    }
+
+    const int slot = nextFreeFingerSlot(devicePath);
+    if (slot < 1) {
+        emit notificationReceived(QStringLiteral("Boş parmak izi slotu kalmadı (max 127)"), true);
+        return;
+    }
+
+    m_fpContextDevice = devicePath;
+    m_pendingGrantFingerId = slot;
+    m_pendingGrantLabel = label.trimmed();
+    m_fpFlow = FpFlow::GrantEnroll;
+    m_fpUnlockMessage =
+        QStringLiteral("Yeni kullanıcı için parmağınızı iki kez okutun (slot %1)…").arg(slot);
+    m_fpUnlockActive = true;
+    emit fingerprintUnlockActiveChanged();
+    m_serialBridge->startEnroll(slot);
+}
+
+void VaultController::beginGrantAccessForVault(const QString &devicePath, const QString &label)
+{
+    const QString path = devicePath.trimmed();
+    const QString trimmedLabel = label.trimmed();
+    if (path.isEmpty()) {
+        emit notificationReceived(QStringLiteral("Kasa seçilmedi"), true);
+        return;
+    }
+    if (trimmedLabel.isEmpty()) {
+        emit notificationReceived(QStringLiteral("Parmak izi için bir isim girin"), true);
+        return;
+    }
+    if (labelExistsForVault(path, trimmedLabel)) {
+        emit notificationReceived(
+            QStringLiteral("Bu kasada \"%1\" adı zaten kullanılıyor").arg(trimmedLabel), true);
+        return;
+    }
+
+    m_pendingGrantLabel = trimmedLabel;
+    m_fpContextDevice = path;
+
+    if (isVaultUnlockedForDevice(path)) {
+        startGrantEnrollForVault(path, trimmedLabel);
+        return;
+    }
+
+    startAuthorizedVerify(FpFlow::GrantVerify, path,
+                          QStringLiteral("Erişim vermek için yetkili parmağınızı okutun…"));
+}
+
+void VaultController::beginRevokeAccessForVault(const QString &devicePath, int fingerId)
+{
+    const QString path = devicePath.trimmed();
+    if (path.isEmpty() || fingerId < 1) {
+        emit notificationReceived(QStringLiteral("Geçersiz işlem"), true);
+        return;
+    }
+
+    const QJsonObject reg = registryEntryForDevice(path);
+    const QJsonArray list = reg.value(QStringLiteral("accessList")).toArray();
+    for (const QJsonValue &v : list) {
+        const QJsonObject o = v.toObject();
+        if (o.value(QStringLiteral("fingerId")).toInt() == fingerId
+            && o.value(QStringLiteral("isOwner")).toBool()) {
+            emit notificationReceived(QStringLiteral("Kasa sahibi kaldırılamaz"), true);
+            return;
+        }
+    }
+
+    m_pendingRevokeFingerId = fingerId;
+    m_fpContextDevice = path;
+
+    if (isVaultUnlockedForDevice(path)) {
+        finishRevokeAfterGate(path, fingerId);
+        return;
+    }
+
+    startAuthorizedVerify(FpFlow::RevokeVerify, path,
+                          QStringLiteral("Erişimi kaldırmak için yetkili parmağınızı okutun…"));
+}
+
+void VaultController::finishRevokeAfterGate(const QString &devicePath, int fingerId)
+{
+    QJsonObject reg = registryEntryForDevice(devicePath);
+    QJsonArray list = reg.value(QStringLiteral("accessList")).toArray();
+    QJsonArray next;
+    bool removed = false;
+    for (const QJsonValue &v : list) {
+        const QJsonObject o = v.toObject();
+        if (o.value(QStringLiteral("fingerId")).toInt() == fingerId) {
+            if (o.value(QStringLiteral("isOwner")).toBool()) {
+                emit notificationReceived(QStringLiteral("Kasa sahibi kaldırılamaz"), true);
+                return;
+            }
+            removed = true;
+            continue;
+        }
+        next.append(o);
+    }
+    if (!removed) {
+        emit notificationReceived(QStringLiteral("Kayıt bulunamadı"), true);
+        return;
+    }
+    reg.insert(QStringLiteral("accessList"), next);
+    if (!saveRegistryEntry(reg)) {
+        emit notificationReceived(QStringLiteral("Kayıt defteri güncellenemedi"), true);
+        return;
+    }
+
+    if (m_serialBridge && m_serialBridge->isConnected() && !m_serialBridge->isBusy())
+        m_serialBridge->deleteFinger(fingerId);
+    else
+        markSensorSlot(fingerId, false);
+
+    emit notificationReceived(
+        QStringLiteral("Erişim kaldırıldı (slot %1)").arg(fingerId), false);
+    emit statusChanged();
+    emit devicesChanged();
+    emit vaultAccessListChanged();
+}
+
+void VaultController::beginDeleteVaultBiometricGate(const QString &devicePath)
+{
+    const QString path = devicePath.trimmed();
+    if (path.isEmpty()) {
+        emit notificationReceived(QStringLiteral("Kasa seçilmedi"), true);
+        return;
+    }
+
+    if (isVaultUnlockedForDevice(path)) {
+        emit deleteVaultGatePassed(path);
+        return;
+    }
+
+    m_pendingDeleteDevicePath = path;
+    startAuthorizedVerify(FpFlow::DeleteVerify, path,
+                          QStringLiteral("Kasayı silmek için yetkili parmağınızı okutun…"));
 }
 
 VaultController::~VaultController()
@@ -1184,18 +1796,7 @@ bool VaultController::unmountVault()
 
 bool VaultController::isFingerAllowedForSelectedVault(int fingerId) const
 {
-    const QJsonObject reg = registryEntryForDevice(m_selectedDevice);
-    const QJsonArray list = reg.value(QStringLiteral("accessList")).toArray();
-    if (list.isEmpty()) {
-        const int owner = reg.value(QStringLiteral("ownerFingerId")).toInt(-1);
-        return owner == fingerId;
-    }
-    for (const QJsonValue &v : list) {
-        const QJsonObject o = v.toObject();
-        if (o.value(QStringLiteral("fingerId")).toInt() == fingerId)
-            return true;
-    }
-    return false;
+    return isFingerAllowedForVault(m_selectedDevice, fingerId);
 }
 
 bool VaultController::fingerInAccessList(int fingerId) const
@@ -1311,8 +1912,8 @@ void VaultController::cancelFingerprintUnlock()
         return;
     m_serialBridge->cancelOperation();
     m_fpUnlockActive = false;
-    m_fpFlow = FpFlow::None;
     m_fpUnlockMessage.clear();
+    clearFingerprintFlowState();
     emit fingerprintUnlockActiveChanged();
 }
 
@@ -1491,8 +2092,11 @@ void VaultController::launchSetupAsync(const QString &device, int ownerId, bool 
             QJsonObject ownerEntry;
             ownerEntry.insert(QStringLiteral("fingerId"), ownerId);
             ownerEntry.insert(QStringLiteral("isOwner"), true);
-            ownerEntry.insert(QStringLiteral("label"),
-                              vaultName.isEmpty() ? QStringLiteral("Sahip") : vaultName);
+            const QString ownerLabel = m_setupOwnerLabel.trimmed().isEmpty()
+                                           ? (vaultName.isEmpty() ? QStringLiteral("Sahip")
+                                                                  : vaultName)
+                                           : m_setupOwnerLabel.trimmed();
+            ownerEntry.insert(QStringLiteral("label"), ownerLabel);
             accessList.append(ownerEntry);
             regEntry.insert(QStringLiteral("accessList"), accessList);
             saveRegistryEntry(regEntry);
@@ -2905,7 +3509,7 @@ void VaultController::beginGrantAccessEnroll(int ownerFingerId, int newFingerId,
     m_pendingGrantLabel = label;
     m_fpFlow = FpFlow::GrantEnroll;
     m_fpUnlockMessage =
-        QStringLiteral("Place your finger twice to enroll new user (slot %1)…").arg(slot);
+        QStringLiteral("Yeni kullanıcı için parmağınızı iki kez okutun (slot %1)…").arg(slot);
     m_fpUnlockActive = true;
     emit fingerprintUnlockActiveChanged();
     m_serialBridge->startEnroll(slot);

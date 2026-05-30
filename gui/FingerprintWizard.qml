@@ -16,6 +16,19 @@ Item {
 
     property int state: 0
 
+    function flowTitle(flow) {
+        switch (flow) {
+        case "setup_enroll": return "Parmak izi kaydı"
+        case "setup_verify": return "Kurulum doğrulaması"
+        case "grant_verify": return "Yetkili doğrulaması (erişim)"
+        case "grant_enroll": return "Yeni parmak izi ekleniyor"
+        case "revoke_verify": return "Yetkili doğrulaması (kaldırma)"
+        case "delete_verify": return "Yetkili doğrulaması (silme)"
+        case "unlock": return "Biyometrik kilit açma"
+        default: return "Parmağınızı sensöre koyun"
+        }
+    }
+
     Rectangle {
         anchors.centerIn: parent
         width: Math.min(400, parent.width - 48)
@@ -34,12 +47,11 @@ Item {
                 width: parent.width
                 horizontalAlignment: Text.AlignHCenter
                 text: {
-                    var flow = vaultController.fingerprintFlow
-                    if (flow === "setup_enroll") return "Parmak izi kaydı"
-                    if (flow === "setup_verify") return "Kurulum doğrulaması"
-                    if (root.state === 1) return "✓ Parmak izi doğrulandı"
-                    if (root.state === 2) return "Doğrulama başarısız"
-                    return "Parmağınızı sensöre koyun"
+                    if (root.state === 1)
+                        return "✓ Parmak izi doğrulandı"
+                    if (root.state === 2)
+                        return "Doğrulama başarısız"
+                    return flowTitle(vaultController.fingerprintFlow)
                 }
                 color: Theme.textPrimary
                 font { pixelSize: 18; bold: true; family: "Inter" }
@@ -60,7 +72,7 @@ Item {
 
                 Button {
                     text: "İptal"
-                    enabled: root.state === 0
+                    enabled: root.state === 0 && !vaultController.serialBridge.busy
                     onClicked: vaultController.cancelFingerprintUnlock()
                 }
             }

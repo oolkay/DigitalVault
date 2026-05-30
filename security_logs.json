@@ -1,6 +1,26 @@
 [
     {
         "level": "SUCCESS",
+        "message": "Loop device ready: /dev/loop18 (/home/oolkay/.local/share/DigitalVault/containers/myvault123.img)",
+        "time": "2026-05-31 01:16:35"
+    },
+    {
+        "level": "INFO",
+        "message": "Creating container: /home/oolkay/.local/share/DigitalVault/containers/myvault123.img",
+        "time": "2026-05-31 01:16:35"
+    },
+    {
+        "level": "ERROR",
+        "message": "losetup: /dev/loop18: detach failed: No such device or address\n[vault_manager] destroyloop: losetup -d failed",
+        "time": "2026-05-31 01:16:08"
+    },
+    {
+        "level": "INFO",
+        "message": "Deleting loop vault: /dev/loop18",
+        "time": "2026-05-31 01:16:08"
+    },
+    {
+        "level": "SUCCESS",
         "message": "Vault locked. Encryption keys cleared from kernel.",
         "time": "2026-05-28 03:16:28"
     },

@@ -35,8 +35,13 @@ class VaultController : public QObject
     Q_PROPERTY(QString fingerprintUnlockMessage READ fingerprintUnlockMessage NOTIFY fingerprintUnlockActiveChanged)
     Q_PROPERTY(QString fingerprintFlow READ fingerprintFlow NOTIFY fingerprintUnlockActiveChanged)
     Q_PROPERTY(int setupOwnerFingerId READ setupOwnerFingerId NOTIFY setupOwnerFingerIdChanged)
+    Q_PROPERTY(QString setupOwnerLabel READ setupOwnerLabel WRITE setSetupOwnerLabel NOTIFY setupOwnerLabelChanged)
     Q_PROPERTY(QObject *serialBridge READ serialBridgeObject CONSTANT)
     Q_PROPERTY(bool sensorConnected READ sensorConnected NOTIFY statusChanged)
+    Q_PROPERTY(QString sensorStatus READ sensorStatus NOTIFY sensorStatusChanged)
+    Q_PROPERTY(QString sensorStatusText READ sensorStatusText NOTIFY sensorStatusChanged)
+    Q_PROPERTY(QString sensorPortPath READ sensorPortPath NOTIFY sensorStatusChanged)
+    Q_PROPERTY(bool autoDetectUsb READ autoDetectUsb WRITE setAutoDetectUsb NOTIFY autoDetectUsbChanged)
     Q_PROPERTY(int autoLockTimeout    READ autoLockTimeout    WRITE setAutoLockTimeout NOTIFY autoLockTimeoutChanged)
     Q_PROPERTY(QString setupStatusText READ setupStatusText   NOTIFY setupRunningChanged)
     Q_PROPERTY(bool isSelectedDeviceVault READ isSelectedDeviceVault NOTIFY statusChanged)
@@ -94,6 +99,9 @@ public:
     Q_INVOKABLE void        startSimulator();
     Q_INVOKABLE void        stopSimulator();
     Q_INVOKABLE void        reconnectSerial();
+    Q_INVOKABLE void        connectToConfiguredPort(const QString &port);
+    Q_INVOKABLE QStringList availableSerialPorts();
+    Q_INVOKABLE void        clearSerialPortSettings();
     Q_INVOKABLE void        setSelectedDevice(const QString &path);
     Q_INVOKABLE QVariantMap createSetupSession(const QString &devicePath = QString()) const;
     Q_INVOKABLE QString     defaultContainersDir() const;
@@ -132,15 +140,28 @@ public:
     QString fingerprintUnlockMessage() const { return m_fpUnlockMessage; }
     QString fingerprintFlow() const;
     int setupOwnerFingerId() const { return m_setupOwnerFingerId; }
+    QString setupOwnerLabel() const { return m_setupOwnerLabel; }
+    void setSetupOwnerLabel(const QString &label);
     QObject *serialBridgeObject() const;
     SerialBridge *serialBridge() const { return m_serialBridge; }
     bool sensorConnected() const;
+    QString sensorStatus() const { return m_sensorStatus; }
+    QString sensorStatusText() const { return m_sensorStatusText; }
+    QString sensorPortPath() const { return m_sensorPortPathDisplay; }
+    bool autoDetectUsb() const;
+    void setAutoDetectUsb(bool enabled);
+    Q_INVOKABLE QString savedSerialPort() const;
 
     /* ── Multi-user Access Management ── */
     Q_INVOKABLE bool        verifyOwner(int fingerId);
     Q_INVOKABLE bool        grantAccess(int ownerFingerId, int newFingerId);
     Q_INVOKABLE void        beginGrantAccessEnroll(int ownerFingerId, int newFingerId, const QString &label);
+    Q_INVOKABLE void        beginGrantAccessForVault(const QString &devicePath, const QString &label);
+    Q_INVOKABLE void        beginRevokeAccessForVault(const QString &devicePath, int fingerId);
+    Q_INVOKABLE void        beginDeleteVaultBiometricGate(const QString &devicePath);
     Q_INVOKABLE bool        revokeAccess(int ownerFingerId, int slotNumber);
+    Q_INVOKABLE bool        isFingerAllowedForVault(const QString &devicePath, int fingerId) const;
+    Q_INVOKABLE bool        labelExistsForVault(const QString &devicePath, const QString &label) const;
     Q_INVOKABLE QVariantList getKeyslots();
     Q_INVOKABLE QVariantList getKeyslotsForDevice(const QString &devicePath);
     Q_INVOKABLE QVariantMap vaultDetailForDevice(const QString &devicePath) const;
@@ -164,8 +185,13 @@ signals:
     void togglingChanged();
     void fingerprintUnlockActiveChanged();
     void setupOwnerFingerIdChanged();
+    void setupOwnerLabelChanged();
+    void deleteVaultGatePassed(const QString &devicePath);
+    void vaultAccessListChanged();
     void autoLockTimeoutChanged();
     void navigationRequested(const QString &pageFile);
+    void sensorStatusChanged();
+    void autoDetectUsbChanged();
 
 private slots:
     void onSimFinished(int exitCode, QProcess::ExitStatus exitStatus);
@@ -173,6 +199,17 @@ private slots:
     void pollStatus();
 
 private:
+    enum class FpFlow {
+        None,
+        Unlock,
+        SetupEnroll,
+        SetupVerify,
+        GrantVerify,
+        GrantEnroll,
+        RevokeVerify,
+        DeleteVerify
+    };
+
     void resetAutoLockTimer();
     void handleAutoLock();
     void beginLockVault();
@@ -180,11 +217,24 @@ private:
     void finishUnlockWithKey(const QByteArray &key32);
     void finishSetupWithKey(const QByteArray &key32);
     bool isFingerAllowedForSelectedVault(int fingerId) const;
+    void handleVerifyCompleted(bool ok, int matchedId, const QString &err);
+    void handleSensorEvent(int eventCode);
+    void startAuthorizedVerify(FpFlow flow, const QString &devicePath, const QString &initialMessage);
+    void startGrantEnrollForVault(const QString &devicePath, const QString &label);
+    void finishRevokeAfterGate(const QString &devicePath, int fingerId);
+    bool appendAccessListEntry(const QString &devicePath, int fingerId, const QString &label, bool isOwner);
+    void clearFingerprintFlowState();
     int runVaultManagerWithKey(const QStringList &args, const QByteArray &key32, int timeoutMs);
     void launchSetupAsync(const QString &device, int ownerId, bool force, int vaultSizeMB,
                           const QString &vaultName, const QString &normalName, const QString &normalFs,
                           const QByteArray &key32);
-    QString serialPortToUse() const;
+    enum class SensorStatus { Unconfigured, Disconnected, Connecting, Connected, Error };
+
+    QString resolveSerialPort();
+    void updateSensorStatus(SensorStatus status, const QString &customText = QString());
+    void onSerialConnectionLost(const QString &reason);
+    void endStartupConnectPhase();
+    void clearFailedSerialPortSetting();
     void tryConnectSerial();
     void scheduleSerialConnectRetries();
     void beginSetupOwnerEnrollAfterConnect(int fingerId);
@@ -203,9 +253,10 @@ private:
     void rollbackSetupEnrollAfterVerifyFail(const QString &reason);
     void onListEnrolledCompleted(bool ok, const QList<int> &fingerIds, const QString &err);
 
-    enum class FpFlow { None, Unlock, SetupEnroll, SetupVerify, GrantEnroll };
     FpFlow m_fpFlow = FpFlow::None;
+    QString m_fpContextDevice;
     int m_setupOwnerFingerId = -1;
+    QString m_setupOwnerLabel;
     QString m_setupDevicePath;
     int m_pendingEnrollSlot = -1;
     bool m_pendingDeleteBeforeEnroll = false;
@@ -215,6 +266,9 @@ private:
     int m_pendingGrantOwnerId = -1;
     int m_pendingGrantFingerId = -1;
     QString m_pendingGrantLabel;
+    int m_pendingRevokeFingerId = -1;
+    QString m_pendingDeleteDevicePath;
+    bool m_pendingRegistryRollbackSlot = false;
     struct PendingSetup {
         QString device;
         bool force = false;
@@ -259,6 +313,12 @@ private:
     QString m_fpUnlockMessage;
     QProcess *m_socatProcess = nullptr;
     int m_serialRetryGeneration = 0;
+    QString m_sensorStatus = QStringLiteral("unconfigured");
+    QString m_sensorStatusText;
+    QString m_sensorPortPathDisplay;
+    QString m_lastAttemptedPort;
+    bool m_startupConnectPhase = true;
+    bool m_manualConnectRequested = false;
 
     void updateActivity(const QString &msg);
     bool mountVault();

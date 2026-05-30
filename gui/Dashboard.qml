@@ -33,6 +33,57 @@ Item {
             topPadding: 12
             bottomPadding: 24
 
+            Rectangle {
+                width: parent.width
+                height: sensorBannerLayout.implicitHeight + 20
+                visible: !vaultController.sensorConnected
+                radius: 8
+                color: Theme.warningBg
+                border.color: Theme.warning
+                border.width: 1
+
+                RowLayout {
+                    id: sensorBannerLayout
+                    anchors {
+                        fill: parent
+                        leftMargin: 14
+                        rightMargin: 12
+                        topMargin: 10
+                        bottomMargin: 10
+                    }
+                    spacing: 10
+
+                    Text {
+                        text: "⚠"
+                        font.pixelSize: 14
+                        color: Theme.warning
+                    }
+
+                    Text {
+                        Layout.fillWidth: true
+                        text: vaultController.sensorStatusText
+                        color: Theme.textPrimary
+                        font { pixelSize: 12; family: "Inter" }
+                        wrapMode: Text.Wrap
+                        maximumLineCount: 2
+                    }
+
+                    Text {
+                        id: sensorBannerLink
+                        text: "Ayarlara git"
+                        color: Theme.accent
+                        font { pixelSize: 12; bold: true; family: "Inter" }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            anchors.margins: -6
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: vaultController.navigateToPage("Settings.qml")
+                        }
+                    }
+                }
+            }
+
             Column {
                 width: parent.width
                 spacing: 6

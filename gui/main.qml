@@ -325,6 +325,110 @@ import DigitalVault
                     }
                 }
             }
+
+            // ── Sensor status chip ─────────────────────
+            Item {
+                id: sensorChip
+                width: parent.width
+                height: 60
+
+                readonly property string status: vaultController.sensorStatus
+
+                function chipBgColor() {
+                    switch (status) {
+                    case "connected": return Theme.successBg
+                    case "connecting": return Theme.warningBg
+                    case "error":
+                    case "disconnected": return Theme.dangerBg
+                    default: return Theme.bgOverlay
+                    }
+                }
+                function chipFgColor() {
+                    switch (status) {
+                    case "connected": return Theme.success
+                    case "connecting": return Theme.warning
+                    case "error":
+                    case "disconnected": return Theme.danger
+                    default: return Theme.textMuted
+                    }
+                }
+                function chipTitle() {
+                    switch (status) {
+                    case "connected": return "Sensör bağlı"
+                    case "connecting": return "Bağlanıyor…"
+                    case "error":
+                    case "disconnected": return "Sensör bağlı değil"
+                    default: return "Port seçilmedi"
+                    }
+                }
+                function showPortLine() {
+                    return vaultController.sensorPortPath.length > 0
+                        && (status === "connected" || status === "connecting")
+                }
+
+                Rectangle {
+                    anchors { fill: parent; leftMargin: 14; rightMargin: 14; topMargin: 4; bottomMargin: 4 }
+                    radius: 10
+                    color: sensorChip.chipBgColor()
+                    Behavior on color { ColorAnimation { duration: 300 } }
+
+                    Row {
+                        id: sensorRow
+                        anchors {
+                            verticalCenter: parent.verticalCenter
+                            left: parent.left
+                            right: parent.right
+                            leftMargin: 12
+                            rightMargin: 8
+                        }
+                        spacing: 8
+
+                        Rectangle {
+                            id: statusDot
+                            width: 8; height: 8; radius: 4
+                            anchors.verticalCenter: parent.verticalCenter
+                            color: sensorChip.chipFgColor()
+                            SequentialAnimation on opacity {
+                                running: sensorChip.status === "connecting"
+                                loops: Animation.Infinite
+                                NumberAnimation { to: 0.3; duration: 900 }
+                                NumberAnimation { to: 1.0; duration: 900 }
+                            }
+                        }
+
+                        Column {
+                            width: Math.max(0, sensorRow.width - statusDot.width - sensorRow.spacing)
+                            spacing: 1
+                            anchors.verticalCenter: parent.verticalCenter
+
+                            Text {
+                                width: parent.width
+                                text: sensorChip.chipTitle()
+                                color: sensorChip.chipFgColor()
+                                font { pixelSize: 12; bold: true; family: "Inter" }
+                                elide: Text.ElideRight
+                                maximumLineCount: 1
+                            }
+                            Text {
+                                width: parent.width
+                                visible: sensorChip.showPortLine()
+                                text: vaultController.sensorPortPath
+                                color: Theme.textSecondary
+                                font { pixelSize: 9; family: "Courier New" }
+                                elide: Text.ElideMiddle
+                                maximumLineCount: 1
+                            }
+                        }
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
+                        hoverEnabled: true
+                        onClicked: vaultController.navigateToPage("Settings.qml")
+                    }
+                }
+            }
         }
 
         // ── Theme toggle + version at bottom ──────────
