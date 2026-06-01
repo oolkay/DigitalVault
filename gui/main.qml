@@ -575,4 +575,12 @@ import DigitalVault
         }
         }
     }
+
+    FingerprintWizard {
+        x: 0
+        y: 0
+        width: root.width
+        height: root.height
+        z: 10000
+    }
 }

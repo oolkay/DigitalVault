@@ -36,10 +36,17 @@ public:
     Q_INVOKABLE void deleteFinger(int fingerId);
     Q_INVOKABLE void cancelOperation();
     Q_INVOKABLE void listEnrolled();
+    Q_INVOKABLE void cancelInventoryIfRunning();
+
+    bool tryStartVerify();
+    bool tryStartEnroll(int fingerId);
+    bool tryDeleteFinger(int fingerId);
+    void forceIdle();
 
 signals:
     void connectionChanged();
     void busyChanged();
+    void operationRejected(const QString &reason);
     void sensorEvent(int eventCode);
     void verifyCompleted(bool success, int matchedId, const QString &error);
     void keyReceived(const QByteArray &key32);

@@ -82,6 +82,38 @@ static int run_cmd(const char *argv[])
     return (WIFEXITED(status) && WEXITSTATUS(status) == 0) ? 0 : -1;
 }
 
+static void log_cmd_failure(const char *step, const char *argv0)
+{
+    fprintf(stderr, "[vault_manager] %s failed (command: %s)\n", step, argv0 ? argv0 : "?");
+}
+
+/** Device size in MiB, or -1 on error. */
+static long device_size_mb(const char *device)
+{
+    char cmd[320];
+    snprintf(cmd, sizeof(cmd), "blockdev --getsize64 '%s' 2>/dev/null", device);
+    FILE *fp = popen(cmd, "r");
+    if (!fp)
+        return -1;
+    unsigned long long bytes = 0;
+    if (fscanf(fp, "%llu", &bytes) != 1) {
+        pclose(fp);
+        return -1;
+    }
+    pclose(fp);
+    return (long)(bytes / (1024ULL * 1024ULL));
+}
+
+static void refresh_partition_nodes(const char *device)
+{
+    const char *partprobe_args[] = {"partprobe", device, NULL};
+    run_cmd(partprobe_args);
+    if (strstr(device, "loop") != NULL) {
+        const char *partx_args[] = {"partx", "-a", device, NULL};
+        run_cmd(partx_args);
+    }
+}
+
 /**
  * cryptsetup'a key'i stdin üzerinden pipe'la.
  * Key asla komut satırında veya dosyada görünmez.
@@ -166,6 +198,44 @@ static int read_key_from_stdin(uint8_t *key_out)
         }
         got += (size_t)n;
     }
+    return 0;
+}
+
+static int get_biometric_key(int finger_id, uint8_t *key_out);
+
+static int read_key_from_file(const char *path, uint8_t *key_out)
+{
+    FILE *f = fopen(path, "rb");
+    if (!f) {
+        perror("[vault_manager] open key file");
+        return -1;
+    }
+    size_t got = fread(key_out, 1, HAL_KEY_LEN, f);
+    fclose(f);
+    unlink(path);
+    if (got != HAL_KEY_LEN) {
+        fprintf(stderr, "[vault_manager] key file size %zu (expected %d)\n", got, HAL_KEY_LEN);
+        secure_wipe(key_out, HAL_KEY_LEN);
+        return -1;
+    }
+    return 0;
+}
+
+static int load_vault_key(int key_from_stdin, const char *key_file, int finger_id,
+                          uint8_t *key_out)
+{
+    if (key_file && key_file[0]) {
+        if (read_key_from_file(key_file, key_out) != 0)
+            return -1;
+        return 0;
+    }
+    if (key_from_stdin) {
+        if (read_key_from_stdin(key_out) != 0)
+            return -1;
+        return 0;
+    }
+    if (get_biometric_key(finger_id, key_out) != 0)
+        return -1;
     return 0;
 }
 
@@ -598,7 +668,7 @@ static int check_device_status(const char *device)
  *   6. cryptsetup close
  */
 static int cmd_setup(const char *device, int finger_id, int force, int partition_size_mb,
-                     int key_from_stdin,
+                     int key_from_stdin, const char *key_file,
                      const char *vault_name, const char *normal_name, const char *normal_fs)
 {
     if (!vault_name) vault_name = "DigitalVault";
@@ -636,8 +706,23 @@ static int cmd_setup(const char *device, int finger_id, int force, int partition
 
     /* 0.5 Partitioning (Optional) */
     if (partition_size_mb > 0) {
-        printf("[vault_manager] Partitioning device: %s (Vault: %d MB)\n", device, partition_size_mb);
-        
+        const long cap_mb = device_size_mb(device);
+        const int min_normal_mb = 16;
+        const int gpt_slop_mb = 2;
+
+        if (cap_mb > 0
+            && partition_size_mb + min_normal_mb + gpt_slop_mb > cap_mb) {
+            fprintf(stderr,
+                    "[vault_manager] Device %s is %ld MB — cannot split %d MB vault + %d MB normal.\n",
+                    device, cap_mb, partition_size_mb, min_normal_mb);
+            fprintf(stderr,
+                    "[vault_manager] Use a larger container, reduce vault size, or format the whole device.\n");
+            return 1;
+        }
+
+        printf("[vault_manager] Partitioning device: %s (Vault: %d MB, device %ld MB)\n",
+               device, partition_size_mb, cap_mb);
+
         /* 1. Wipe existing signatures */
         const char *wipe_args[] = {"wipefs", "-a", device, NULL};
         run_cmd(wipe_args);
@@ -645,7 +730,10 @@ static int cmd_setup(const char *device, int finger_id, int force, int partition
         /* 2. Create partition table */
         const char *label_args[] = {"parted", "-s", device, "mklabel", "gpt", NULL};
         if (run_cmd(label_args) != 0) {
-            fprintf(stderr, "[vault_manager] Failed to create partition table!\n");
+            log_cmd_failure("Create partition table", label_args[0]);
+            fprintf(stderr,
+                    "[vault_manager] Hint: close apps using %s; for loop devices recreate the container.\n",
+                    device);
             return 1;
         }
 
@@ -654,16 +742,21 @@ static int cmd_setup(const char *device, int finger_id, int force, int partition
         snprintf(size_str, sizeof(size_str), "%dMiB", partition_size_mb);
         const char *part1_args[] = {"parted", "-s", device, "mkpart", "primary", "ext4", "1MiB", size_str, NULL};
         if (run_cmd(part1_args) != 0) {
-            fprintf(stderr, "[vault_manager] Failed to create vault partition!\n");
+            log_cmd_failure("Create vault partition", part1_args[0]);
             return 1;
         }
 
         /* 4. Create normal partition (Partition 2) */
         const char *part2_args[] = {"parted", "-s", device, "mkpart", "primary", "fat32", size_str, "100%", NULL};
         if (run_cmd(part2_args) != 0) {
-            fprintf(stderr, "[vault_manager] Failed to create normal partition!\n");
+            log_cmd_failure("Create normal partition", part2_args[0]);
+            fprintf(stderr,
+                    "[vault_manager] Vault size %d MB may be too large for this %ld MB device.\n",
+                    partition_size_mb, cap_mb);
             return 1;
         }
+
+        refresh_partition_nodes(device);
 
         /* 5. Format partition 2 as exFAT */
         printf("[vault_manager] Waiting for partitions to settle...\n");
@@ -704,14 +797,10 @@ static int cmd_setup(const char *device, int finger_id, int force, int partition
         printf("[vault_manager] Partitioning complete. Vault target: %s\n", target_device);
     }
 
-    /* 1. Biyometrik key al */
+    /* 1. Vault key (stdin, file from GUI, or HAL) */
     uint8_t key[HAL_KEY_LEN];
-    if (key_from_stdin) {
-        if (read_key_from_stdin(key) != 0)
-            return 1;
-    } else if (get_biometric_key(finger_id, key) != 0) {
+    if (load_vault_key(key_from_stdin, key_file, finger_id, key) != 0)
         return 1;
-    }
 
     /* 2. LUKS formatla */
     printf("[vault_manager] Formatting LUKS2 container (AES-256-XTS)...\n");
@@ -814,7 +903,8 @@ static int cmd_setup(const char *device, int finger_id, int force, int partition
 /**
  * OPEN: Parmak izi doğrula → LUKS aç → ext4 mount.
  */
-static int cmd_open(const char *device, const char *mount_point, int finger_id, int key_from_stdin)
+static int cmd_open(const char *device, const char *mount_point, int finger_id,
+                  int key_from_stdin, const char *key_file)
 {
     char resolved_device[256];
     resolve_vault_device(device, resolved_device, sizeof(resolved_device));
@@ -827,14 +917,10 @@ static int cmd_open(const char *device, const char *mount_point, int finger_id, 
 
     printf("[vault_manager] Opening vault: %s → %s\n", resolved_device, mount_point);
 
-    /* 1. Biyometrik key al */
+    /* 1. Vault key */
     uint8_t key[HAL_KEY_LEN];
-    if (key_from_stdin) {
-        if (read_key_from_stdin(key) != 0)
-            return 1;
-    } else if (get_biometric_key(finger_id, key) != 0) {
+    if (load_vault_key(key_from_stdin, key_file, finger_id, key) != 0)
         return 1;
-    }
 
     /* 2. LUKS aç */
     printf("[vault_manager] Decrypting LUKS container...\n");
@@ -1301,7 +1387,7 @@ static int cmd_createloop(const char *image_path, int size_mb)
     }
 
     char cmd[768];
-    snprintf(cmd, sizeof(cmd), "losetup -f --show '%s'", image_path);
+    snprintf(cmd, sizeof(cmd), "losetup -f -P --show '%s'", image_path);
     FILE *fp = popen(cmd, "r");
     if (!fp) {
         perror("[vault_manager] createloop: popen");
@@ -1397,8 +1483,8 @@ static void print_usage(const char *prog)
         "DigitalVault — Vault Manager (LUKS + ext4)\n"
         "\n"
         "Usage:\n"
-        "  %s setup     <device> [finger_id] [--key-from-stdin] — First-time LUKS setup\n"
-        "  %s open      <device> <mountpoint> [--key-from-stdin] — Unlock vault\n"
+        "  %s setup     <device> [finger_id] [--key-from-stdin|--key-file PATH] — LUKS setup\n"
+        "  %s open      <device> <mountpoint> [--key-from-stdin|--key-file PATH] — Unlock\n"
         "  %s close     <mountpoint>                        — Lock vault (no process kill)\n"
         "  %s forceclose <mountpoint>                      — Force lock vault\n"
         "  %s reconcile <mountpoint>                        — Release orphan mapper/setup mounts\n"
@@ -1430,6 +1516,7 @@ int main(int argc, char *argv[])
         int fid = 1;
         int force = 0;
         int key_from_stdin = 0;
+        const char *key_file = NULL;
         int partition_size = 0;
         const char *vault_name = "DigitalVault";
         const char *normal_name = "Normal";
@@ -1439,6 +1526,8 @@ int main(int argc, char *argv[])
         for (int i = 3; i < argc; i++) {
             if (strcmp(argv[i], "--key-from-stdin") == 0) {
                 key_from_stdin = 1;
+            } else if (strcmp(argv[i], "--key-file") == 0 && i + 1 < argc) {
+                key_file = argv[++i];
             } else if (strcmp(argv[i], "--force") == 0) {
                 force = 1;
             } else if (strcmp(argv[i], "--partition") == 0 && i + 1 < argc) {
@@ -1454,7 +1543,7 @@ int main(int argc, char *argv[])
             }
         }
 
-        return cmd_setup(argv[2], fid, force, partition_size, key_from_stdin,
+        return cmd_setup(argv[2], fid, force, partition_size, key_from_stdin, key_file,
                          vault_name, normal_name, normal_fs);
     }
     else if (strcmp(cmd, "open") == 0) {
@@ -1464,13 +1553,16 @@ int main(int argc, char *argv[])
         }
         int fid = 1;
         int key_from_stdin = 0;
+        const char *key_file = NULL;
         for (int i = 4; i < argc; i++) {
             if (strcmp(argv[i], "--key-from-stdin") == 0)
                 key_from_stdin = 1;
+            else if (strcmp(argv[i], "--key-file") == 0 && i + 1 < argc)
+                key_file = argv[++i];
             else
                 fid = atoi(argv[i]);
         }
-        return cmd_open(argv[2], argv[3], fid, key_from_stdin);
+        return cmd_open(argv[2], argv[3], fid, key_from_stdin, key_file);
     }
     else if (strcmp(cmd, "close") == 0) {
         if (argc < 3) {

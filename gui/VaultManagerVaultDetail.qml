@@ -28,6 +28,11 @@ Item {
 
     readonly property var deviceData: deviceEntry()
 
+    onDevicePathChanged: {
+        if (accessCard)
+            accessCard.refreshAccessList()
+    }
+
     ScrollView {
         anchors.fill: parent
         contentWidth: availableWidth
@@ -138,6 +143,193 @@ Item {
                         visible: text !== ""
                         color: Theme.textSecondary
                         font { pixelSize: 11; family: "Inter" }
+                    }
+                }
+            }
+
+
+            Rectangle {
+                id: accessCard
+                width: parent.width
+                radius: Theme.radius
+                color: Theme.bgCard
+                border.color: Theme.border
+                border.width: 1
+                implicitHeight: accessCol.implicitHeight + 28
+
+                property var accessEntries: []
+
+                readonly property bool canUseSensor: vaultController.sensorConnected
+                    || (vaultController.serialBridge && vaultController.serialBridge.connected)
+                readonly property bool fpActive: vaultController.fingerprintUnlockActive
+                readonly property bool atAccessCapacity: accessEntries.length >= 4
+                readonly property bool canManageAccess: canUseSensor && !fpActive
+
+                function refreshAccessList() {
+                    if (!root.devicePath) {
+                        accessEntries = []
+                        return
+                    }
+                    accessEntries = vaultController.accessListForDevice(root.devicePath)
+                }
+
+                function submitGrantAccess() {
+                    const label = grantLabelField.text.trim()
+                    if (!label) {
+                        vaultController.notifyUser(
+                            "Enter a display name for this fingerprint.", true)
+                        return
+                    }
+                    if (vaultController.labelExistsForVault(root.devicePath, label)) {
+                        vaultController.notifyUser(
+                            'Display name "' + label + '" is already used for this vault.', true)
+                        return
+                    }
+                    vaultController.beginGrantAccessForVault(root.devicePath, label)
+                }
+
+                Component.onCompleted: refreshAccessList()
+
+                Connections {
+                    target: vaultController
+                    function onVaultAccessListChanged() { accessCard.refreshAccessList() }
+                    function onDevicesChanged() { accessCard.refreshAccessList() }
+                }
+
+                Column {
+                    id: accessCol
+                    anchors.fill: parent
+                    anchors.margins: 14
+                    spacing: 12
+
+                    Text {
+                        text: "Authorized fingerprints"
+                        color: Theme.textPrimary
+                        font { pixelSize: 14; bold: true; family: "Inter" }
+                    }
+
+                    Text {
+                        width: parent.width
+                        wrapMode: Text.Wrap
+                        text: "People who can unlock this vault."
+                        color: Theme.textSecondary
+                        font { pixelSize: 11; family: "Inter" }
+                    }
+
+                    Text {
+                        width: parent.width
+                        visible: accessCard.accessEntries.length === 0
+                        text: "No authorized fingerprints yet."
+                        color: Theme.textMuted
+                        font { pixelSize: 11; family: "Inter" }
+                    }
+
+                    Repeater {
+                        model: accessCard.accessEntries
+                        delegate: Rectangle {
+                            width: parent.width
+                            height: 40
+                            radius: 8
+                            color: Theme.bgOverlay
+                            border.color: Theme.border
+                            border.width: 1
+
+                            Row {
+                                anchors.fill: parent
+                                anchors.leftMargin: 12
+                                anchors.rightMargin: 8
+                                spacing: 8
+
+                                Text {
+                                    width: Math.max(0, parent.width - 120)
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: modelData.label || ("Slot " + modelData.fingerId)
+                                    color: Theme.textPrimary
+                                    font { pixelSize: 12; family: "Inter" }
+                                    elide: Text.ElideRight
+                                }
+
+                                Text {
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    visible: modelData.isOwner
+                                    text: "Owner"
+                                    color: Theme.accent
+                                    font { pixelSize: 10; bold: true; family: "Inter" }
+                                }
+
+                                Item { width: 1; height: 1; anchors.verticalCenter: parent.verticalCenter }
+
+                                Rectangle {
+                                    visible: !modelData.isOwner
+                                    width: removeLbl.implicitWidth + 12
+                                    height: 28
+                                    radius: 14
+                                    color: removeMouse.containsMouse ? Theme.dangerBg : "transparent"
+                                    anchors.verticalCenter: parent.verticalCenter
+
+                                    Text {
+                                        id: removeLbl
+                                        anchors.centerIn: parent
+                                        text: "Remove"
+                                        color: Theme.danger
+                                        font { pixelSize: 11; bold: true; family: "Inter" }
+                                    }
+
+                                    MouseArea {
+                                        id: removeMouse
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        enabled: accessCard.canManageAccess
+                                        cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                                        onClicked: vaultController.beginRevokeAccessForVault(
+                                            root.devicePath, modelData.fingerId)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Text {
+                        width: parent.width
+                        visible: !accessCard.canUseSensor
+                        wrapMode: Text.Wrap
+                        text: "Fingerprint sensor not connected."
+                        color: Theme.textSecondary
+                        font { pixelSize: 11; family: "Inter" }
+                    }
+
+                    Text {
+                        visible: !accessCard.canUseSensor
+                        text: "Open Settings"
+                        color: Theme.accent
+                        font { pixelSize: 11; bold: true; family: "Inter" }
+                        MouseArea {
+                            anchors.fill: parent
+                            anchors.margins: -4
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: vaultController.navigateToPage("Settings.qml")
+                        }
+                    }
+
+                    Text {
+                        width: parent.width
+                        visible: accessCard.atAccessCapacity
+                        text: "Maximum of 4 access entries for this vault."
+                        color: Theme.warning
+                        font { pixelSize: 11; family: "Inter" }
+                    }
+
+                    WizardTextField {
+                        id: grantLabelField
+                        width: parent.width
+                        label: "Display name"
+                    }
+
+                    WizardActionButton {
+                        text: "Add access"
+                        variant: "primary"
+                        enabled: accessCard.canManageAccess && !accessCard.atAccessCapacity
+                        onClicked: accessCard.submitGrantAccess()
                     }
                 }
             }

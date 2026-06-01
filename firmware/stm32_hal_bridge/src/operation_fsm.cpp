@@ -47,6 +47,8 @@ static const unsigned long kEnrollTimeoutMs = 60000;
 static const unsigned long kListTimeoutMs = 60000;
 static const unsigned long kDeleteTimeoutMs = 10000;
 static const unsigned long kKeyWindowMs = 10000;
+/** After owner enroll during setup, host may request key without a second verify. */
+static const unsigned long kPostEnrollKeyWindowMs = 600000;
 static const uint16_t kMaxTemplates = 128; /* AS608 library capacity */
 
 static void deriveVaultKey() {
@@ -459,6 +461,7 @@ void opTick(unsigned long nowMs) {
             return;
         }
         uint8_t pl[1] = {enrollSlot};
+        keyWindowUntilMs = nowMs + kPostEnrollKeyWindowMs;
         halHostSendResult(HAL_RES_SUCCESS, pl, 1);
         goIdle();
         break;

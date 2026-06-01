@@ -69,6 +69,20 @@ Item {
         setupWarningDialog.open()
     }
 
+    function requestDeleteVault(devicePath) {
+        if (!devicePath)
+            return
+        if (vaultController.fingerprintUnlockActive || deleteVaultDialog.visible)
+            return
+        if (!vaultController.isVaultUnlockedForDevice(devicePath)
+                && !vaultController.sensorConnected) {
+            vaultController.notifyUser(
+                "Connect the fingerprint sensor before deleting a locked vault.", true)
+            return
+        }
+        vaultController.beginDeleteVaultBiometricGate(devicePath)
+    }
+
     function openDeleteVault(devicePath) {
         deleteVaultDialog.targetPath = devicePath
         deleteVaultDialog.preview = vaultController.previewDeleteVault(devicePath)
@@ -156,6 +170,9 @@ Item {
             if (activeDetailPath)
                 refreshLayout()
         }
+        function onDeleteVaultGatePassed(devicePath) {
+            vaultManagerPage.openDeleteVault(devicePath)
+        }
     }
 
     Component {
@@ -188,7 +205,7 @@ Item {
             onRenameRequested: vaultManagerPage.openRename(
                 vaultManagerPage.activeDetailPath,
                 deviceData.displayName || deviceData.name || "")
-            onDeleteRequested: vaultManagerPage.openDeleteVault(vaultManagerPage.activeDetailPath)
+            onDeleteRequested: vaultManagerPage.requestDeleteVault(vaultManagerPage.activeDetailPath)
             onSetupEncryptionRequested: vaultManagerPage.openSetupWizard(vaultManagerPage.activeDetailPath)
         }
     }
@@ -579,10 +596,8 @@ Item {
                             width: parent.width
                             wrapMode: Text.Wrap
                             text: vaultController.setupOwnerFingerId > 0
-                                  ? ("Registered on sensor slot #" + vaultController.setupOwnerFingerId)
-                                  : ("Enroll the owner fingerprint on sensor slot #"
-                                     + (setupWarningDialog.setupSession.proposedOwnerSlot || "?")
-                                     + " before continuing.")
+                                  ? "Owner fingerprint registered."
+                                  : "Enroll the owner fingerprint before continuing."
                             color: vaultController.setupOwnerFingerId > 0 ? Theme.success : Theme.textSecondary
                             font { pixelSize: 12; family: "Inter" }
                         }
@@ -616,6 +631,10 @@ Item {
                         from: 16
                         to: 2048
                         value: 1024
+                        hintText: setupWarningDialog.setupSession.valid
+                                  && !setupWarningDialog.canShowNormalStepNow()
+                                  ? "Device is small — setup will encrypt the whole device (no separate normal partition)."
+                                  : ""
                         onValueChanged: {
                             if (!setupWarningDialog.visible)
                                 return
@@ -666,10 +685,8 @@ Item {
                         Text { text: "Vault: " + vaultNameField.text; color: Theme.textPrimary; font { pixelSize: 12 } }
                         Text {
                             text: vaultController.setupOwnerFingerId > 0
-                                  ? ("Owner sensor slot: #" + vaultController.setupOwnerFingerId)
-                                  : ("Owner sensor slot: #"
-                                     + (setupWarningDialog.setupSession.proposedOwnerSlot || "?")
-                                     + " (enroll required)")
+                                  ? "Owner fingerprint: enrolled in step 1"
+                                  : "Owner fingerprint: not enrolled yet"
                             color: Theme.textPrimary
                             font { pixelSize: 12 }
                         }
@@ -730,10 +747,12 @@ Item {
                 normalName = normalStepLoader.item.partitionFields.normalName
                 normalFs = normalStepLoader.item.partitionFields.filesystemCombo.currentText
             }
+            var vaultPartMb = setupWarningDialog.canShowNormalStepNow()
+                              ? parseInt(setupVaultSizeSlider.value) : 0
             vaultController.beginVaultSetupBiometric(
                 setupSession.devicePath,
                 setupSession.requiresForceConfirmation,
-                parseInt(setupVaultSizeSlider.value),
+                vaultPartMb,
                 vaultNameField.text,
                 normalName,
                 normalFs
@@ -742,6 +761,7 @@ Item {
         }
 
         onClosed: {
+            vaultController.clearSetupWizardSession()
             setupSession = { valid: false }
             setupLogicalStep = 0
             if (setupChrome)
@@ -749,9 +769,5 @@ Item {
             if (forceCheckbox)
                 forceCheckbox.checked = false
         }
-    }
-
-    FingerprintWizard {
-        anchors.fill: parent
     }
 }

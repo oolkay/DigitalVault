@@ -17,6 +17,7 @@ Donanım geldiğinde:
 import asyncio
 import argparse
 import logging
+import random
 import os
 import signal
 import sys
@@ -207,21 +208,25 @@ class HardwareSimulator:
         return make_ok_response(key=self._key_manager.key_b64)
 
     async def _emit_scan_events(self, writer, need_remove: bool = False) -> None:
-        """UART event sequence for enroll/verify."""
+        """UART event sequence for enroll/verify (paced for GUI UX testing)."""
+
+        async def pause() -> None:
+            await asyncio.sleep(random.uniform(0.4, 0.8))
+
         for code in (EVT_WAITING_FINGER, EVT_FINGER_DETECTED):
             writer.write(build_packet(code))
             await writer.drain()
-            await asyncio.sleep(0.05)
+            await pause()
         if need_remove:
             writer.write(build_packet(EVT_REMOVE_FINGER))
             await writer.drain()
-            await asyncio.sleep(0.05)
+            await pause()
             writer.write(build_packet(EVT_PLACE_AGAIN))
             await writer.drain()
-            await asyncio.sleep(0.05)
+            await pause()
         writer.write(build_packet(EVT_PROCESSING))
         await writer.drain()
-        await asyncio.sleep(0.1)
+        await pause()
 
     async def handle_uart_packets(self, code: int, payload: bytes, writer) -> None:
         """Process one binary command; write response packets to writer."""
@@ -266,6 +271,7 @@ class HardwareSimulator:
             await self._emit_scan_events(writer, need_remove=True)
             try:
                 fp = self._fingerprint_db.enroll(finger_id, None)
+                self._key_window_until = time.time() + 600.0
                 writer.write(build_packet(RES_SUCCESS, bytes([fp.finger_id])))
             except ValueError as e:
                 msg = str(e)

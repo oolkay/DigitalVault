@@ -121,10 +121,22 @@ int configurePort(int fd)
     if (tcgetattr(fd, &tio) < 0)
         return -1;
     cfmakeraw(&tio);
-    /* PTY (socat) ignores baud; cfsetispeed fails on Linux pseudo-ttys */
+    cfsetispeed(&tio, B115200);
+    cfsetospeed(&tio, B115200);
+    tio.c_cflag &= static_cast<tcflag_t>(~(PARENB | CSTOPB | CSIZE));
+    tio.c_cflag |= static_cast<tcflag_t>(CS8 | CLOCAL | CREAD);
+#ifdef CRTSCTS
+    tio.c_cflag &= static_cast<tcflag_t>(~CRTSCTS);
+#endif
+#ifdef HUPCL
+    tio.c_cflag &= static_cast<tcflag_t>(~HUPCL);
+#endif
+    tio.c_iflag &= static_cast<tcflag_t>(~(IXON | IXOFF | IXANY));
     tio.c_cc[VMIN] = 0;
     tio.c_cc[VTIME] = 1;
-    return tcsetattr(fd, TCSANOW, &tio);
+    if (tcsetattr(fd, TCSANOW, &tio) < 0)
+        return -1;
+    return 0;
 }
 
 } // namespace
@@ -164,6 +176,9 @@ public slots:
 
     void connectPort(const QString &port)
     {
+        if (m_fd >= 0 && m_portPath == port && m_bridge->m_connected)
+            return;
+
         if (m_fd >= 0) {
             if (m_notifier) {
                 m_notifier->setEnabled(false);
@@ -195,8 +210,9 @@ public slots:
             emit m_bridge->connectionLost(QStringLiteral("termios failed"));
             return;
         }
+        (void)::tcflush(m_fd, TCIOFLUSH);
 
-        qInfo() << "SerialBridge: connected to" << port;
+        qInfo() << "SerialBridge: connected to" << port << "@115200";
         m_notifier = new QSocketNotifier(m_fd, QSocketNotifier::Read, this);
         connect(m_notifier, &QSocketNotifier::activated, this, &SerialWorker::onReadyRead);
 
@@ -229,14 +245,16 @@ public slots:
         emit m_bridge->connectionChanged();
     }
 
-    void startVerify()
+    bool startVerify()
     {
         if (!beginOp())
-            return;
+            return false;
         m_op = Op::Verify;
         m_deadlineMs = kVerifyTimeoutMs;
-        writeAll(buildPacket(kCmdVerify));
+        if (!writeCommandOrAbort(buildPacket(kCmdVerify)))
+            return false;
         armDeadline();
+        return true;
     }
 
     void requestKey()
@@ -245,30 +263,34 @@ public slots:
             writeAll(buildPacket(kCmdGetKey));
     }
 
-    void startEnroll(int fingerId)
+    bool startEnroll(int fingerId)
     {
         if (!beginOp())
-            return;
+            return false;
         m_op = Op::Enroll;
         m_pendingEnrollFingerId = fingerId;
         m_deadlineMs = kEnrollTimeoutMs;
         QByteArray pl;
         pl.append(static_cast<char>(fingerId & 0xFF));
-        writeAll(buildPacket(kCmdEnroll, pl));
+        if (!writeCommandOrAbort(buildPacket(kCmdEnroll, pl)))
+            return false;
         armDeadline();
+        return true;
     }
 
-    void deleteFinger(int fingerId)
+    bool deleteFinger(int fingerId)
     {
         if (!beginOp())
-            return;
+            return false;
         m_op = Op::Delete;
         m_deadlineMs = kVerifyTimeoutMs;
         m_pendingDeleteFingerId = fingerId;
         QByteArray pl;
         pl.append(static_cast<char>(fingerId & 0xFF));
-        writeAll(buildPacket(kCmdDelete, pl));
+        if (!writeCommandOrAbort(buildPacket(kCmdDelete, pl)))
+            return false;
         armDeadline();
+        return true;
     }
 
     void listEnrolled()
@@ -277,8 +299,32 @@ public slots:
             return;
         m_op = Op::List;
         m_deadlineMs = kVerifyTimeoutMs;
-        writeAll(buildPacket(kCmdListEnrolled));
+        if (!writeCommandOrAbort(buildPacket(kCmdListEnrolled)))
+            return;
         armDeadline();
+    }
+
+    void cancelInventoryIfRunning()
+    {
+        if (m_op == Op::List)
+            cancelOperation();
+    }
+
+    void forceIdle()
+    {
+        if (m_timer)
+            m_timer->stop();
+        if (m_recoveryTimer)
+            m_recoveryTimer->stop();
+        m_timeoutOp = Op::None;
+        if (m_op != Op::None) {
+            if (m_fd >= 0)
+                writeAll(buildPacket(kCmdCancel));
+            finishOp();
+        } else if (m_bridge->m_busy.load(std::memory_order_acquire)) {
+            m_bridge->setBusy(false);
+        }
+        m_op = Op::None;
     }
 
     void cancelOperation()
@@ -302,19 +348,35 @@ public slots:
 private slots:
     void onReadyRead()
     {
+        if (m_fd < 0)
+            return;
+
         char buf[256];
         for (;;) {
+            struct pollfd pfd;
+            pfd.fd = m_fd;
+            pfd.events = POLLIN;
+            pfd.revents = 0;
+            const int pr = ::poll(&pfd, 1, 0);
+            if (pr < 0) {
+                if (errno != EINTR)
+                    reportLinkLost(QString::fromUtf8(strerror(errno)));
+                return;
+            }
+            if (pr == 0 || !(pfd.revents & POLLIN))
+                break;
+
             const ssize_t n = ::read(m_fd, buf, sizeof(buf));
             if (n < 0) {
                 if (errno == EAGAIN || errno == EWOULDBLOCK)
-                    break;
+                    continue;
                 reportLinkLost(QString::fromUtf8(strerror(errno)));
                 return;
             }
-            if (n == 0) {
-                reportLinkLost(QStringLiteral("device_removed"));
-                return;
-            }
+            /* VMIN=0/VTIME=1 can return 0 without a real unplug — not EOF. */
+            if (n == 0)
+                break;
+
             m_rx.append(buf, static_cast<int>(n));
         }
         processRx();
@@ -330,7 +392,7 @@ private slots:
         }
         struct pollfd pfd;
         pfd.fd = m_fd;
-        pfd.events = POLLIN | POLLERR | POLLHUP;
+        pfd.events = POLLIN;
         pfd.revents = 0;
         const int pr = ::poll(&pfd, 1, 0);
         if (pr < 0) {
@@ -338,13 +400,16 @@ private slots:
                 reportLinkLost(QString::fromUtf8(strerror(errno)));
             return;
         }
-        if (pr > 0 && (pfd.revents & (POLLERR | POLLHUP | POLLNVAL))) {
+        /* Do not treat POLLHUP/POLLERR alone as disconnect — USB serial often
+         * reports modem line changes without a real unplug. read/write paths
+         * detect true I/O failure. */
+        if (pr > 0 && (pfd.revents & POLLNVAL))
             reportLinkLost(QStringLiteral("device_removed"));
-        }
     }
 
     void reportLinkLost(const QString &reason)
     {
+        qWarning() << "SerialBridge: link lost:" << reason;
         if (m_fd < 0 && !m_bridge->m_connected)
             return;
         if (m_linkWatch)
@@ -392,9 +457,12 @@ private slots:
     {
         const Op timed = m_timeoutOp;
         m_timeoutOp = Op::None;
-        resetPort();
+        m_rx.clear();
         if (m_bridge->m_busy.load(std::memory_order_acquire))
             m_bridge->setBusy(false);
+        /* Background inventory must not close/reopen the UART (causes reconnect spam). */
+        if (timed != Op::List)
+            resetPort();
         if (timed == Op::Verify)
             emit m_bridge->verifyCompleted(false, 0, QStringLiteral("Verification timed out"));
         else if (timed == Op::Enroll)
@@ -405,6 +473,28 @@ private slots:
                                             QStringLiteral("Delete timed out"));
         else if (timed == Op::List)
             emit m_bridge->listEnrolledCompleted(false, {}, QStringLiteral("List timed out"));
+    }
+
+    void abortOpWithProtocolError()
+    {
+        const Op was = m_op;
+        if (m_timer)
+            m_timer->stop();
+        m_op = Op::None;
+        m_rx.clear();
+        m_badChecksum = 0;
+        if (m_bridge->m_busy.load(std::memory_order_acquire))
+            m_bridge->setBusy(false);
+        if (was == Op::Verify)
+            emit m_bridge->verifyCompleted(false, 0, QStringLiteral("Sensor protocol error"));
+        else if (was == Op::Enroll)
+            emit m_bridge->enrollCompleted(false, m_pendingEnrollFingerId,
+                                            QStringLiteral("Sensor protocol error"));
+        else if (was == Op::Delete)
+            emit m_bridge->deleteCompleted(false, m_pendingDeleteFingerId,
+                                            QStringLiteral("Sensor protocol error"));
+        else if (was == Op::List)
+            emit m_bridge->listEnrolledCompleted(false, {}, QStringLiteral("Sensor protocol error"));
     }
 
     void resetPort()
@@ -419,34 +509,60 @@ private slots:
             m_fd = -1;
         }
         m_rx.clear();
-        if (!m_portPath.isEmpty())
+        if (!m_portPath.isEmpty()) {
+            qDebug() << "SerialBridge: recovering link on" << m_portPath;
             connectPort(m_portPath);
+        }
     }
 
 private:
     enum class Op { None, Verify, Enroll, Delete, List };
 
-    void writeAll(const QByteArray &data)
+    bool writeAll(const QByteArray &data)
     {
         if (m_fd < 0)
-            return;
+            return false;
         const char *p = data.constData();
         ssize_t left = data.size();
+        int stallRetries = 0;
+        constexpr int kMaxStallRetries = 50;
         while (left > 0) {
             const ssize_t w = ::write(m_fd, p, static_cast<size_t>(left));
             if (w < 0) {
-                if (errno == EAGAIN || errno == EWOULDBLOCK)
-                    break;
+                if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                    if (++stallRetries > kMaxStallRetries)
+                        return false;
+                    struct pollfd pfd;
+                    pfd.fd = m_fd;
+                    pfd.events = POLLOUT;
+                    pfd.revents = 0;
+                    if (::poll(&pfd, 1, 100) <= 0)
+                        return false;
+                    continue;
+                }
                 reportLinkLost(QString::fromUtf8(strerror(errno)));
-                return;
+                return false;
             }
             if (w == 0) {
                 reportLinkLost(QStringLiteral("device_removed"));
-                return;
+                return false;
             }
             p += w;
             left -= w;
+            stallRetries = 0;
         }
+        return true;
+    }
+
+    bool writeCommandOrAbort(const QByteArray &packet)
+    {
+        if (writeAll(packet))
+            return true;
+        if (m_bridge->m_connected)
+            emit m_bridge->operationRejected(
+                QStringLiteral("Could not send command to sensor"));
+        finishOp();
+        return false;
     }
 
     bool beginOp()
@@ -455,8 +571,11 @@ private:
             emit m_bridge->connectionLost(QStringLiteral("port closed"));
             return false;
         }
-        if (m_bridge->m_busy.load(std::memory_order_acquire))
+        if (m_bridge->m_busy.load(std::memory_order_acquire)) {
+            emit m_bridge->operationRejected(
+                QStringLiteral("Sensor is busy — please wait"));
             return false;
+        }
         m_bridge->setBusy(true);
         m_rx.clear();
         return true;
@@ -498,11 +617,14 @@ private:
             m_rx.remove(0, total);
             const QByteArray body = frame.left(frame.size() - 1);
             if (xorChecksum(body) != static_cast<quint8>(frame.at(frame.size() - 1))) {
+                if (m_op == Op::None) {
+                    m_rx.remove(0, 1);
+                    continue;
+                }
                 m_badChecksum++;
                 if (m_badChecksum >= 3) {
-                    m_badChecksum = 0;
-                    emit m_bridge->connectionLost(QStringLiteral("protocol_error"));
-                    resetPort();
+                    qWarning() << "SerialBridge: protocol checksum failures on active op";
+                    abortOpWithProtocolError();
                 }
                 continue;
             }
@@ -631,6 +753,40 @@ void SerialBridge::disconnectPort()
 void SerialBridge::startVerify()
 {
     QMetaObject::invokeMethod(m_worker, "startVerify", Qt::QueuedConnection);
+}
+
+bool SerialBridge::tryStartVerify()
+{
+    if (isBusy())
+        return false;
+    startVerify();
+    return true;
+}
+
+bool SerialBridge::tryStartEnroll(int fingerId)
+{
+    if (isBusy())
+        return false;
+    startEnroll(fingerId);
+    return true;
+}
+
+bool SerialBridge::tryDeleteFinger(int fingerId)
+{
+    if (isBusy())
+        return false;
+    deleteFinger(fingerId);
+    return true;
+}
+
+void SerialBridge::cancelInventoryIfRunning()
+{
+    QMetaObject::invokeMethod(m_worker, "cancelInventoryIfRunning", Qt::QueuedConnection);
+}
+
+void SerialBridge::forceIdle()
+{
+    QMetaObject::invokeMethod(m_worker, "forceIdle", Qt::QueuedConnection);
 }
 
 void SerialBridge::requestKey()

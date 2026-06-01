@@ -2,78 +2,113 @@ import QtQuick
 import QtQuick.Controls
 import DigitalVault
 
-Item {
+// Global biometric overlay (single instance in main.qml). Popup layer sits above Dialogs.
+Popup {
     id: root
-    anchors.fill: parent
-    visible: vaultController.fingerprintUnlockActive
-    z: 300
-
-    ModalScrim {
-        anchors.fill: parent
-        active: root.visible
-        blocking: true
-    }
+    modal: true
+    focus: true
+    padding: 0
+    closePolicy: Popup.NoAutoClose
 
     property int state: 0
 
-    function flowTitle(flow) {
-        switch (flow) {
-        case "setup_enroll": return "Parmak izi kaydı"
-        case "setup_verify": return "Kurulum doğrulaması"
-        case "grant_verify": return "Yetkili doğrulaması (erişim)"
-        case "grant_enroll": return "Yeni parmak izi ekleniyor"
-        case "revoke_verify": return "Yetkili doğrulaması (kaldırma)"
-        case "delete_verify": return "Yetkili doğrulaması (silme)"
-        case "unlock": return "Biyometrik kilit açma"
-        default: return "Parmağınızı sensöre koyun"
+    function syncOpened() {
+        if (vaultController.fingerprintUnlockActive) {
+            if (!opened)
+                open()
+        } else if (opened) {
+            close()
         }
     }
 
-    Rectangle {
-        anchors.centerIn: parent
-        width: Math.min(400, parent.width - 48)
-        radius: Theme.radius
-        color: Theme.bgCard
-        border.color: Theme.border
-        implicitHeight: col.implicitHeight + 40
+    Component.onCompleted: syncOpened()
 
-        Column {
-            id: col
+    function flowTitle(flow) {
+        switch (flow) {
+        case "setup_enroll": return "Fingerprint enrollment"
+        case "setup_find_existing": return "Find existing fingerprint"
+        case "setup_verify": return "Setup verification"
+        case "grant_verify": return "Authorized verification (grant)"
+        case "grant_enroll": return "Enrolling new fingerprint"
+        case "revoke_verify": return "Authorized verification (revoke)"
+        case "delete_verify": return "Authorized verification (delete)"
+        case "unlock": return "Biometric unlock"
+        default: return "Fingerprint"
+        }
+    }
+
+    function headlineText() {
+        const ps = vaultController.fingerprintPromptState
+        if (ps === 1)
+            return "Enrollment complete"
+        if (ps === 2)
+            return "Enrollment failed"
+        if (root.state === 1)
+            return "Fingerprint verified"
+        if (root.state === 2)
+            return "Verification failed"
+        return flowTitle(vaultController.fingerprintFlow)
+    }
+
+    background: Rectangle {
+        anchors.fill: parent
+        color: Qt.rgba(0, 0, 0, 0.65)
+    }
+
+    contentItem: Item {
+        anchors.fill: parent
+
+        Rectangle {
+            id: card
             anchors.centerIn: parent
-            width: parent.width - 40
-            spacing: 16
+            width: Math.min(400, parent.width - 48)
+            radius: Theme.radius
+            color: Theme.bgCard
+            border.color: Theme.border
+            implicitHeight: col.implicitHeight + 40
 
-            Text {
-                width: parent.width
-                horizontalAlignment: Text.AlignHCenter
-                text: {
-                    if (root.state === 1)
-                        return "✓ Parmak izi doğrulandı"
-                    if (root.state === 2)
-                        return "Doğrulama başarısız"
-                    return flowTitle(vaultController.fingerprintFlow)
+            Column {
+                id: col
+                anchors.centerIn: parent
+                width: parent.width - 40
+                spacing: 16
+
+                Text {
+                    width: parent.width
+                    horizontalAlignment: Text.AlignHCenter
+                    text: headlineText()
+                    color: Theme.textPrimary
+                    font { pixelSize: 16; bold: true; family: "Inter" }
                 }
-                color: Theme.textPrimary
-                font { pixelSize: 18; bold: true; family: "Inter" }
-            }
 
-            Text {
-                width: parent.width
-                horizontalAlignment: Text.AlignHCenter
-                wrapMode: Text.Wrap
-                text: vaultController.fingerprintUnlockMessage
-                color: Theme.textSecondary
-                font { pixelSize: 13; family: "Inter" }
-            }
+                Text {
+                    width: parent.width
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.Wrap
+                    text: vaultController.fingerprintUnlockMessage
+                    color: Theme.textPrimary
+                    font { pixelSize: 18; bold: true; family: "Inter" }
+                }
 
-            Row {
-                anchors.horizontalCenter: parent.horizontalCenter
-                spacing: 12
+                Text {
+                    width: parent.width
+                    horizontalAlignment: Text.AlignHCenter
+                    visible: vaultController.fingerprintFlow === "setup_enroll"
+                             && vaultController.fingerprintEnrollStep >= 2
+                             && vaultController.fingerprintPromptState === 0
+                    text: "Step 2 of 2"
+                    color: Theme.textSecondary
+                    font { pixelSize: 12; family: "Inter" }
+                }
 
-                Button {
-                    text: "İptal"
-                    enabled: root.state === 0 && !vaultController.serialBridge.busy
-                    onClicked: vaultController.cancelFingerprintUnlock()
+                Row {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    spacing: 12
+
+                    Button {
+                        text: "Cancel"
+                        onClicked: vaultController.cancelFingerprintUnlock()
+                    }
                 }
             }
         }
@@ -82,7 +117,12 @@ Item {
     Connections {
         target: vaultController
         function onFingerprintUnlockActiveChanged() {
+            root.syncOpened()
             if (vaultController.fingerprintUnlockActive)
+                root.state = 0
+        }
+        function onFingerprintPromptStateChanged() {
+            if (vaultController.fingerprintPromptState === 0)
                 root.state = 0
         }
     }

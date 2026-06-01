@@ -11,6 +11,7 @@
 #include <QSet>
 
 #include <atomic>
+#include <functional>
 
 #include <QtQml/qqmlregistration.h>
 
@@ -34,6 +35,8 @@ class VaultController : public QObject
     Q_PROPERTY(bool fingerprintUnlockActive READ fingerprintUnlockActive NOTIFY fingerprintUnlockActiveChanged)
     Q_PROPERTY(QString fingerprintUnlockMessage READ fingerprintUnlockMessage NOTIFY fingerprintUnlockActiveChanged)
     Q_PROPERTY(QString fingerprintFlow READ fingerprintFlow NOTIFY fingerprintUnlockActiveChanged)
+    Q_PROPERTY(int fingerprintPromptState READ fingerprintPromptState NOTIFY fingerprintPromptStateChanged)
+    Q_PROPERTY(int fingerprintEnrollStep READ fingerprintEnrollStep NOTIFY fingerprintEnrollStepChanged)
     Q_PROPERTY(int setupOwnerFingerId READ setupOwnerFingerId NOTIFY setupOwnerFingerIdChanged)
     Q_PROPERTY(QString setupOwnerLabel READ setupOwnerLabel WRITE setSetupOwnerLabel NOTIFY setupOwnerLabelChanged)
     Q_PROPERTY(QObject *serialBridge READ serialBridgeObject CONSTANT)
@@ -83,6 +86,7 @@ public:
     Q_INVOKABLE void        beginSetupOwnerEnroll(int fingerId);
     Q_INVOKABLE void        beginSetupOwnerEnrollForDevice(const QString &devicePath);
     Q_INVOKABLE void        prepareSetupOwnerSlot(const QString &devicePath);
+    Q_INVOKABLE void        clearSetupWizardSession();
     Q_INVOKABLE int         ownerFingerSlotForDevice(const QString &devicePath) const;
     Q_INVOKABLE int         nextFreeFingerSlot(const QString &excludeDevicePath = QString()) const;
     Q_INVOKABLE bool        beginVaultSetupBiometric(const QString &device, bool force, int vaultSizeMB,
@@ -138,6 +142,8 @@ public:
     bool isToggling() const { return m_isToggling; }
     bool fingerprintUnlockActive() const { return m_fpUnlockActive; }
     QString fingerprintUnlockMessage() const { return m_fpUnlockMessage; }
+    int fingerprintPromptState() const { return m_fpPromptState; }
+    int fingerprintEnrollStep() const { return m_fpEnrollStep; }
     QString fingerprintFlow() const;
     int setupOwnerFingerId() const { return m_setupOwnerFingerId; }
     QString setupOwnerLabel() const { return m_setupOwnerLabel; }
@@ -184,6 +190,8 @@ signals:
     void devicesChanged();
     void togglingChanged();
     void fingerprintUnlockActiveChanged();
+    void fingerprintPromptStateChanged();
+    void fingerprintEnrollStepChanged();
     void setupOwnerFingerIdChanged();
     void setupOwnerLabelChanged();
     void deleteVaultGatePassed(const QString &devicePath);
@@ -202,6 +210,7 @@ private:
     enum class FpFlow {
         None,
         Unlock,
+        SetupFindExisting,
         SetupEnroll,
         SetupVerify,
         GrantVerify,
@@ -224,7 +233,15 @@ private:
     void finishRevokeAfterGate(const QString &devicePath, int fingerId);
     bool appendAccessListEntry(const QString &devicePath, int fingerId, const QString &label, bool isOwner);
     void clearFingerprintFlowState();
+    void beginFingerprintOperationUi(FpFlow flow, const QString &message);
+    void abortFingerprintOperationUi();
+    void endFingerprintOperationUi();
+    void setFingerprintPromptOutcome(int state, const QString &message);
+    static bool isLiveFingerprintFlow(FpFlow flow);
+    bool ensureFingerprintIdle();
+    void cleanupGrantEnrollOrphan();
     int runVaultManagerWithKey(const QStringList &args, const QByteArray &key32, int timeoutMs);
+    QString m_lastVaultManagerOutput;
     void launchSetupAsync(const QString &device, int ownerId, bool force, int vaultSizeMB,
                           const QString &vaultName, const QString &normalName, const QString &normalFs,
                           const QByteArray &key32);
@@ -240,8 +257,11 @@ private:
     void beginSetupOwnerEnrollAfterConnect(int fingerId);
     void beginSetupOwnerEnrollForDeviceAfterConnect(const QString &devicePath);
     void beginFingerprintUnlockAfterConnect();
-    void startOwnerEnrollOnSlot(int fingerId, bool deleteFirst);
+    void beginOwnerEnrollAuto();
+    void beginSetupFindExisting();
+    void beginSetupEnrollAfterNoMatch();
     void onDeleteCompletedForEnroll(bool ok, int fingerId, const QString &err);
+    void onSerialBusyWatchdog();
     QSet<int> collectUsedFingerSlots(const QString &excludeDevicePath) const;
     QSet<int> collectSensorOccupiedSlots() const;
     bool isSlotReferencedInRegistry(int fingerId) const;
@@ -250,8 +270,15 @@ private:
     void saveSensorSlotCache();
     void markSensorSlot(int fingerId, bool occupied);
     void refreshSensorInventory();
+    void scheduleSensorInventoryRefresh();
+    void performSensorInventoryRefresh();
+    void runExclusiveSerialOp(const std::function<void()> &action, bool preemptInventory = true);
+    void runExclusiveSerialOpRetry(int generation, const std::function<void()> &action,
+                                   bool preemptInventory, int elapsedMs);
     void rollbackSetupEnrollAfterVerifyFail(const QString &reason);
     void onListEnrolledCompleted(bool ok, const QList<int> &fingerIds, const QString &err);
+    void startVaultSetupVerify();
+    void requestVaultSetupKeyAfterEnroll();
 
     FpFlow m_fpFlow = FpFlow::None;
     QString m_fpContextDevice;
@@ -262,6 +289,9 @@ private:
     bool m_pendingDeleteBeforeEnroll = false;
     int m_pendingSetupVerifyRollback = -1;
     bool m_pendingEnrollRetryAfterExists = false;
+    bool m_setupOwnerEnrolledThisSession = false;
+    qint64 m_setupEnrollKeyGraceUntilMs = 0;
+    bool m_pendingSetupGetKeyOnly = false;
     mutable QSet<int> m_sensorOccupiedSlots;
     int m_pendingGrantOwnerId = -1;
     int m_pendingGrantFingerId = -1;
@@ -311,6 +341,8 @@ private:
     SerialBridge *m_serialBridge = nullptr;
     bool m_fpUnlockActive = false;
     QString m_fpUnlockMessage;
+    int m_fpPromptState = 0;
+    int m_fpEnrollStep = 0;
     QProcess *m_socatProcess = nullptr;
     int m_serialRetryGeneration = 0;
     QString m_sensorStatus = QStringLiteral("unconfigured");
@@ -319,6 +351,10 @@ private:
     QString m_lastAttemptedPort;
     bool m_startupConnectPhase = true;
     bool m_manualConnectRequested = false;
+    QTimer *m_inventoryRefreshTimer = nullptr;
+    QTimer *m_serialBusyWatchdog = nullptr;
+    int m_serialExclusiveGeneration = 0;
+    bool m_serialConnectQueued = false;
 
     void updateActivity(const QString &msg);
     bool mountVault();

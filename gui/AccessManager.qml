@@ -30,11 +30,6 @@ Item {
         }
     }
 
-    FingerprintWizard {
-        anchors.fill: parent
-        z: 400
-    }
-
     ScrollView {
         anchors.fill: parent
         contentWidth: availableWidth

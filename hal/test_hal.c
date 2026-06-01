@@ -544,12 +544,66 @@ static int run_stress(const char *hal_path, int iterations)
     return (ok_count == iterations) ? 0 : 1;
 }
 
+/** List enrolled slots and delete each (non-interactive factory reset). */
+static int run_wipe_sensor(const char *hal_path)
+{
+    hal_finger_info_t fingers[64];
+    int count = 0;
+    int tpl = 0;
+
+    printf(BOLD "\nHAL wipe-sensor — %s\n" RESET, hal_path);
+
+    int ret = hal_init(hal_path);
+    if (ret != HAL_OK) {
+        printf(RED "hal_init: %s\n" RESET, hal_strerror(ret));
+        print_peer_hint(hal_path);
+        return 1;
+    }
+
+    printf(CYAN "  Listing enrolled templates (may take up to ~2 min)…\n" RESET);
+    fflush(stdout);
+    ret = hal_list_fingers(fingers, 64, &count);
+    if (ret != HAL_OK) {
+        printf(RED "  List failed: %s\n" RESET, hal_strerror(ret));
+        hal_cleanup();
+        return 1;
+    }
+
+    if (count == 0) {
+        printf(GREEN "  No templates on sensor.\n" RESET);
+    } else {
+        printf("  Deleting %d template(s)…\n", count);
+        for (int i = 0; i < count; i++) {
+            const int slot = fingers[i].finger_id;
+            printf("    slot %d … ", slot);
+            fflush(stdout);
+            ret = hal_delete_finger(slot);
+            if (ret == HAL_OK)
+                printf(GREEN "OK\n" RESET);
+            else if (ret == HAL_ERR_NO_MATCH)
+                printf(YELLOW "empty\n" RESET);
+            else
+                printf(RED "%s\n" RESET, hal_strerror(ret));
+        }
+    }
+
+    ret = hal_ping(&tpl);
+    if (ret == HAL_OK)
+        printf(GREEN "  Ping: ~%d template(s) remaining.\n" RESET, tpl);
+    else
+        printf(YELLOW "  Ping: %s\n" RESET, hal_strerror(ret));
+
+    hal_cleanup();
+    return (ret == HAL_OK && tpl == 0) ? 0 : (count == 0 ? 0 : 1);
+}
+
 int main(int argc, char **argv)
 {
     const char *path = "simulator:/tmp/biometric_vault.sock";
     int stress = 0;
     int force_auto = 0;
     int force_interactive = 0;
+    int wipe_sensor = 0;
 
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--stress") == 0 && i + 1 < argc) {
@@ -558,10 +612,15 @@ int main(int argc, char **argv)
             force_auto = 1;
         } else if (strcmp(argv[i], "-i") == 0 || strcmp(argv[i], "--interactive") == 0) {
             force_interactive = 1;
+        } else if (strcmp(argv[i], "--wipe-sensor") == 0) {
+            wipe_sensor = 1;
         } else if (argv[i][0] != '-') {
             path = argv[i];
         }
     }
+
+    if (wipe_sensor)
+        return run_wipe_sensor(path);
 
     const int is_serial = (strstr(path, "serial:") != NULL);
     const int interactive = force_interactive || (is_serial && !force_auto && stress == 0);

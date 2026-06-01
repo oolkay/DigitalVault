@@ -227,8 +227,4 @@ Item {
         anchors.fill: parent
         blurSource: pageContent
     }
-
-    FingerprintWizard {
-        anchors.fill: parent
-    }
 }
