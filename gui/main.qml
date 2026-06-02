@@ -29,8 +29,6 @@ import DigitalVault
     readonly property var navPages: [
         { label: "Dashboard",      icon: "⬡", page: "Dashboard.qml" },
         { label: "Vault Manager",  icon: "🗄", page: "VaultManager.qml" },
-        { label: "Fingerprints",   icon: "☝", page: "FingerprintManager.qml" },
-        { label: "Access Manager", icon: "🔑", page: "AccessManager.qml" },
         { label: "Security Log",   icon: "📋", page: "SecurityLog.qml" },
         { label: "Settings",       icon: "⚙", page: "Settings.qml" }
     ]
@@ -354,11 +352,11 @@ import DigitalVault
                 }
                 function chipTitle() {
                     switch (status) {
-                    case "connected": return "Sensör bağlı"
-                    case "connecting": return "Bağlanıyor…"
+                    case "connected": return "Sensor connected"
+                    case "connecting": return "Connecting…"
                     case "error":
-                    case "disconnected": return "Sensör bağlı değil"
-                    default: return "Port seçilmedi"
+                    case "disconnected": return "Sensor disconnected"
+                    default: return "No port selected"
                     }
                 }
                 function showPortLine() {

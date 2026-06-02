@@ -29,6 +29,7 @@ Rectangle {
     }
 
     ColumnLayout {
+        id: panelLayout
         anchors.fill: parent
         anchors.margins: 28
         spacing: 20
@@ -88,12 +89,42 @@ Rectangle {
                 }
             }
 
-            VaultStatusBadge {
-                isUnlocked: detail.isUnlocked === true
-                isActiveVault: vaultController.isToggling
-                               && (devicePath === vaultController.unlockedDevice
-                                   || (devicePath === vaultController.selectedDevice
-                                       && !detail.isUnlocked))
+            RowLayout {
+                spacing: 10
+                Layout.alignment: Qt.AlignTop | Qt.AlignRight
+
+                Rectangle {
+                    Layout.preferredWidth: editLabel.implicitWidth + 28
+                    Layout.preferredHeight: 34
+                    radius: 17
+                    color: editMouse.containsMouse ? Theme.bgHover : Theme.bgOverlay
+                    border.color: Theme.border
+                    border.width: 1
+
+                    Text {
+                        id: editLabel
+                        anchors.centerIn: parent
+                        text: "Edit"
+                        color: Theme.textPrimary
+                        font { pixelSize: 12; bold: true; family: "Inter" }
+                    }
+
+                    MouseArea {
+                        id: editMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: vaultController.navigateToVaultManagerDetail(devicePath)
+                    }
+                }
+
+                VaultStatusBadge {
+                    isUnlocked: detail.isUnlocked === true
+                    isActiveVault: vaultController.isToggling
+                                   && (devicePath === vaultController.unlockedDevice
+                                       || (devicePath === vaultController.selectedDevice
+                                           && !detail.isUnlocked))
+                }
             }
         }
 
@@ -116,7 +147,7 @@ Rectangle {
             Text {
                 Layout.fillWidth: true
                 wrapMode: Text.Wrap
-                text: "People who can unlock this vault (LUKS keyslots on this device)."
+                text: "People who can unlock this vault."
                 color: Theme.textSecondary
                 font { pixelSize: 11; family: "Inter" }
             }
@@ -147,34 +178,44 @@ Rectangle {
                 }
             }
 
-            Column {
+            ScrollView {
                 Layout.fillWidth: true
-                spacing: 6
-                visible: accessListExpanded && detail.keyslots && detail.keyslots.length > 0
+                visible: accessListExpanded && detail.accessList && detail.accessList.length > 0
+                Layout.preferredHeight: Math.min(accessListCol.implicitHeight, 126)
+                contentWidth: availableWidth
+                clip: true
 
-                Repeater {
-                    model: detail.keyslots || []
-                    delegate: Rectangle {
-                        width: parent.width
-                        height: 36
-                        radius: 8
-                        color: Theme.bgOverlay
-                        border.color: Theme.border
-                        border.width: 1
+                Column {
+                    id: accessListCol
+                    width: parent.width
+                    spacing: 6
 
-                        Row {
-                            anchors { fill: parent; leftMargin: 12; rightMargin: 12 }
-                            spacing: 10
-                            Text {
-                                text: modelData.isOwner ? "👑" : "🔑"
-                                font.pixelSize: 14
-                                anchors.verticalCenter: parent.verticalCenter
-                            }
-                            Text {
-                                text: modelData.label || ("Slot " + modelData.number)
-                                color: Theme.textPrimary
-                                font { pixelSize: 12; family: "Inter" }
-                                anchors.verticalCenter: parent.verticalCenter
+                    Repeater {
+                        model: detail.accessList || []
+                        delegate: Rectangle {
+                            width: accessListCol.width
+                            height: 36
+                            radius: 8
+                            color: Theme.bgOverlay
+                            border.color: Theme.border
+                            border.width: 1
+
+                            Row {
+                                anchors { fill: parent; leftMargin: 12; rightMargin: 12 }
+                                spacing: 10
+                                Text {
+                                    text: modelData.isOwner ? "👑" : "🔑"
+                                    font.pixelSize: 14
+                                    anchors.verticalCenter: parent.verticalCenter
+                                }
+                                Text {
+                                    width: Math.max(0, parent.width - 26)
+                                    text: modelData.label || "Unnamed fingerprint"
+                                    color: Theme.textPrimary
+                                    font { pixelSize: 12; family: "Inter" }
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    elide: Text.ElideRight
+                                }
                             }
                         }
                     }
@@ -182,45 +223,12 @@ Rectangle {
             }
 
             Text {
-                visible: accessListExpanded && (!detail.keyslots || detail.keyslots.length === 0)
+                visible: accessListExpanded && (!detail.accessList || detail.accessList.length === 0)
                 text: "No one in the access list yet."
                 color: Theme.textMuted
                 font { pixelSize: 11; family: "Inter" }
             }
 
-            Rectangle {
-                Layout.fillWidth: true
-                Layout.preferredHeight: 36
-                radius: 8
-                color: manageMouse.containsMouse ? Theme.accentGlow : "transparent"
-                border.color: manageMouse.containsMouse ? Theme.accent : "transparent"
-                border.width: 1
-
-                Row {
-                    id: manageRow
-                    anchors.centerIn: parent
-                    spacing: 6
-                    Text {
-                        text: "Manage access"
-                        color: manageMouse.containsMouse ? Theme.accentHover : Theme.accent
-                        font { pixelSize: 12; bold: true; underline: true; family: "Inter" }
-                    }
-                    Text {
-                        text: "→"
-                        color: manageMouse.containsMouse ? Theme.accentHover : Theme.accent
-                        font { pixelSize: 12; family: "Inter" }
-                    }
-                }
-
-                MouseArea {
-                    id: manageMouse
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    z: 1
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: vaultController.navigateToPage("AccessManager.qml")
-                }
-            }
         }
 
         Item { Layout.fillHeight: true }

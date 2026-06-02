@@ -70,7 +70,7 @@ Item {
 
                     Text {
                         id: sensorBannerLink
-                        text: "Ayarlara git"
+                        text: "Open settings"
                         color: Theme.accent
                         font { pixelSize: 12; bold: true; family: "Inter" }
 
@@ -190,7 +190,7 @@ Item {
                 VaultDetailPanel {
                     id: detailPanel
                     Layout.fillWidth: true
-                    Layout.preferredHeight: Math.max(420, implicitHeight)
+                    Layout.preferredHeight: 420
                     Layout.alignment: Qt.AlignTop
                     devicePath: vaultController.selectedDevice
                     visible: vaultController.isSelectedDeviceVault

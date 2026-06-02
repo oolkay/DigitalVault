@@ -175,7 +175,7 @@ Item {
                 // ── Parmak izi sensörü ───────────────────────────
                 SettingsSection {
                     id: sensorSection
-                    title: "Parmak izi sensörü"
+                    title: "Fingerprint sensor"
                     icon: "H"
                     width: parent.width
 
@@ -214,7 +214,7 @@ Item {
                     function connectSensor() {
                         const path = selectedPortPath()
                         if (path.length === 0) {
-                            vaultController.notifyUser("Seri port seçin veya girin", true)
+                            vaultController.notifyUser("Select or enter a serial port.", true)
                             return
                         }
                         vaultController.connectToConfiguredPort(path)
@@ -224,7 +224,7 @@ Item {
 
                     SettingsRow {
                         width: parent.width
-                        label: "Bağlantı durumu"
+                        label: "Connection status"
                         description: {
                             var d = vaultController.sensorStatusText
                             if (vaultController.sensorPortPath.length > 0)
@@ -250,13 +250,13 @@ Item {
                             bottomPadding: 8
 
                             Text {
-                                text: "Seri port"
+                                text: "Serial port"
                                 color: Theme.textPrimary
                                 font { pixelSize: 13; bold: true; family: "Inter" }
                             }
                             Text {
                                 width: parent.width
-                                text: "STM32 UART (ör. /dev/ttyUSB0). Listeden seçin veya özel yol girin."
+                                text: "STM32 UART, for example /dev/ttyUSB0. Choose a port from the list or enter a custom path."
                                 color: Theme.textSecondary
                                 font { pixelSize: 11; family: "Inter" }
                                 wrapMode: Text.Wrap
@@ -266,7 +266,7 @@ Item {
                                 id: portCombo
                                 width: parent.width
                                 model: []
-                                readonly property string portPlaceholder: "Port seçin…"
+                                readonly property string portPlaceholder: "Select a port…"
                                 displayText: currentIndex >= 0 && model.length > 0
                                     ? model[currentIndex] : portPlaceholder
 
@@ -328,7 +328,7 @@ Item {
                             WizardTextField {
                                 id: customPortField
                                 width: parent.width
-                                label: "Özel port (isteğe bağlı, örn. /dev/ttyUSB0)"
+                                label: "Custom port (optional, for example /dev/ttyUSB0)"
                             }
 
                             Row {
@@ -336,12 +336,12 @@ Item {
                                 spacing: 10
 
                                 WizardActionButton {
-                                    text: "Yenile"
+                                    text: "Refresh"
                                     variant: "secondary"
                                     onClicked: sensorSection.refreshPortList()
                                 }
                                 WizardActionButton {
-                                    text: "Bağlan"
+                                    text: "Connect"
                                     variant: "primary"
                                     onClicked: sensorSection.connectSensor()
                                 }
@@ -351,8 +351,8 @@ Item {
 
                     SettingsRow {
                         width: parent.width
-                        label: "USB otomatik bul"
-                        description: "Açılışta /dev/ttyUSB* ve ttyACM* taranır (kapalıyken yalnızca kayıtlı port)"
+                        label: "Auto-detect USB"
+                        description: "Scan /dev/ttyUSB* and ttyACM* at startup. When disabled, only the saved port is used."
                         control: ToggleSwitch {
                             checked: vaultController.autoDetectUsb
                             onToggled: function(enabled) {

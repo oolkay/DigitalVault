@@ -10,8 +10,6 @@ Popup {
     padding: 0
     closePolicy: Popup.NoAutoClose
 
-    property int state: 0
-
     function syncOpened() {
         if (vaultController.fingerprintUnlockActive) {
             if (!opened)
@@ -23,16 +21,22 @@ Popup {
 
     Component.onCompleted: syncOpened()
 
+    function isEnrollFlow() {
+        return vaultController.fingerprintFlow === "setup_enroll"
+               || vaultController.fingerprintFlow === "grant_enroll"
+    }
+
     function flowTitle(flow) {
         switch (flow) {
-        case "setup_enroll": return "Fingerprint enrollment"
-        case "setup_find_existing": return "Find existing fingerprint"
-        case "setup_verify": return "Setup verification"
-        case "grant_verify": return "Authorized verification (grant)"
-        case "grant_enroll": return "Enrolling new fingerprint"
-        case "revoke_verify": return "Authorized verification (revoke)"
-        case "delete_verify": return "Authorized verification (delete)"
-        case "unlock": return "Biometric unlock"
+        case "setup_find_existing": return "Check existing fingerprint"
+        case "setup_enroll": return "Add owner fingerprint"
+        case "setup_verify": return "Confirm setup"
+        case "grant_verify": return "Confirm current access"
+        case "grant_find_existing": return "Scan fingerprint to add"
+        case "grant_enroll": return "Add new fingerprint"
+        case "revoke_verify": return "Confirm removal"
+        case "delete_verify": return "Confirm deletion"
+        case "unlock": return "Unlock vault"
         default: return "Fingerprint"
         }
     }
@@ -40,14 +44,75 @@ Popup {
     function headlineText() {
         const ps = vaultController.fingerprintPromptState
         if (ps === 1)
-            return "Enrollment complete"
+            return isEnrollFlow() ? "Fingerprint added" : "Fingerprint verified"
         if (ps === 2)
-            return "Enrollment failed"
-        if (root.state === 1)
-            return "Fingerprint verified"
-        if (root.state === 2)
-            return "Verification failed"
+            return isEnrollFlow() ? "Fingerprint not added" : "Verification failed"
         return flowTitle(vaultController.fingerprintFlow)
+    }
+
+    function statusText() {
+        const ps = vaultController.fingerprintPromptState
+        const msg = vaultController.fingerprintUnlockMessage
+        if (ps === 1)
+            return isEnrollFlow() ? "Complete" : "Verified"
+        if (ps === 2)
+            return "Try again"
+        if (!isEnrollFlow())
+            return "Waiting for touch"
+
+        const lower = msg.toLowerCase()
+        if (lower.indexOf("remove") >= 0)
+            return "Lift finger"
+        if (vaultController.fingerprintEnrollStep >= 2)
+            return "Second scan"
+        if (vaultController.fingerprintEnrollStep >= 1)
+            return "First scan"
+        return "Get ready"
+    }
+
+    function helperText() {
+        const ps = vaultController.fingerprintPromptState
+        if (ps === 1)
+            return "You can continue."
+        if (ps === 2)
+            return "Cancel and start again when you are ready."
+        const flow = vaultController.fingerprintFlow
+        if (flow === "grant_verify")
+            return "This confirms you can manage access for this vault."
+        if (flow === "grant_find_existing")
+            return "If this fingerprint is already saved, it will be linked to this vault."
+        if (flow === "grant_enroll")
+            return "This is the new fingerprint being added. Use the same finger for both scans."
+        if (isEnrollFlow())
+            return "Use the same finger for both scans."
+        return "Touch the sensor with an authorized finger."
+    }
+
+    function statusColor() {
+        const ps = vaultController.fingerprintPromptState
+        if (ps === 1)
+            return Theme.success
+        if (ps === 2)
+            return Theme.danger
+        return Theme.accent
+    }
+
+    function statusBg() {
+        const ps = vaultController.fingerprintPromptState
+        if (ps === 1)
+            return Theme.successBg
+        if (ps === 2)
+            return Theme.dangerBg
+        return Theme.accentGlow
+    }
+
+    function iconText() {
+        const ps = vaultController.fingerprintPromptState
+        if (ps === 1)
+            return "✓"
+        if (ps === 2)
+            return "!"
+        return "☝"
     }
 
     background: Rectangle {
@@ -61,52 +126,115 @@ Popup {
         Rectangle {
             id: card
             anchors.centerIn: parent
-            width: Math.min(400, parent.width - 48)
+            width: Math.min(460, Math.max(320, parent.width - 48))
             radius: Theme.radius
             color: Theme.bgCard
             border.color: Theme.border
-            implicitHeight: col.implicitHeight + 40
+            border.width: 1
+            implicitHeight: col.implicitHeight + 44
 
             Column {
                 id: col
                 anchors.centerIn: parent
-                width: parent.width - 40
+                width: parent.width - 44
                 spacing: 16
 
-                Text {
-                    width: parent.width
-                    horizontalAlignment: Text.AlignHCenter
-                    text: headlineText()
-                    color: Theme.textPrimary
-                    font { pixelSize: 16; bold: true; family: "Inter" }
-                }
-
-                Text {
-                    width: parent.width
-                    horizontalAlignment: Text.AlignHCenter
-                    wrapMode: Text.Wrap
-                    text: vaultController.fingerprintUnlockMessage
-                    color: Theme.textPrimary
-                    font { pixelSize: 18; bold: true; family: "Inter" }
-                }
-
-                Text {
-                    width: parent.width
-                    horizontalAlignment: Text.AlignHCenter
-                    visible: vaultController.fingerprintFlow === "setup_enroll"
-                             && vaultController.fingerprintEnrollStep >= 2
-                             && vaultController.fingerprintPromptState === 0
-                    text: "Step 2 of 2"
-                    color: Theme.textSecondary
-                    font { pixelSize: 12; family: "Inter" }
-                }
-
-                Row {
+                Rectangle {
                     anchors.horizontalCenter: parent.horizontalCenter
-                    spacing: 12
+                    width: 64
+                    height: 64
+                    radius: 32
+                    color: statusBg()
+                    border.color: statusColor()
+                    border.width: 1
 
-                    Button {
+                    Text {
+                        anchors.centerIn: parent
+                        text: iconText()
+                        color: statusColor()
+                        font { pixelSize: 28; bold: true; family: "Inter" }
+                    }
+                }
+
+                Column {
+                    width: parent.width
+                    spacing: 6
+
+                    Text {
+                        width: parent.width
+                        horizontalAlignment: Text.AlignHCenter
+                        text: headlineText()
+                        color: Theme.textPrimary
+                        font { pixelSize: 18; bold: true; family: "Inter" }
+                        wrapMode: Text.Wrap
+                    }
+
+                    Text {
+                        width: parent.width
+                        horizontalAlignment: Text.AlignHCenter
+                        wrapMode: Text.Wrap
+                        text: vaultController.fingerprintUnlockMessage
+                        color: Theme.textPrimary
+                        font { pixelSize: 14; bold: true; family: "Inter" }
+                    }
+                }
+
+                Rectangle {
+                    width: parent.width
+                    height: 44
+                    radius: 8
+                    color: Theme.bgOverlay
+                    border.color: Theme.border
+                    border.width: 1
+
+                    Row {
+                        anchors.fill: parent
+                        anchors.leftMargin: 14
+                        anchors.rightMargin: 14
+                        spacing: 10
+
+                        Text {
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: 110
+                            text: statusText()
+                            color: statusColor()
+                            font { pixelSize: 12; bold: true; family: "Inter" }
+                            elide: Text.ElideRight
+                        }
+
+                        Text {
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: Math.max(0, parent.width - 120)
+                            wrapMode: Text.Wrap
+                            text: helperText()
+                            color: Theme.textSecondary
+                            font { pixelSize: 12; family: "Inter" }
+                        }
+                    }
+                }
+
+                Rectangle {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    width: cancelLbl.implicitWidth + 28
+                    height: 36
+                    radius: 18
+                    color: cancelMouse.containsMouse ? Theme.bgHover : Theme.bgOverlay
+                    border.color: Theme.border
+                    border.width: 1
+
+                    Text {
+                        id: cancelLbl
+                        anchors.centerIn: parent
                         text: "Cancel"
+                        color: Theme.textPrimary
+                        font { pixelSize: 12; bold: true; family: "Inter" }
+                    }
+
+                    MouseArea {
+                        id: cancelMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
                         onClicked: vaultController.cancelFingerprintUnlock()
                     }
                 }
@@ -116,14 +244,6 @@ Popup {
 
     Connections {
         target: vaultController
-        function onFingerprintUnlockActiveChanged() {
-            root.syncOpened()
-            if (vaultController.fingerprintUnlockActive)
-                root.state = 0
-        }
-        function onFingerprintPromptStateChanged() {
-            if (vaultController.fingerprintPromptState === 0)
-                root.state = 0
-        }
+        function onFingerprintUnlockActiveChanged() { root.syncOpened() }
     }
 }

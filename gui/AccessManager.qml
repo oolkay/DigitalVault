@@ -6,12 +6,12 @@ import DigitalVault
 Item {
     id: accessPage
 
-    property var keyslotList: []
+    property var accessEntries: []
     property bool isLoading: false
 
     function refreshSlots() {
         isLoading = true
-        keyslotList = vaultController.accessListForDevice(vaultController.selectedDevice)
+        accessEntries = vaultController.accessListForDevice(vaultController.selectedDevice)
         isLoading = false
     }
 
@@ -54,7 +54,7 @@ Item {
                     Behavior on color { ColorAnimation { duration: 250 } }
                 }
                 Text {
-                    text: "Manage who can unlock the selected vault. Access is stored in the PC registry (no LUKS keyslot changes)."
+                    text: "Manage who can unlock the selected vault."
                     color: Theme.textSecondary
                     font { pixelSize: 13; family: "Inter" }
                     width: parent.width
@@ -166,7 +166,7 @@ Item {
                                     font { pixelSize: 14; bold: true; family: "Inter" }
                                 }
                                 Text {
-                                    text: "To grant access to someone else, you must first verify your identity. Please enter your Owner Fingerprint ID and scan your finger."
+                                    text: "To grant access to someone else, first verify your identity with the owner fingerprint."
                                     color: Theme.textSecondary
                                     font { pixelSize: 12; family: "Inter" }
                                     width: parent.width
@@ -177,7 +177,7 @@ Item {
                                     spacing: 16
                                     Column {
                                         spacing: 6
-                                        Text { text: "Owner ID"; color: Theme.textSecondary; font { pixelSize: 11; bold: true; family: "Inter" } }
+                                        Text { text: "Owner fingerprint"; color: Theme.textSecondary; font { pixelSize: 11; bold: true; family: "Inter" } }
                                         Rectangle {
                                             width: 100; height: 38; radius: 8
                                             color: Theme.bgInput
@@ -250,7 +250,7 @@ Item {
                                     Column {
                                         spacing: 6
                                         Layout.preferredWidth: 100
-                                        Text { text: "New Finger ID"; color: Theme.textSecondary; font { pixelSize: 11; bold: true; family: "Inter" } }
+                                        Text { text: "New fingerprint"; color: Theme.textSecondary; font { pixelSize: 11; bold: true; family: "Inter" } }
                                         Rectangle {
                                             width: parent.width; height: 38; radius: 8
                                             color: Theme.bgInput
@@ -270,7 +270,7 @@ Item {
                                     Column {
                                         spacing: 6
                                         Layout.fillWidth: true
-                                        Text { text: "Alias / Description (e.g., 'Ömer Sol Parmak')"; color: Theme.textSecondary; font { pixelSize: 11; bold: true; family: "Inter" } }
+                                        Text { text: "Alias / Description (e.g., 'Left Hand Point')"; color: Theme.textSecondary; font { pixelSize: 11; bold: true; family: "Inter" } }
                                         Rectangle {
                                             width: parent.width; height: 38; radius: 8
                                             color: Theme.bgInput
@@ -374,7 +374,7 @@ Item {
                                 Text {
                                     id: countLabel
                                     anchors.centerIn: parent
-                                    text: accessPage.keyslotList.length
+                                    text: accessPage.accessEntries.length
                                     color: "white"
                                     font { pixelSize: 11; bold: true }
                                 }
@@ -412,7 +412,7 @@ Item {
                         spacing: 8
 
                         Repeater {
-                            model: accessPage.keyslotList
+                            model: accessPage.accessEntries
 
                             delegate: Rectangle {
                                 width: parent.width
@@ -453,7 +453,7 @@ Item {
                                             Behavior on color { ColorAnimation { duration: 250 } }
                                         }
                                         Text {
-                                            text: "Slot " + modelData.number + " • " + modelData.type
+                                            text: modelData.isOwner ? "Owner fingerprint" : "Additional fingerprint"
                                             color: Theme.textMuted
                                             font { pixelSize: 11; family: "Inter" }
                                             Behavior on color { ColorAnimation { duration: 250 } }
@@ -518,7 +518,7 @@ Item {
                             color: Theme.bgOverlay
                             border.color: Theme.border
                             border.width: 1
-                            visible: accessPage.keyslotList.length === 0
+                            visible: accessPage.accessEntries.length === 0
                             Behavior on color { ColorAnimation { duration: 250 } }
 
                             Column {
@@ -531,7 +531,7 @@ Item {
                                 }
                                 Text {
                                     anchors.horizontalCenter: parent.horizontalCenter
-                                    text: "No keyslots found. Setup your vault first."
+                                    text: "No authorized fingerprints yet. Set up your vault first."
                                     color: Theme.textMuted
                                     font { pixelSize: 13; family: "Inter" }
                                     Behavior on color { ColorAnimation { duration: 250 } }
@@ -578,7 +578,7 @@ Item {
 
             Text {
                 width: parent.width
-                text: "Are you sure you want to revoke keyslot " + revokeConfirmDialog.slotNum + "?"
+                text: "Are you sure you want to remove this fingerprint?"
                 color: Theme.textPrimary
                 font { pixelSize: 14; family: "Inter" }
                 horizontalAlignment: Text.AlignHCenter

@@ -74,6 +74,10 @@ Item {
             return
         if (vaultController.fingerprintUnlockActive || deleteVaultDialog.visible)
             return
+        if (!vaultController.deleteVaultRequiresBiometric(devicePath)) {
+            openDeleteVault(devicePath)
+            return
+        }
         if (!vaultController.isVaultUnlockedForDevice(devicePath)
                 && !vaultController.sensorConnected) {
             vaultController.notifyUser(
@@ -119,7 +123,14 @@ Item {
                 PropertyAnimation { property: "y"; from: 0; to: 8; duration: 140 }
             }
 
-            Component.onCompleted: vmStack.push(homeComp)
+            Component.onCompleted: {
+                vmStack.push(homeComp)
+                Qt.callLater(function() {
+                    const pendingPath = vaultController.takePendingVaultManagerDetailPath()
+                    if (pendingPath)
+                        vaultManagerPage.openVaultDetail(pendingPath)
+                })
+            }
         }
     }
 
@@ -534,6 +545,7 @@ Item {
                 return
             setupChrome.resultText.visible = false
             vaultNameField.text = setupSession.defaultVaultName || "My Vault"
+            ownerFingerprintNameField.text = vaultController.setupOwnerLabel || ""
             if (setupSession.devicePath)
                 vaultController.prepareSetupOwnerSlot(setupSession.devicePath)
             if (normalStepLoader.item) {
@@ -592,12 +604,22 @@ Item {
                         width: parent.width
                         spacing: 8
                         WizardFieldLabel { label: "Owner fingerprint" }
+                        WizardTextField {
+                            id: ownerFingerprintNameField
+                            width: parent.width
+                            label: "Fingerprint name"
+                            placeholderText: "Left Hand Point"
+                            text: vaultController.setupOwnerLabel
+                            onTextChanged: vaultController.setupOwnerLabel = text
+                        }
                         Text {
                             width: parent.width
                             wrapMode: Text.Wrap
                             text: vaultController.setupOwnerFingerId > 0
-                                  ? "Owner fingerprint registered."
-                                  : "Enroll the owner fingerprint before continuing."
+                                  ? (vaultController.setupOwnerLabel.length > 0
+                                     ? "Owner fingerprint registered as " + vaultController.setupOwnerLabel + "."
+                                     : "Owner fingerprint registered. Add a name before continuing.")
+                                  : "Enter a name, then enroll the owner fingerprint."
                             color: vaultController.setupOwnerFingerId > 0 ? Theme.success : Theme.textSecondary
                             font { pixelSize: 12; family: "Inter" }
                         }
@@ -619,8 +641,15 @@ Item {
                                 anchors.fill: parent
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
-                                onClicked: vaultController.beginSetupOwnerEnrollForDevice(
-                                               setupWarningDialog.setupSession.devicePath)
+                                onClicked: {
+                                    if (ownerFingerprintNameField.text.trim().length === 0) {
+                                        vaultController.notifyUser("Enter a fingerprint name before enrolling.", true)
+                                        return
+                                    }
+                                    vaultController.setupOwnerLabel = ownerFingerprintNameField.text.trim()
+                                    vaultController.beginSetupOwnerEnrollForDevice(
+                                        setupWarningDialog.setupSession.devicePath)
+                                }
                             }
                         }
                     }
@@ -685,7 +714,7 @@ Item {
                         Text { text: "Vault: " + vaultNameField.text; color: Theme.textPrimary; font { pixelSize: 12 } }
                         Text {
                             text: vaultController.setupOwnerFingerId > 0
-                                  ? "Owner fingerprint: enrolled in step 1"
+                                  ? "Owner fingerprint: " + vaultController.setupOwnerLabel
                                   : "Owner fingerprint: not enrolled yet"
                             color: Theme.textPrimary
                             font { pixelSize: 12 }
@@ -725,17 +754,28 @@ Item {
 
         function handlePrimary() {
             if (setupLogicalStep < setupStepCount - 1) {
+                if (setupLogicalStep === 0
+                        && ownerFingerprintNameField.text.trim().length === 0) {
+                    vaultController.notifyUser("Enter a fingerprint name before continuing.", true)
+                    return
+                }
                 if (setupLogicalStep === 0 && vaultController.setupOwnerFingerId < 1) {
                     vaultController.notifyUser("Enroll the owner fingerprint before continuing.", true)
                     return
                 }
+                vaultController.setupOwnerLabel = ownerFingerprintNameField.text.trim()
                 applyLogicalStep(setupLogicalStep + 1)
+                return
+            }
+            if (ownerFingerprintNameField.text.trim().length === 0) {
+                vaultController.notifyUser("Enter a fingerprint name before setup.", true)
                 return
             }
             if (vaultController.setupOwnerFingerId < 1) {
                 vaultController.notifyUser("Enroll the owner fingerprint before setup.", true)
                 return
             }
+            vaultController.setupOwnerLabel = ownerFingerprintNameField.text.trim()
             if (!forceCheckbox.checked) {
                 vaultController.notifyUser(
                     "You must confirm that all data on the device will be erased.", true)

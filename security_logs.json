@@ -1,6 +1,391 @@
 [
     {
         "level": "SUCCESS",
+        "message": "Vault locked. Encryption keys cleared from kernel.",
+        "time": "2026-06-02 21:44:07"
+    },
+    {
+        "level": "INFO",
+        "message": "Locking vault and clearing kernel keys...",
+        "time": "2026-06-02 21:44:07"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault unlocked via biometric",
+        "time": "2026-06-02 21:44:03"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault locked. Encryption keys cleared from kernel.",
+        "time": "2026-06-02 21:37:10"
+    },
+    {
+        "level": "INFO",
+        "message": "Locking vault and clearing kernel keys...",
+        "time": "2026-06-02 21:37:10"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault unlocked via biometric",
+        "time": "2026-06-02 21:37:06"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault locked. Encryption keys cleared from kernel.",
+        "time": "2026-06-02 21:25:29"
+    },
+    {
+        "level": "INFO",
+        "message": "Locking vault and clearing kernel keys...",
+        "time": "2026-06-02 21:25:29"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault unlocked via biometric",
+        "time": "2026-06-02 21:25:17"
+    },
+    {
+        "level": "INFO",
+        "message": "Renamed vault display name: denemekasa",
+        "time": "2026-06-02 21:25:05"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault locked. Encryption keys cleared from kernel.",
+        "time": "2026-06-02 21:24:28"
+    },
+    {
+        "level": "INFO",
+        "message": "Locking vault and clearing kernel keys...",
+        "time": "2026-06-02 21:24:28"
+    },
+    {
+        "level": "WARNING",
+        "message": "Inactivity timeout reached. Auto-locking vault...",
+        "time": "2026-06-02 21:24:28"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault unlocked via biometric",
+        "time": "2026-06-02 21:23:28"
+    },
+    {
+        "level": "INFO",
+        "message": "Auto-lock timeout changed to 1 minutes",
+        "time": "2026-06-02 21:23:14"
+    },
+    {
+        "level": "CRITICAL",
+        "message": "Sensor disconnected — emergency locking vault.",
+        "time": "2026-06-02 21:22:39"
+    },
+    {
+        "level": "INFO",
+        "message": "Opened vault in file manager",
+        "time": "2026-06-02 21:22:21"
+    },
+    {
+        "level": "INFO",
+        "message": "Opened terminal at /home/oolkay/VaultMount",
+        "time": "2026-06-02 21:22:19"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault unlocked via biometric",
+        "time": "2026-06-02 21:22:12"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault locked. Encryption keys cleared from kernel.",
+        "time": "2026-06-02 21:00:12"
+    },
+    {
+        "level": "INFO",
+        "message": "Locking vault and clearing kernel keys...",
+        "time": "2026-06-02 21:00:12"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault unlocked via biometric",
+        "time": "2026-06-02 20:59:28"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault setup complete: /dev/loop18",
+        "time": "2026-06-02 20:57:59"
+    },
+    {
+        "level": "INFO",
+        "message": "Formatting new encrypted vault on: /dev/loop18",
+        "time": "2026-06-02 20:57:40"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Loop device ready: /dev/loop18 (/home/oolkay/.local/share/DigitalVault/containers/denemeloopdevice.img)",
+        "time": "2026-06-02 20:57:04"
+    },
+    {
+        "level": "INFO",
+        "message": "Creating container: /home/oolkay/.local/share/DigitalVault/containers/denemeloopdevice.img",
+        "time": "2026-06-02 20:57:04"
+    },
+    {
+        "level": "ERROR",
+        "message": "losetup: /dev/loop18: detach failed: No such device or address\n[vault_manager] destroyloop: losetup -d failed",
+        "time": "2026-06-02 20:56:45"
+    },
+    {
+        "level": "INFO",
+        "message": "Deleting loop vault: /dev/loop18",
+        "time": "2026-06-02 20:56:45"
+    },
+    {
+        "level": "ERROR",
+        "message": "[vault_manager] Create partition table failed (command: parted)\n[vault_manager] Hint: close apps using /dev/loop18; for loop devices recreate the container.\n[vault_manager] ═══════════════════════════════════════\n[vault_manager] Setting up new vault on: /dev/loop18 \n[vault_manager]   Vault Name  : denemekasa\n[vault_manager]   Normal Name : Normal\n[vault_manager]   Normal FS   : exfat\n[vault_manager] ═══════════════════════════════════════\n[vault_manager] Scanning device: /dev/loop18\n[vault_manager] STATUS: Device appears empty. Safe to format.\n[vault_manager] Partitioning device: /dev/loop18 (Vault: 200 MB, device 0 MB)",
+        "time": "2026-06-02 20:56:20"
+    },
+    {
+        "level": "INFO",
+        "message": "Formatting new encrypted vault on: /dev/loop18",
+        "time": "2026-06-02 20:56:20"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Loop device ready: /dev/loop18 (/home/oolkay/.local/share/DigitalVault/containers/denemeloop.img)",
+        "time": "2026-06-02 19:31:49"
+    },
+    {
+        "level": "INFO",
+        "message": "Creating container: /home/oolkay/.local/share/DigitalVault/containers/denemeloop.img",
+        "time": "2026-06-02 19:31:49"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault setup complete: /dev/loop18",
+        "time": "2026-06-02 19:18:39"
+    },
+    {
+        "level": "INFO",
+        "message": "Formatting new encrypted vault on: /dev/loop18",
+        "time": "2026-06-02 19:18:22"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Loop device ready: /dev/loop18 (/home/oolkay/.local/share/DigitalVault/containers/myvault223.img)",
+        "time": "2026-06-02 19:17:24"
+    },
+    {
+        "level": "INFO",
+        "message": "Creating container: /home/oolkay/.local/share/DigitalVault/containers/myvault223.img",
+        "time": "2026-06-02 19:17:24"
+    },
+    {
+        "level": "INFO",
+        "message": "Renamed vault display name: demokasa",
+        "time": "2026-06-02 18:58:14"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault setup complete: /dev/loop20",
+        "time": "2026-06-02 18:57:45"
+    },
+    {
+        "level": "INFO",
+        "message": "Formatting new encrypted vault on: /dev/loop20",
+        "time": "2026-06-02 18:57:26"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Loop device ready: /dev/loop20 (/home/oolkay/.local/share/DigitalVault/containers/demovault.img)",
+        "time": "2026-06-02 18:55:52"
+    },
+    {
+        "level": "INFO",
+        "message": "Creating container: /home/oolkay/.local/share/DigitalVault/containers/demovault.img",
+        "time": "2026-06-02 18:55:52"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault setup complete: /dev/loop19",
+        "time": "2026-06-02 18:40:42"
+    },
+    {
+        "level": "INFO",
+        "message": "Formatting new encrypted vault on: /dev/loop19",
+        "time": "2026-06-02 18:40:22"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Loop device ready: /dev/loop19 (/home/oolkay/.local/share/DigitalVault/containers/myvaul10.img)",
+        "time": "2026-06-02 18:39:54"
+    },
+    {
+        "level": "INFO",
+        "message": "Creating container: /home/oolkay/.local/share/DigitalVault/containers/myvaul10.img",
+        "time": "2026-06-02 18:39:54"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault unlocked via biometric",
+        "time": "2026-06-02 18:39:19"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault setup complete: /dev/loop18",
+        "time": "2026-06-02 18:39:07"
+    },
+    {
+        "level": "INFO",
+        "message": "Formatting new encrypted vault on: /dev/loop18",
+        "time": "2026-06-02 18:38:57"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Loop device ready: /dev/loop18 (/home/oolkay/.local/share/DigitalVault/containers/myvault3.img)",
+        "time": "2026-06-02 18:37:39"
+    },
+    {
+        "level": "INFO",
+        "message": "Creating container: /home/oolkay/.local/share/DigitalVault/containers/myvault3.img",
+        "time": "2026-06-02 18:37:38"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Deleted vault: /dev/loop18",
+        "time": "2026-06-02 18:37:21"
+    },
+    {
+        "level": "INFO",
+        "message": "Deleting loop vault: /dev/loop18",
+        "time": "2026-06-02 18:37:21"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Loop device ready: /dev/loop18 (/home/oolkay/.local/share/DigitalVault/containers/myvault3.img)",
+        "time": "2026-06-02 18:37:11"
+    },
+    {
+        "level": "INFO",
+        "message": "Creating container: /home/oolkay/.local/share/DigitalVault/containers/myvault3.img",
+        "time": "2026-06-02 18:37:11"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Deleted vault: /dev/loop18",
+        "time": "2026-06-02 18:36:01"
+    },
+    {
+        "level": "INFO",
+        "message": "Deleting loop vault: /dev/loop18",
+        "time": "2026-06-02 18:36:00"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Loop device ready: /dev/loop18 (/home/oolkay/.local/share/DigitalVault/containers/deneme1.img)",
+        "time": "2026-06-02 18:31:48"
+    },
+    {
+        "level": "INFO",
+        "message": "Creating container: /home/oolkay/.local/share/DigitalVault/containers/deneme1.img",
+        "time": "2026-06-02 18:31:48"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Deleted vault: /dev/loop19",
+        "time": "2026-06-02 18:19:37"
+    },
+    {
+        "level": "INFO",
+        "message": "Deleting loop vault: /dev/loop19",
+        "time": "2026-06-02 18:19:37"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault locked. Encryption keys cleared from kernel.",
+        "time": "2026-06-02 18:19:20"
+    },
+    {
+        "level": "INFO",
+        "message": "Locking vault and clearing kernel keys...",
+        "time": "2026-06-02 18:19:20"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault unlocked via biometric",
+        "time": "2026-06-02 18:19:16"
+    },
+    {
+        "level": "ERROR",
+        "message": "losetup: /dev/loop20: failed to use device: No such device\n[vault_manager] destroyloop: losetup -d failed",
+        "time": "2026-06-02 18:17:30"
+    },
+    {
+        "level": "INFO",
+        "message": "Deleting loop vault: /dev/loop20",
+        "time": "2026-06-02 18:17:30"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault locked. Encryption keys cleared from kernel.",
+        "time": "2026-06-02 18:16:29"
+    },
+    {
+        "level": "INFO",
+        "message": "Locking vault and clearing kernel keys...",
+        "time": "2026-06-02 18:16:29"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault unlocked via biometric",
+        "time": "2026-06-02 18:16:18"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault locked. Encryption keys cleared from kernel.",
+        "time": "2026-06-02 18:16:06"
+    },
+    {
+        "level": "INFO",
+        "message": "Locking vault and clearing kernel keys...",
+        "time": "2026-06-02 18:16:06"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault unlocked via biometric",
+        "time": "2026-06-02 18:16:00"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault setup complete: /dev/loop19",
+        "time": "2026-06-02 18:15:46"
+    },
+    {
+        "level": "INFO",
+        "message": "Formatting new encrypted vault on: /dev/loop19",
+        "time": "2026-06-02 18:15:29"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Loop device ready: /dev/loop19 (/home/oolkay/.local/share/DigitalVault/containers/myvault3.img)",
+        "time": "2026-06-02 18:15:05"
+    },
+    {
+        "level": "INFO",
+        "message": "Creating container: /home/oolkay/.local/share/DigitalVault/containers/myvault3.img",
+        "time": "2026-06-02 18:15:05"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Loop device ready: /dev/loop18 (/home/oolkay/.local/share/DigitalVault/containers/myvault.img)",
+        "time": "2026-06-02 18:14:06"
+    },
+    {
+        "level": "INFO",
+        "message": "Creating container: /home/oolkay/.local/share/DigitalVault/containers/myvault.img",
+        "time": "2026-06-02 18:14:06"
+    },
+    {
+        "level": "SUCCESS",
         "message": "Deleted vault: /dev/loop19",
         "time": "2026-06-01 23:59:17"
     },

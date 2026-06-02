@@ -83,7 +83,7 @@ Item {
                         font { pixelSize: 13; bold: true; family: "Inter" }
                     }
                     Text {
-                        text: "Sensor communicates via STM32 → HAL → FUSE. Each fingerprint maps to a unique slot on the AS608 module."
+                        text: "Add or rename fingerprints used by your vaults."
                         color: Theme.textSecondary
                         font { pixelSize: 11; family: "Inter" }
                         Behavior on color { ColorAnimation { duration: 250 } }
@@ -166,7 +166,7 @@ Item {
                         }
 
                         Text {
-                            text: "Slot " + index + " • AS608 Module • Registered"
+                            text: "Registered fingerprint"
                             color: Theme.textSecondary
                             font { pixelSize: 11; family: "Inter" }
                         }

@@ -177,7 +177,7 @@ Item {
                     const label = grantLabelField.text.trim()
                     if (!label) {
                         vaultController.notifyUser(
-                            "Enter a display name for this fingerprint.", true)
+                            "Enter a fingerprint name.", true)
                         return
                     }
                     if (vaultController.labelExistsForVault(root.devicePath, label)) {
@@ -186,6 +186,15 @@ Item {
                         return
                     }
                     vaultController.beginGrantAccessForVault(root.devicePath, label)
+                }
+
+                function renameAccess(fingerId, label) {
+                    const trimmed = label.trim()
+                    if (!trimmed) {
+                        vaultController.notifyUser("Enter a fingerprint name.", true)
+                        return false
+                    }
+                    return vaultController.renameVaultFingerprintLabel(root.devicePath, fingerId, trimmed)
                 }
 
                 Component.onCompleted: refreshAccessList()
@@ -203,15 +212,15 @@ Item {
                     spacing: 12
 
                     Text {
-                        text: "Authorized fingerprints"
+                        text: "People who can unlock this vault"
                         color: Theme.textPrimary
-                        font { pixelSize: 14; bold: true; family: "Inter" }
+                        font { pixelSize: 15; bold: true; family: "Inter" }
                     }
 
                     Text {
                         width: parent.width
                         wrapMode: Text.Wrap
-                        text: "People who can unlock this vault."
+                        text: "Add, rename, or remove fingerprints for this vault."
                         color: Theme.textSecondary
                         font { pixelSize: 11; family: "Inter" }
                     }
@@ -227,12 +236,14 @@ Item {
                     Repeater {
                         model: accessCard.accessEntries
                         delegate: Rectangle {
+                            id: accessRow
                             width: parent.width
-                            height: 40
+                            height: 48
                             radius: 8
                             color: Theme.bgOverlay
                             border.color: Theme.border
                             border.width: 1
+                            property bool editing: false
 
                             Row {
                                 anchors.fill: parent
@@ -240,49 +251,181 @@ Item {
                                 anchors.rightMargin: 8
                                 spacing: 8
 
-                                Text {
-                                    width: Math.max(0, parent.width - 120)
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    text: modelData.label || ("Slot " + modelData.fingerId)
-                                    color: Theme.textPrimary
-                                    font { pixelSize: 12; family: "Inter" }
-                                    elide: Text.ElideRight
-                                }
-
-                                Text {
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    visible: modelData.isOwner
-                                    text: "Owner"
-                                    color: Theme.accent
-                                    font { pixelSize: 10; bold: true; family: "Inter" }
-                                }
-
-                                Item { width: 1; height: 1; anchors.verticalCenter: parent.verticalCenter }
-
-                                Rectangle {
-                                    visible: !modelData.isOwner
-                                    width: removeLbl.implicitWidth + 12
-                                    height: 28
-                                    radius: 14
-                                    color: removeMouse.containsMouse ? Theme.dangerBg : "transparent"
-                                    anchors.verticalCenter: parent.verticalCenter
+                                Item {
+                                    width: Math.max(0, parent.width - actionGroup.width - 8)
+                                    height: parent.height
 
                                     Text {
-                                        id: removeLbl
-                                        anchors.centerIn: parent
-                                        text: "Remove"
-                                        color: Theme.danger
-                                        font { pixelSize: 11; bold: true; family: "Inter" }
+                                        visible: !accessRow.editing
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        width: parent.width
+                                        text: modelData.label || "Unnamed fingerprint"
+                                        color: Theme.textPrimary
+                                        font { pixelSize: 13; bold: true; family: "Inter" }
+                                        elide: Text.ElideRight
                                     }
 
-                                    MouseArea {
-                                        id: removeMouse
-                                        anchors.fill: parent
-                                        hoverEnabled: true
-                                        enabled: accessCard.canManageAccess
-                                        cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-                                        onClicked: vaultController.beginRevokeAccessForVault(
-                                            root.devicePath, modelData.fingerId)
+                                    TextInput {
+                                        id: renameInput
+                                        visible: accessRow.editing
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        width: parent.width
+                                        height: 34
+                                        text: modelData.label || ""
+                                        color: Theme.textPrimary
+                                        selectionColor: Theme.accent
+                                        selectedTextColor: "white"
+                                        font { pixelSize: 13; family: "Inter" }
+                                        verticalAlignment: TextInput.AlignVCenter
+                                        clip: true
+                                        onAccepted: {
+                                            if (accessCard.renameAccess(modelData.fingerId, text))
+                                                accessRow.editing = false
+                                        }
+
+                                        Rectangle {
+                                            anchors.fill: parent
+                                            anchors.margins: -8
+                                            z: -1
+                                            radius: 8
+                                            color: Theme.bgInput
+                                            border.color: renameInput.activeFocus ? Theme.accent : Theme.border
+                                            border.width: 1
+                                        }
+                                    }
+                                }
+
+                                Row {
+                                    id: actionGroup
+                                    width: accessRow.editing ? 104 : (modelData.isOwner ? 120 : 160)
+                                    height: parent.height
+                                    spacing: 6
+                                    layoutDirection: Qt.RightToLeft
+
+                                    Rectangle {
+                                        visible: accessRow.editing
+                                        width: saveLbl.implicitWidth + 12
+                                        height: 28
+                                        radius: 14
+                                        color: saveMouse.containsMouse ? Theme.accentGlow : "transparent"
+
+                                        Text {
+                                            id: saveLbl
+                                            anchors.centerIn: parent
+                                            text: "Save"
+                                            color: Theme.accent
+                                            font { pixelSize: 11; bold: true; family: "Inter" }
+                                        }
+
+                                        MouseArea {
+                                            id: saveMouse
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            enabled: accessCard.canManageAccess
+                                            cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                                            onClicked: {
+                                                if (accessCard.renameAccess(modelData.fingerId, renameInput.text))
+                                                    accessRow.editing = false
+                                            }
+                                        }
+                                    }
+
+                                    Rectangle {
+                                        visible: accessRow.editing
+                                        width: cancelLbl.implicitWidth + 12
+                                        height: 28
+                                        radius: 14
+                                        color: cancelMouse.containsMouse ? Theme.bgHover : "transparent"
+
+                                        Text {
+                                            id: cancelLbl
+                                            anchors.centerIn: parent
+                                            text: "Cancel"
+                                            color: Theme.textSecondary
+                                            font { pixelSize: 11; bold: true; family: "Inter" }
+                                        }
+
+                                        MouseArea {
+                                            id: cancelMouse
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: {
+                                                renameInput.text = modelData.label || ""
+                                                accessRow.editing = false
+                                            }
+                                        }
+                                    }
+
+                                    Rectangle {
+                                        visible: !accessRow.editing
+                                        width: editLbl.implicitWidth + 12
+                                        height: 28
+                                        radius: 14
+                                        color: editMouse.containsMouse ? Theme.accentGlow : "transparent"
+
+                                        Text {
+                                            id: editLbl
+                                            anchors.centerIn: parent
+                                            text: "Rename"
+                                            color: Theme.accent
+                                            font { pixelSize: 11; bold: true; family: "Inter" }
+                                        }
+
+                                        MouseArea {
+                                            id: editMouse
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            enabled: accessCard.canManageAccess
+                                            cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                                            onClicked: {
+                                                accessRow.editing = true
+                                                renameInput.forceActiveFocus()
+                                                renameInput.selectAll()
+                                            }
+                                        }
+                                    }
+
+                                    Rectangle {
+                                        visible: !modelData.isOwner && !accessRow.editing
+                                        width: removeLbl.implicitWidth + 12
+                                        height: 28
+                                        radius: 14
+                                        color: removeMouse.containsMouse ? Theme.dangerBg : "transparent"
+
+                                        Text {
+                                            id: removeLbl
+                                            anchors.centerIn: parent
+                                            text: "Remove"
+                                            color: Theme.danger
+                                            font { pixelSize: 11; bold: true; family: "Inter" }
+                                        }
+
+                                        MouseArea {
+                                            id: removeMouse
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            enabled: accessCard.canManageAccess
+                                            cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                                            onClicked: vaultController.beginRevokeAccessForVault(
+                                                root.devicePath, modelData.fingerId)
+                                        }
+                                    }
+
+                                    Rectangle {
+                                        visible: modelData.isOwner && !accessRow.editing
+                                        width: ownerLbl.implicitWidth + 12
+                                        height: 24
+                                        radius: 12
+                                        color: Theme.accentGlow
+
+                                        Text {
+                                            id: ownerLbl
+                                            anchors.centerIn: parent
+                                            text: "Owner"
+                                            color: Theme.accent
+                                            font { pixelSize: 10; bold: true; family: "Inter" }
+                                        }
                                     }
                                 }
                             }
@@ -293,7 +436,7 @@ Item {
                         width: parent.width
                         visible: !accessCard.canUseSensor
                         wrapMode: Text.Wrap
-                        text: "Fingerprint sensor not connected."
+                        text: "Connect the fingerprint sensor to manage access."
                         color: Theme.textSecondary
                         font { pixelSize: 11; family: "Inter" }
                     }
@@ -322,11 +465,12 @@ Item {
                     WizardTextField {
                         id: grantLabelField
                         width: parent.width
-                        label: "Display name"
+                        label: "Name for new fingerprint"
+                        placeholderText: "Left index finger"
                     }
 
                     WizardActionButton {
-                        text: "Add access"
+                        text: "Authorize fingerprint"
                         variant: "primary"
                         enabled: accessCard.canManageAccess && !accessCard.atAccessCapacity
                         onClicked: accessCard.submitGrantAccess()

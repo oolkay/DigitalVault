@@ -6,6 +6,7 @@ Column {
     required property string label
     property alias text: fieldInput.text
     property alias input: fieldInput
+    property string placeholderText: ""
     property int fieldHeight: 38
     property bool readOnly: false
     spacing: 6
@@ -37,6 +38,15 @@ Column {
             anchors { fill: parent; leftMargin: 12; rightMargin: 12 }
             verticalAlignment: TextInput.AlignVCenter
             color: Theme.textPrimary
+            font { pixelSize: 14; family: "Inter" }
+        }
+
+        Text {
+            visible: !root.readOnly && fieldInput.text.length === 0 && root.placeholderText.length > 0
+            anchors { fill: parent; leftMargin: 12; rightMargin: 12 }
+            verticalAlignment: Text.AlignVCenter
+            text: root.placeholderText
+            color: Theme.textMuted
             font { pixelSize: 14; family: "Inter" }
         }
     }

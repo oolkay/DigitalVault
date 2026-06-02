@@ -113,6 +113,7 @@ public:
                                              const QString &storageDir = QString());
     Q_INVOKABLE bool        deleteDevice(const QString &devicePath);
     Q_INVOKABLE bool        deleteVault(const QString &devicePath);
+    Q_INVOKABLE bool        deleteVaultRequiresBiometric(const QString &devicePath) const;
     Q_INVOKABLE QVariantMap previewDeleteVault(const QString &devicePath) const;
     Q_INVOKABLE bool        renameVaultDisplayName(const QString &devicePath, const QString &newName);
     Q_INVOKABLE bool        reconcileVaultRuntime();
@@ -135,6 +136,8 @@ public:
                                        const QString &vaultName, const QString &normalName, const QString &normalFs);
     Q_INVOKABLE void        openInFileManager();
     Q_INVOKABLE void        openInTerminal();
+    Q_INVOKABLE void        navigateToVaultManagerDetail(const QString &devicePath);
+    Q_INVOKABLE QString     takePendingVaultManagerDetailPath();
     
     int  autoLockTimeout() const { return m_autoLockTimeout; }
     void setAutoLockTimeout(int minutes);
@@ -168,6 +171,8 @@ public:
     Q_INVOKABLE bool        revokeAccess(int ownerFingerId, int slotNumber);
     Q_INVOKABLE bool        isFingerAllowedForVault(const QString &devicePath, int fingerId) const;
     Q_INVOKABLE bool        labelExistsForVault(const QString &devicePath, const QString &label) const;
+    Q_INVOKABLE bool        renameVaultFingerprintLabel(const QString &devicePath, int fingerId,
+                                                        const QString &newLabel);
     Q_INVOKABLE QVariantList getKeyslots();
     Q_INVOKABLE QVariantList getKeyslotsForDevice(const QString &devicePath);
     Q_INVOKABLE QVariantMap vaultDetailForDevice(const QString &devicePath) const;
@@ -214,6 +219,7 @@ private:
         SetupEnroll,
         SetupVerify,
         GrantVerify,
+        GrantFindExisting,
         GrantEnroll,
         RevokeVerify,
         DeleteVerify
@@ -232,6 +238,7 @@ private:
     void startGrantEnrollForVault(const QString &devicePath, const QString &label);
     void finishRevokeAfterGate(const QString &devicePath, int fingerId);
     bool appendAccessListEntry(const QString &devicePath, int fingerId, const QString &label, bool isOwner);
+    void startGrantFindExistingForVault(const QString &devicePath, const QString &label);
     void clearFingerprintFlowState();
     void beginFingerprintOperationUi(FpFlow flow, const QString &message);
     void abortFingerprintOperationUi();
@@ -332,6 +339,7 @@ private:
     QString      m_registryPath;
     QString      m_containersDir;
     QString      m_statePath;
+    QString      m_pendingVaultManagerDetailPath;
     QByteArray   m_vaultManagerBinCache;
     QByteArray   m_mountPointCache;
 
