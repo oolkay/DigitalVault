@@ -27,7 +27,7 @@ Column {
             ComboBox {
                 id: fsCombo
                 width: parent.width
-                model: ["exfat", "vfat", "ext4"]
+                model: vaultController.supportedFilesystems()
                 currentIndex: 0
             }
         }

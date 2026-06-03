@@ -5,5 +5,5 @@ Text {
     required property string title
     text: title
     color: Theme.textPrimary
-    font { pixelSize: 14; bold: true; family: "Inter" }
+    font { pixelSize: 17; bold: true; family: Theme.fontFamily }
 }

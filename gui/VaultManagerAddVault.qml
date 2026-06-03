@@ -38,7 +38,7 @@ Item {
                 Text {
                     text: "Connected storage"
                     color: Theme.textPrimary
-                    font { pixelSize: 16; bold: true; family: "Inter" }
+                    font { pixelSize: 16; bold: true; family: Theme.fontFamily }
                 }
 
                 Text {
@@ -46,7 +46,7 @@ Item {
                     wrapMode: Text.Wrap
                     text: "Physical disks and partitions without a vault yet."
                     color: Theme.textSecondary
-                    font { pixelSize: 12; family: "Inter" }
+                    font { pixelSize: 12; family: Theme.fontFamily }
                 }
 
                 Repeater {
@@ -63,7 +63,7 @@ Item {
                     visible: vaultController.discoveredStorageDevices.length === 0
                     text: "No additional disks detected"
                     color: Theme.textMuted
-                    font { pixelSize: 12; family: "Inter" }
+                    font { pixelSize: 12; family: Theme.fontFamily }
                 }
             }
 
@@ -84,7 +84,7 @@ Item {
                     Text {
                         text: "Virtual containers"
                         color: Theme.textPrimary
-                        font { pixelSize: 14; bold: true; family: "Inter" }
+                        font { pixelSize: 14; bold: true; family: Theme.fontFamily }
                     }
 
                     Text {
@@ -92,7 +92,7 @@ Item {
                         wrapMode: Text.Wrap
                         text: "Sparse image + loop device. After creation, encrypt via Set up encryption on the managed entry."
                         color: Theme.textSecondary
-                        font { pixelSize: 11; family: "Inter" }
+                        font { pixelSize: 11; family: Theme.fontFamily }
                     }
 
                     Rectangle {
@@ -106,7 +106,7 @@ Item {
                             anchors.centerIn: parent
                             text: "+ Create loop device"
                             color: "white"
-                            font { pixelSize: 12; bold: true; family: "Inter" }
+                            font { pixelSize: 12; bold: true; family: Theme.fontFamily }
                         }
 
                         MouseArea {

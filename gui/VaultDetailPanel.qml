@@ -12,6 +12,7 @@ Rectangle {
 
     property string devicePath: ""
     property var detail: ({})
+    property string pendingForceLockDevice: ""
 
     function refreshDetail() {
         if (!devicePath)
@@ -26,6 +27,12 @@ Rectangle {
         target: vaultController
         function onStatusChanged() { root.refreshDetail() }
         function onDevicesChanged() { root.refreshDetail() }
+        function onLockRequiresForceConfirmation(devicePath) {
+            if (devicePath !== root.devicePath)
+                return
+            root.pendingForceLockDevice = devicePath
+            forceLockOverlay.visible = true
+        }
     }
 
     ColumnLayout {
@@ -45,7 +52,7 @@ Rectangle {
                 Text {
                     text: detail.displayName || detail.name || "Vault"
                     color: Theme.textPrimary
-                    font { pixelSize: 22; bold: true; family: "Inter" }
+                    font { pixelSize: 22; bold: true; family: Theme.fontFamily }
                     Layout.fillWidth: true
                     wrapMode: Text.Wrap
                 }
@@ -56,7 +63,7 @@ Rectangle {
                         return sz ? (sz + " encrypted partition") : "Encrypted vault"
                     }
                     color: Theme.textSecondary
-                    font { pixelSize: 13; family: "Inter" }
+                    font { pixelSize: 13; family: Theme.fontFamily }
                 }
 
                 Text {
@@ -66,7 +73,7 @@ Rectangle {
                            ? ("Encryption: " + detail.encryptionLabel)
                            : "Encryption: AES-256-XTS (LUKS2)"
                     color: Theme.textSecondary
-                    font { pixelSize: 12; family: "Inter" }
+                    font { pixelSize: 12; family: Theme.fontFamily }
                 }
 
                 Text {
@@ -74,7 +81,7 @@ Rectangle {
                     wrapMode: Text.Wrap
                     text: "This vault is encrypted with AES-256-XTS in LUKS2 mode."
                     color: Theme.textMuted
-                    font { pixelSize: 11; family: "Inter" }
+                    font { pixelSize: 11; family: Theme.fontFamily }
                 }
 
                 Text {
@@ -85,7 +92,7 @@ Rectangle {
                         return p ? ("Device: " + p) : ""
                     }
                     color: Theme.textMuted
-                    font { pixelSize: 11; family: "monospace" }
+                    font { pixelSize: 11; family: Theme.monoFamily }
                 }
             }
 
@@ -106,7 +113,7 @@ Rectangle {
                         anchors.centerIn: parent
                         text: "Edit"
                         color: Theme.textPrimary
-                        font { pixelSize: 12; bold: true; family: "Inter" }
+                        font { pixelSize: 12; bold: true; family: Theme.fontFamily }
                     }
 
                     MouseArea {
@@ -134,6 +141,65 @@ Rectangle {
             color: Theme.border
         }
 
+        Rectangle {
+            Layout.fillWidth: true
+            Layout.preferredHeight: stateMessage.implicitHeight + 22
+            radius: Theme.radiusSm
+            color: {
+                if (vaultController.isToggling
+                    && (devicePath === vaultController.unlockedDevice
+                        || devicePath === vaultController.selectedDevice))
+                    return Theme.warningBg
+                return detail.isUnlocked ? Theme.successBg : Theme.bgOverlay
+            }
+            border.color: {
+                if (vaultController.isToggling
+                    && (devicePath === vaultController.unlockedDevice
+                        || devicePath === vaultController.selectedDevice))
+                    return Theme.warning
+                return detail.isUnlocked ? Theme.success : Theme.border
+            }
+            border.width: 1
+
+            RowLayout {
+                anchors.fill: parent
+                anchors.margins: 11
+                spacing: 10
+
+                Rectangle {
+                    Layout.preferredWidth: 9
+                    Layout.preferredHeight: 9
+                    radius: 5
+                    color: {
+                        if (vaultController.isToggling
+                            && (devicePath === vaultController.unlockedDevice
+                                || devicePath === vaultController.selectedDevice))
+                            return Theme.warning
+                        return detail.isUnlocked ? Theme.success : Theme.textMuted
+                    }
+                }
+
+                Text {
+                    id: stateMessage
+                    Layout.fillWidth: true
+                    wrapMode: Text.Wrap
+                    text: {
+                        if (vaultController.isToggling
+                            && (devicePath === vaultController.unlockedDevice
+                                || devicePath === vaultController.selectedDevice))
+                            return detail.isUnlocked
+                                ? "Locking the vault. Keep this window open until the operation finishes."
+                                : "Verifying access and decrypting the vault."
+                        return detail.isUnlocked
+                            ? "Files are accessible. Lock the vault when you are finished."
+                            : "Vault is locked. Unlock requires fingerprint verification."
+                    }
+                    color: Theme.textPrimary
+                    font { pixelSize: 12; family: Theme.fontFamily }
+                }
+            }
+        }
+
         ColumnLayout {
             Layout.fillWidth: true
             spacing: 8
@@ -141,7 +207,7 @@ Rectangle {
             Text {
                 text: "Authorized access"
                 color: Theme.textMuted
-                font { pixelSize: 10; bold: true; family: "Inter"; letterSpacing: 1 }
+                font { pixelSize: 10; bold: true; family: Theme.fontFamily; letterSpacing: 1 }
             }
 
             Text {
@@ -149,7 +215,7 @@ Rectangle {
                 wrapMode: Text.Wrap
                 text: "People who can unlock this vault."
                 color: Theme.textSecondary
-                font { pixelSize: 11; family: "Inter" }
+                font { pixelSize: 11; family: Theme.fontFamily }
             }
 
             RowLayout {
@@ -162,14 +228,14 @@ Rectangle {
                         return n === 1 ? "1 person can unlock" : (n + " people can unlock")
                     }
                     color: Theme.textPrimary
-                    font { pixelSize: 14; family: "Inter" }
+                    font { pixelSize: 14; family: Theme.fontFamily }
                     Layout.fillWidth: true
                 }
 
                 Text {
                     text: accessListExpanded ? "Hide list" : "Show list"
                     color: Theme.accent
-                    font { pixelSize: 12; underline: true; family: "Inter" }
+                    font { pixelSize: 12; underline: true; family: Theme.fontFamily }
                     MouseArea {
                         anchors.fill: parent
                         cursorShape: Qt.PointingHandCursor
@@ -204,15 +270,17 @@ Rectangle {
                                 anchors { fill: parent; leftMargin: 12; rightMargin: 12 }
                                 spacing: 10
                                 Text {
-                                    text: modelData.isOwner ? "👑" : "🔑"
-                                    font.pixelSize: 14
+                                    width: 44
+                                    text: modelData.isOwner ? "OWNER" : "USER"
+                                    color: modelData.isOwner ? Theme.success : Theme.textSecondary
+                                    font { pixelSize: 9; bold: true; family: Theme.fontFamily }
                                     anchors.verticalCenter: parent.verticalCenter
                                 }
                                 Text {
-                                    width: Math.max(0, parent.width - 26)
+                                    width: Math.max(0, parent.width - 54)
                                     text: modelData.label || "Unnamed fingerprint"
                                     color: Theme.textPrimary
-                                    font { pixelSize: 12; family: "Inter" }
+                                    font { pixelSize: 12; family: Theme.fontFamily }
                                     anchors.verticalCenter: parent.verticalCenter
                                     elide: Text.ElideRight
                                 }
@@ -226,7 +294,7 @@ Rectangle {
                 visible: accessListExpanded && (!detail.accessList || detail.accessList.length === 0)
                 text: "No one in the access list yet."
                 color: Theme.textMuted
-                font { pixelSize: 11; family: "Inter" }
+                font { pixelSize: 11; family: Theme.fontFamily }
             }
 
         }
@@ -240,12 +308,12 @@ Rectangle {
             Rectangle {
                 Layout.fillWidth: true
                 Layout.preferredHeight: 44
-                radius: 22
+                radius: Theme.radiusSm
                 color: {
                     if (vaultController.isToggling
                         && (devicePath === vaultController.unlockedDevice
                             || devicePath === vaultController.selectedDevice))
-                        return "#444"
+                        return Theme.warning
                     return detail.isUnlocked ? Theme.danger : Theme.success
                 }
                 opacity: devicePath ? 1 : 0.5
@@ -256,11 +324,11 @@ Rectangle {
                         if (vaultController.isToggling
                             && (devicePath === vaultController.unlockedDevice
                                 || devicePath === vaultController.selectedDevice))
-                            return detail.isUnlocked ? "⏳ Locking…" : "⏳ Decrypting…"
-                        return detail.isUnlocked ? "🔒  Lock Vault" : "🔓  Unlock Vault"
+                            return detail.isUnlocked ? "Locking..." : "Decrypting..."
+                        return detail.isUnlocked ? "Lock Vault" : "Unlock Vault"
                     }
                     color: "white"
-                    font { pixelSize: 13; bold: true; family: "Inter" }
+                    font { pixelSize: 13; bold: true; family: Theme.fontFamily }
                 }
 
                 MouseArea {
@@ -283,13 +351,13 @@ Rectangle {
                 Rectangle {
                     Layout.fillWidth: true
                     Layout.preferredHeight: 36
-                    radius: 18
+                    radius: Theme.radiusSm
                     color: filesMouse.containsMouse ? Theme.accentHover : Theme.accent
                     Text {
                         anchors.centerIn: parent
-                        text: "📁  Open Files"
+                        text: "Open Files"
                         color: "white"
-                        font { pixelSize: 12; bold: true; family: "Inter" }
+                        font { pixelSize: 12; bold: true; family: Theme.fontFamily }
                     }
                     MouseArea {
                         id: filesMouse
@@ -303,15 +371,15 @@ Rectangle {
                 Rectangle {
                     Layout.fillWidth: true
                     Layout.preferredHeight: 36
-                    radius: 18
+                    radius: Theme.radiusSm
                     color: termMouse.containsMouse ? Theme.bgHover : Theme.bgOverlay
                     border.color: Theme.border
                     border.width: 1
                     Text {
                         anchors.centerIn: parent
-                        text: "⌨  Terminal"
+                        text: "Terminal"
                         color: Theme.textPrimary
-                        font { pixelSize: 12; bold: true; family: "Inter" }
+                        font { pixelSize: 12; bold: true; family: Theme.fontFamily }
                     }
                     MouseArea {
                         id: termMouse
@@ -326,4 +394,130 @@ Rectangle {
     }
 
     property bool accessListExpanded: false
+
+    Rectangle {
+        id: forceLockOverlay
+        anchors.fill: parent
+        z: 20
+        visible: false
+        color: Qt.rgba(0, 0, 0, 0.38)
+        radius: root.radius
+
+        function closeOverlay() {
+            visible = false
+            root.pendingForceLockDevice = ""
+        }
+
+        MouseArea {
+            anchors.fill: parent
+            onClicked: forceLockOverlay.closeOverlay()
+        }
+
+        Rectangle {
+            id: forceLockCard
+            width: Math.max(300, Math.min(parent.width - 36, 440))
+            height: forceLockContent.implicitHeight + 36
+            anchors.centerIn: parent
+            radius: Theme.radius
+            color: Theme.bgSurface
+            border.color: Theme.border
+            border.width: 1
+
+            MouseArea {
+                anchors.fill: parent
+                acceptedButtons: Qt.LeftButton
+            }
+
+            ColumnLayout {
+                id: forceLockContent
+                anchors.fill: parent
+                anchors.margins: 18
+                spacing: 14
+
+                Text {
+                    Layout.fillWidth: true
+                    text: "Force Lock Vault?"
+                    color: Theme.warning
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.Wrap
+                    font { pixelSize: 16; bold: true; family: Theme.fontFamily }
+                }
+
+                Text {
+                    Layout.fillWidth: true
+                    text: "This vault is currently being used by another app or terminal."
+                    color: Theme.textPrimary
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.Wrap
+                    font { pixelSize: 13; family: Theme.fontFamily }
+                }
+
+                Text {
+                    Layout.fillWidth: true
+                    text: "Force locking can close those processes. Unsaved work inside the vault may be lost."
+                    color: Theme.textSecondary
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.Wrap
+                    font { pixelSize: 12; family: Theme.fontFamily }
+                }
+
+                RowLayout {
+                    Layout.alignment: Qt.AlignHCenter
+                    spacing: 12
+
+                    Rectangle {
+                        Layout.preferredWidth: 112
+                        Layout.preferredHeight: 36
+                        radius: Theme.radiusSm
+                        color: cancelForceMouse.containsMouse ? Theme.bgHover : Theme.bgOverlay
+                        border.color: Theme.border
+                        border.width: 1
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: "Cancel"
+                            color: Theme.textSecondary
+                            font { pixelSize: 12; bold: true; family: Theme.fontFamily }
+                        }
+
+                        MouseArea {
+                            id: cancelForceMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: forceLockOverlay.closeOverlay()
+                        }
+                    }
+
+                    Rectangle {
+                        Layout.preferredWidth: 132
+                        Layout.preferredHeight: 36
+                        radius: Theme.radiusSm
+                        color: confirmForceMouse.containsMouse ? Theme.warning : Theme.danger
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: "Force Lock"
+                            color: "white"
+                            font { pixelSize: 12; bold: true; family: Theme.fontFamily }
+                        }
+
+                        MouseArea {
+                            id: confirmForceMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                if (root.pendingForceLockDevice
+                                        && vaultController.selectedDevice !== root.pendingForceLockDevice)
+                                    vaultController.setSelectedDevice(root.pendingForceLockDevice)
+                                forceLockOverlay.closeOverlay()
+                                vaultController.forceLockVault()
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }

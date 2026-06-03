@@ -50,7 +50,7 @@ Column {
             width: parent.width
             text: layoutData.diskModel || "Storage device"
             color: Theme.textPrimary
-            font { pixelSize: 13; bold: true; family: "Inter" }
+            font { pixelSize: 15; bold: true; family: Theme.fontFamily }
             elide: Text.ElideRight
         }
 
@@ -69,21 +69,21 @@ Column {
                 return bits.join(" · ")
             }
             color: Theme.textSecondary
-            font { pixelSize: 11; family: "Inter" }
+            font { pixelSize: 13; family: Theme.fontFamily }
         }
 
         Text {
             width: parent.width
             text: layoutData.diskPath || ""
             color: Theme.textMuted
-            font { pixelSize: 10; family: "Inter" }
+            font { pixelSize: 12; family: Theme.fontFamily }
             elide: Text.ElideMiddle
         }
     }
 
     Rectangle {
         width: parent.width
-        height: 60
+        height: 74
         radius: 8
         color: Theme.bgInput
         border.color: Theme.border
@@ -162,7 +162,7 @@ Column {
                             horizontalAlignment: Text.AlignHCenter
                             text: root.segmentPathLabel(modelData, segmentWidth)
                             color: Theme.textPrimary
-                            font { pixelSize: segmentWidth < 56 ? 7 : 8; family: "Inter" }
+                            font { pixelSize: segmentWidth < 56 ? 9 : 11; family: Theme.fontFamily }
                             elide: Text.ElideMiddle
                         }
 
@@ -171,7 +171,7 @@ Column {
                             horizontalAlignment: Text.AlignHCenter
                             text: modelData.size || ""
                             color: Theme.textSecondary
-                            font { pixelSize: 7; family: "Inter" }
+                            font { pixelSize: 12; family: Theme.fontFamily }
                             elide: Text.ElideRight
                         }
                     }
@@ -205,7 +205,7 @@ Column {
                 Text {
                     text: "Encrypted vault"
                     color: Theme.textMuted
-                    font { pixelSize: 10; family: "Inter" }
+                    font { pixelSize: 12; family: Theme.fontFamily }
                     anchors.verticalCenter: parent.verticalCenter
                 }
             }
@@ -220,7 +220,7 @@ Column {
                 Text {
                     text: "Normal storage"
                     color: Theme.textMuted
-                    font { pixelSize: 10; family: "Inter" }
+                    font { pixelSize: 12; family: Theme.fontFamily }
                     anchors.verticalCenter: parent.verticalCenter
                 }
             }
@@ -236,7 +236,7 @@ Column {
                 Text {
                     text: "Container"
                     color: Theme.textMuted
-                    font { pixelSize: 10; family: "Inter" }
+                    font { pixelSize: 12; family: Theme.fontFamily }
                     anchors.verticalCenter: parent.verticalCenter
                 }
             }
@@ -250,7 +250,7 @@ Column {
                 Text {
                     text: "Used"
                     color: Theme.textMuted
-                    font { pixelSize: 10; family: "Inter" }
+                    font { pixelSize: 12; family: Theme.fontFamily }
                     anchors.verticalCenter: parent.verticalCenter
                 }
             }
@@ -265,7 +265,7 @@ Column {
                 Text {
                     text: "Free"
                     color: Theme.textMuted
-                    font { pixelSize: 10; family: "Inter" }
+                    font { pixelSize: 12; family: Theme.fontFamily }
                     anchors.verticalCenter: parent.verticalCenter
                 }
             }
@@ -276,7 +276,7 @@ Column {
             wrapMode: Text.Wrap
             text: "Usage shown when a partition is mounted or the vault is unlocked on the Dashboard."
             color: Theme.textMuted
-            font { pixelSize: 9; family: "Inter" }
+            font { pixelSize: 12; family: Theme.fontFamily }
         }
     }
 
@@ -286,6 +286,6 @@ Column {
         wrapMode: Text.Wrap
         text: "No partition layout reported for this device."
         color: Theme.textMuted
-        font { pixelSize: 11; family: "Inter" }
+        font { pixelSize: 13; family: Theme.fontFamily }
     }
 }

@@ -44,8 +44,9 @@ Rectangle {
             anchors.verticalCenter: parent.verticalCenter
             Text {
                 anchors.centerIn: parent
-                text: "🔐"
-                font.pixelSize: 20
+                text: "V"
+                color: isSelected ? Theme.accent : Theme.success
+                font { pixelSize: 15; bold: true; family: Theme.fontFamily }
             }
         }
 
@@ -59,14 +60,14 @@ Rectangle {
                 elide: Text.ElideRight
                 text: vaultData.displayName || vaultData.name || "Vault"
                 color: isSelected ? Theme.navActiveText : Theme.textPrimary
-                font { pixelSize: 14; bold: true; family: "Inter" }
+                font { pixelSize: 14; bold: true; family: Theme.fontFamily }
             }
             Text {
                 width: parent.width
                 elide: Text.ElideRight
                 text: vaultData.sizeLabel || "Encrypted vault"
                 color: Theme.textMuted
-                font { pixelSize: 11; family: "Inter" }
+                font { pixelSize: 11; family: Theme.fontFamily }
             }
         }
 

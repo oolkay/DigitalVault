@@ -22,7 +22,7 @@ Item {
             Text {
                 text: "Settings"
                 color: Theme.textPrimary
-                font { pixelSize: 26; bold: true; family: "Inter" }
+                font { pixelSize: 26; bold: true; family: Theme.fontFamily }
                 Behavior on color { ColorAnimation { duration: 250 } }
             }
 
@@ -47,7 +47,7 @@ Item {
                                 anchors.verticalCenter: parent.verticalCenter
                                 text: Theme.isDark ? "Dark" : "Light"
                                 color: Theme.textSecondary
-                                font { pixelSize: 13; family: "Inter" }
+                                font { pixelSize: 13; family: Theme.fontFamily }
                                 Behavior on color { ColorAnimation { duration: 250 } }
                             }
                             Rectangle {
@@ -125,7 +125,7 @@ Item {
                                 contentItem: Text {
                                     text: label
                                     color: highlighted ? "white" : Theme.textPrimary
-                                    font { pixelSize: 13; family: "Inter" }
+                                    font { pixelSize: 13; family: Theme.fontFamily }
                                     verticalAlignment: Text.AlignVCenter
                                     leftPadding: 12
                                 }
@@ -140,7 +140,7 @@ Item {
                                 leftPadding: 12
                                 rightPadding: timeoutCombo.indicator.width + timeoutCombo.spacing
                                 text: timeoutCombo.displayText
-                                font { pixelSize: 13; family: "Inter" }
+                                font { pixelSize: 13; family: Theme.fontFamily }
                                 color: Theme.textPrimary
                                 verticalAlignment: Text.AlignVCenter
                                 elide: Text.ElideRight
@@ -234,7 +234,7 @@ Item {
                         control: Text {
                             text: vaultController.sensorStatusText
                             color: sensorSection.sensorStatusColor()
-                            font { pixelSize: 13; bold: true; family: "Inter" }
+                            font { pixelSize: 13; bold: true; family: Theme.fontFamily }
                         }
                     }
 
@@ -252,13 +252,13 @@ Item {
                             Text {
                                 text: "Serial port"
                                 color: Theme.textPrimary
-                                font { pixelSize: 13; bold: true; family: "Inter" }
+                                font { pixelSize: 13; bold: true; family: Theme.fontFamily }
                             }
                             Text {
                                 width: parent.width
-                                text: "STM32 UART, for example /dev/ttyUSB0. Choose a port from the list or enter a custom path."
+                                text: "STM32 UART, for example /dev/ttyUSB0. If the port appears but cannot connect, add your user to the dialout group."
                                 color: Theme.textSecondary
-                                font { pixelSize: 11; family: "Inter" }
+                                font { pixelSize: 11; family: Theme.fontFamily }
                                 wrapMode: Text.Wrap
                             }
 
@@ -276,7 +276,7 @@ Item {
                                     contentItem: Text {
                                         text: modelData
                                         color: highlighted ? "white" : Theme.textPrimary
-                                        font { pixelSize: 13; family: "Inter" }
+                                        font { pixelSize: 13; family: Theme.fontFamily }
                                         verticalAlignment: Text.AlignVCenter
                                         leftPadding: 12
                                         elide: Text.ElideMiddle
@@ -292,7 +292,7 @@ Item {
                                     leftPadding: 12
                                     rightPadding: portCombo.indicator.width + portCombo.spacing
                                     text: portCombo.displayText
-                                    font { pixelSize: 13; family: "Inter" }
+                                    font { pixelSize: 13; family: Theme.fontFamily }
                                     color: portCombo.currentIndex >= 0 ? Theme.textPrimary : Theme.textSecondary
                                     verticalAlignment: Text.AlignVCenter
                                     elide: Text.ElideMiddle
@@ -382,7 +382,7 @@ Item {
                                 anchors { verticalCenter: parent.verticalCenter; left: parent.left; leftMargin: 12; right: parent.right; rightMargin: 8 }
                                 text: vaultController.defaultContainersDir()
                                 color: Theme.textSecondary
-                                font { pixelSize: 11; family: "Courier New" }
+                                font { pixelSize: 11; family: Theme.monoFamily }
                                 elide: Text.ElideMiddle
                                 Behavior on color { ColorAnimation { duration: 250 } }
                             }
@@ -403,7 +403,7 @@ Item {
                                 anchors { verticalCenter: parent.verticalCenter; left: parent.left; leftMargin: 12 }
                                 text: "~/VaultMount"
                                 color: Theme.textSecondary
-                                font { pixelSize: 12; family: "Courier New" }
+                                font { pixelSize: 12; family: Theme.monoFamily }
                                 Behavior on color { ColorAnimation { duration: 250 } }
                             }
                         }
@@ -423,7 +423,7 @@ Item {
                         control: Text {
                             text: "v1.0.0"
                             color: Theme.accent
-                            font { pixelSize: 13; bold: true; family: "Inter" }
+                            font { pixelSize: 13; bold: true; family: Theme.fontFamily }
                         }
                     }
                     SettingsRow {
@@ -433,7 +433,7 @@ Item {
                         control: Text {
                             text: "Ömer Faruk Olkay"
                             color: Theme.textSecondary
-                            font { pixelSize: 13; family: "Inter" }
+                            font { pixelSize: 13; family: Theme.fontFamily }
                             Behavior on color { ColorAnimation { duration: 250 } }
                         }
                     }
@@ -469,7 +469,7 @@ Item {
                     anchors.verticalCenter: parent.verticalCenter
                     text: title
                     color: Theme.textPrimary
-                    font { pixelSize: 14; bold: true; family: "Inter" }
+                    font { pixelSize: 14; bold: true; family: Theme.fontFamily }
                     Behavior on color { ColorAnimation { duration: 250 } }
                 }
             }
@@ -503,7 +503,7 @@ Item {
                     width: parent.width
                     text: label
                     color: Theme.textPrimary
-                    font { pixelSize: 13; bold: true; family: "Inter" }
+                    font { pixelSize: 13; bold: true; family: Theme.fontFamily }
                     Behavior on color { ColorAnimation { duration: 250 } }
                     wrapMode: Text.Wrap
                 }
@@ -511,7 +511,7 @@ Item {
                     width: parent.width
                     text: description
                     color: Theme.textSecondary
-                    font { pixelSize: 11; family: "Inter" }
+                    font { pixelSize: 11; family: Theme.fontFamily }
                     Behavior on color { ColorAnimation { duration: 250 } }
                     wrapMode: Text.Wrap
                 }

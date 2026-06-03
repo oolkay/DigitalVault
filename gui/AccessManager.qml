@@ -50,13 +50,13 @@ Item {
                 Text {
                     text: "Access Manager"
                     color: Theme.textPrimary
-                    font { pixelSize: 26; bold: true; family: "Inter" }
+                    font { pixelSize: 26; bold: true; family: Theme.fontFamily }
                     Behavior on color { ColorAnimation { duration: 250 } }
                 }
                 Text {
                     text: "Manage who can unlock the selected vault."
                     color: Theme.textSecondary
-                    font { pixelSize: 13; family: "Inter" }
+                    font { pixelSize: 13; family: Theme.fontFamily }
                     width: parent.width
                     wrapMode: Text.Wrap
                     Behavior on color { ColorAnimation { duration: 250 } }
@@ -76,11 +76,24 @@ Item {
                 Row {
                     anchors { centerIn: parent }
                     spacing: 12
-                    Text { text: "⚠"; font.pixelSize: 22; anchors.verticalCenter: parent.verticalCenter }
+                    Rectangle {
+                        width: 24
+                        height: 24
+                        radius: 12
+                        color: Theme.bgSurface
+                        border.color: Theme.warning
+                        anchors.verticalCenter: parent.verticalCenter
+                        Text {
+                            anchors.centerIn: parent
+                            text: "!"
+                            color: Theme.warning
+                            font { pixelSize: 13; bold: true; family: Theme.fontFamily }
+                        }
+                    }
                     Text {
                         text: "Please select a vault from the Dashboard first."
                         color: Theme.warning
-                        font { pixelSize: 14; bold: true; family: "Inter" }
+                        font { pixelSize: 14; bold: true; family: Theme.fontFamily }
                         anchors.verticalCenter: parent.verticalCenter
                     }
                 }
@@ -104,11 +117,7 @@ Item {
                 Rectangle {
                     anchors { top: parent.top; left: parent.left; right: parent.right }
                     height: 3; radius: parent.radius
-                    gradient: Gradient {
-                        orientation: Gradient.Horizontal
-                        GradientStop { position: 0.0; color: "#2ECC88" }
-                        GradientStop { position: 1.0; color: "#4E6BF5" }
-                    }
+                    color: Theme.accent
                 }
 
                 Column {
@@ -121,11 +130,24 @@ Item {
 
                     Row {
                         spacing: 10
-                        Text { text: "🔑"; font.pixelSize: 18; anchors.verticalCenter: parent.verticalCenter }
+                        Rectangle {
+                            width: 28
+                            height: 28
+                            radius: Theme.radiusSm
+                            color: Theme.accentGlow
+                            border.color: Theme.borderFocus
+                            anchors.verticalCenter: parent.verticalCenter
+                            Text {
+                                anchors.centerIn: parent
+                                text: "A"
+                                color: Theme.accent
+                                font { pixelSize: 12; bold: true; family: Theme.fontFamily }
+                            }
+                        }
                         Text {
                             text: "Grant New Access Wizard"
                             color: Theme.textPrimary
-                            font { pixelSize: 15; bold: true; family: "Inter" }
+                            font { pixelSize: 15; bold: true; family: Theme.fontFamily }
                             anchors.verticalCenter: parent.verticalCenter
                             Behavior on color { ColorAnimation { duration: 250 } }
                         }
@@ -163,12 +185,12 @@ Item {
                                 Text {
                                     text: "Step 1: Owner Authorization"
                                     color: Theme.textPrimary
-                                    font { pixelSize: 14; bold: true; family: "Inter" }
+                                    font { pixelSize: 14; bold: true; family: Theme.fontFamily }
                                 }
                                 Text {
                                     text: "To grant access to someone else, first verify your identity with the owner fingerprint."
                                     color: Theme.textSecondary
-                                    font { pixelSize: 12; family: "Inter" }
+                                    font { pixelSize: 12; family: Theme.fontFamily }
                                     width: parent.width
                                     wrapMode: Text.Wrap
                                 }
@@ -177,7 +199,7 @@ Item {
                                     spacing: 16
                                     Column {
                                         spacing: 6
-                                        Text { text: "Owner fingerprint"; color: Theme.textSecondary; font { pixelSize: 11; bold: true; family: "Inter" } }
+                                        Text { text: "Owner fingerprint"; color: Theme.textSecondary; font { pixelSize: 11; bold: true; family: Theme.fontFamily } }
                                         Rectangle {
                                             width: 100; height: 38; radius: 8
                                             color: Theme.bgInput
@@ -187,7 +209,7 @@ Item {
                                                 id: step1OwnerInput
                                                 anchors { fill: parent; margins: 10 }
                                                 color: Theme.textPrimary
-                                                font { pixelSize: 14; family: "Inter" }
+                                                font { pixelSize: 14; family: Theme.fontFamily }
                                                 text: "1"
                                                 validator: IntValidator { bottom: 1; top: 127 }
                                             }
@@ -202,7 +224,7 @@ Item {
                                             anchors.centerIn: parent
                                             text: "Verify & Continue →"
                                             color: "white"
-                                            font { pixelSize: 12; bold: true; family: "Inter" }
+                                            font { pixelSize: 12; bold: true; family: Theme.fontFamily }
                                         }
                                         MouseArea {
                                             anchors.fill: parent
@@ -233,12 +255,12 @@ Item {
                                 Text {
                                     text: "Step 2: New User Enrollment"
                                     color: Theme.textPrimary
-                                    font { pixelSize: 14; bold: true; family: "Inter" }
+                                    font { pixelSize: 14; bold: true; family: Theme.fontFamily }
                                 }
                                 Text {
                                     text: "Authorization successful. Now, enter the details for the new user. When you click 'Grant Access', the new user must place their finger on the sensor to finalize."
                                     color: Theme.success
-                                    font { pixelSize: 12; family: "Inter" }
+                                    font { pixelSize: 12; family: Theme.fontFamily }
                                     width: parent.width
                                     wrapMode: Text.Wrap
                                 }
@@ -250,7 +272,7 @@ Item {
                                     Column {
                                         spacing: 6
                                         Layout.preferredWidth: 100
-                                        Text { text: "New fingerprint"; color: Theme.textSecondary; font { pixelSize: 11; bold: true; family: "Inter" } }
+                                        Text { text: "New fingerprint"; color: Theme.textSecondary; font { pixelSize: 11; bold: true; family: Theme.fontFamily } }
                                         Rectangle {
                                             width: parent.width; height: 38; radius: 8
                                             color: Theme.bgInput
@@ -260,7 +282,7 @@ Item {
                                                 id: step2NewIdInput
                                                 anchors { fill: parent; margins: 10 }
                                                 color: Theme.textPrimary
-                                                font { pixelSize: 14; family: "Inter" }
+                                                font { pixelSize: 14; family: Theme.fontFamily }
                                                 text: "2"
                                                 validator: IntValidator { bottom: 1; top: 127 }
                                             }
@@ -270,7 +292,7 @@ Item {
                                     Column {
                                         spacing: 6
                                         Layout.fillWidth: true
-                                        Text { text: "Alias / Description (e.g., 'Left Hand Point')"; color: Theme.textSecondary; font { pixelSize: 11; bold: true; family: "Inter" } }
+                                        Text { text: "Alias / Description (e.g., 'Left Hand Point')"; color: Theme.textSecondary; font { pixelSize: 11; bold: true; family: Theme.fontFamily } }
                                         Rectangle {
                                             width: parent.width; height: 38; radius: 8
                                             color: Theme.bgInput
@@ -280,7 +302,7 @@ Item {
                                                 id: step2NewNameInput
                                                 anchors { fill: parent; margins: 10 }
                                                 color: Theme.textPrimary
-                                                font { pixelSize: 14; family: "Inter" }
+                                                font { pixelSize: 14; family: Theme.fontFamily }
                                                 text: "New User"
                                             }
                                         }
@@ -297,7 +319,7 @@ Item {
                                             anchors.centerIn: parent
                                             text: "← Back"
                                             color: Theme.textSecondary
-                                            font { pixelSize: 12; bold: true; family: "Inter" }
+                                            font { pixelSize: 12; bold: true; family: Theme.fontFamily }
                                         }
                                         MouseArea {
                                             anchors.fill: parent
@@ -312,7 +334,7 @@ Item {
                                             anchors.centerIn: parent
                                             text: "Scan Finger & Grant Access"
                                             color: "white"
-                                            font { pixelSize: 12; bold: true; family: "Inter" }
+                                            font { pixelSize: 12; bold: true; family: Theme.fontFamily }
                                         }
                                         MouseArea {
                                             anchors.fill: parent
@@ -359,11 +381,24 @@ Item {
                         Row {
                             anchors.verticalCenter: parent.verticalCenter
                             spacing: 10
-                            Text { text: "🔑"; font.pixelSize: 18; anchors.verticalCenter: parent.verticalCenter }
+                            Rectangle {
+                                width: 28
+                                height: 28
+                                radius: Theme.radiusSm
+                                color: Theme.accentGlow
+                                border.color: Theme.borderFocus
+                                anchors.verticalCenter: parent.verticalCenter
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: "A"
+                                    color: Theme.accent
+                                    font { pixelSize: 12; bold: true; family: Theme.fontFamily }
+                                }
+                            }
                             Text {
                                 text: "Access list"
                                 color: Theme.textPrimary
-                                font { pixelSize: 15; bold: true; family: "Inter" }
+                                font { pixelSize: 15; bold: true; family: Theme.fontFamily }
                                 anchors.verticalCenter: parent.verticalCenter
                                 Behavior on color { ColorAnimation { duration: 250 } }
                             }
@@ -393,7 +428,7 @@ Item {
                                 anchors.centerIn: parent
                                 text: "↻  Refresh"
                                 color: Theme.textSecondary
-                                font { pixelSize: 11; bold: true; family: "Inter" }
+                                font { pixelSize: 11; bold: true; family: Theme.fontFamily }
                                 Behavior on color { ColorAnimation { duration: 250 } }
                             }
                             MouseArea {
@@ -449,13 +484,13 @@ Item {
                                         Text {
                                             text: modelData.label
                                             color: Theme.textPrimary
-                                            font { pixelSize: 13; bold: true; family: "Inter" }
+                                            font { pixelSize: 13; bold: true; family: Theme.fontFamily }
                                             Behavior on color { ColorAnimation { duration: 250 } }
                                         }
                                         Text {
                                             text: modelData.isOwner ? "Owner fingerprint" : "Additional fingerprint"
                                             color: Theme.textMuted
-                                            font { pixelSize: 11; family: "Inter" }
+                                            font { pixelSize: 11; family: Theme.fontFamily }
                                             Behavior on color { ColorAnimation { duration: 250 } }
                                         }
                                     }
@@ -475,7 +510,7 @@ Item {
                                             anchors.centerIn: parent
                                             text: "Revoke"
                                             color: Theme.danger
-                                            font { pixelSize: 11; bold: true; family: "Inter" }
+                                            font { pixelSize: 11; bold: true; family: Theme.fontFamily }
                                         }
                                         MouseArea {
                                             id: revokeMouse
@@ -503,7 +538,7 @@ Item {
                                             anchors.centerIn: parent
                                             text: "OWNER"
                                             color: Theme.success
-                                            font { pixelSize: 10; bold: true; family: "Inter" }
+                                            font { pixelSize: 10; bold: true; family: Theme.fontFamily }
                                         }
                                     }
                                 }
@@ -533,7 +568,7 @@ Item {
                                     anchors.horizontalCenter: parent.horizontalCenter
                                     text: "No authorized fingerprints yet. Set up your vault first."
                                     color: Theme.textMuted
-                                    font { pixelSize: 13; family: "Inter" }
+                                    font { pixelSize: 13; family: Theme.fontFamily }
                                     Behavior on color { ColorAnimation { duration: 250 } }
                                 }
                             }
@@ -566,7 +601,7 @@ Item {
                 anchors.centerIn: parent
                 text: "Revoke Access"
                 color: Theme.danger
-                font { pixelSize: 16; bold: true; family: "Inter" }
+                font { pixelSize: 16; bold: true; family: Theme.fontFamily }
             }
         }
 
@@ -580,7 +615,7 @@ Item {
                 width: parent.width
                 text: "Are you sure you want to remove this fingerprint?"
                 color: Theme.textPrimary
-                font { pixelSize: 14; family: "Inter" }
+                font { pixelSize: 14; family: Theme.fontFamily }
                 horizontalAlignment: Text.AlignHCenter
                 wrapMode: Text.Wrap
             }
@@ -588,7 +623,7 @@ Item {
                 width: parent.width
                 text: "This user will no longer be able to unlock the vault. This action cannot be undone."
                 color: Theme.textSecondary
-                font { pixelSize: 12; family: "Inter" }
+                font { pixelSize: 12; family: Theme.fontFamily }
                 horizontalAlignment: Text.AlignHCenter
                 wrapMode: Text.Wrap
             }

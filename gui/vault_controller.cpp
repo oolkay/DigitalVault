@@ -569,7 +569,7 @@ QString VaultController::resolveSerialPort()
     if (port.isEmpty()
         && settings.value(QStringLiteral("hal/autoDetectUsb"), false).toBool()) {
         const QDir devDir(QStringLiteral("/dev"));
-        const auto filters = QDir::System | QDir::Files | QDir::Readable;
+        const auto filters = QDir::System | QDir::Files;
         const QStringList names =
             devDir.entryList({QStringLiteral("ttyUSB*"), QStringLiteral("ttyACM*")},
                              filters, QDir::Name);
@@ -747,7 +747,7 @@ QStringList VaultController::availableSerialPorts()
 {
     QStringList ports;
     const QDir devDir(QStringLiteral("/dev"));
-    const auto filters = QDir::System | QDir::Files | QDir::Readable;
+    const auto filters = QDir::System | QDir::Files;
     ports << devDir.entryList({QStringLiteral("ttyUSB*"), QStringLiteral("ttyACM*")},
                               filters, QDir::Name);
     for (int i = 0; i < ports.size(); ++i)
@@ -2322,25 +2322,30 @@ bool VaultController::mountVault()
     return false;
 }
 
-bool VaultController::unmountVault()
+VaultController::LockResult VaultController::unmountVault(bool force)
 {
-    addLog("INFO", "Locking vault and clearing kernel keys...");
+    addLog("INFO", force
+           ? "Force-locking vault and closing holders..."
+           : "Locking vault and clearing kernel keys...");
 
-    int ret = runVaultManager({"close", m_mountPoint}, 10000);
+    const int ret = force
+        ? runVaultManager({"forceclose", m_mountPoint}, 20000)
+        : runVaultManager({"close", m_mountPoint}, 10000);
 
     if (ret == 0) {
-        addLog("SUCCESS", "Vault locked. Encryption keys cleared from kernel.");
-        return true;
+        addLog("SUCCESS", force
+               ? "Vault force-locked. Holders were closed and encryption keys cleared."
+               : "Vault locked. Encryption keys cleared from kernel.");
+        return LockResult::Success;
     }
 
-    if (ret == 2) {
+    if (!force && ret == 2) {
         addLog("WARNING", "Mount point is busy. Close file manager or terminal windows using the vault.");
-        emit notificationReceived(
-            "Could not lock vault: mount point is busy. Close apps using the mount folder.", true);
-    } else {
-        addLog("ERROR", "Failed to close vault (exit code: " + QString::number(ret) + ")");
+        return LockResult::Busy;
     }
-    return false;
+
+    addLog("ERROR", "Failed to close vault (exit code: " + QString::number(ret) + ")");
+    return LockResult::Failed;
 }
 
 bool VaultController::isFingerAllowedForSelectedVault(int fingerId) const
@@ -2524,6 +2529,11 @@ bool VaultController::beginVaultSetupBiometric(const QString &device, bool force
         emit notificationReceived(QStringLiteral("Fingerprint sensor not connected"), true);
         return false;
     }
+    const QString ownerLabel = m_setupOwnerLabel.trimmed();
+    if (ownerLabel.isEmpty()) {
+        emit notificationReceived(QStringLiteral("Enter a fingerprint name before setup."), true);
+        return false;
+    }
     if (!ensureFingerprintIdle())
         return false;
 
@@ -2533,6 +2543,7 @@ bool VaultController::beginVaultSetupBiometric(const QString &device, bool force
     m_pendingSetup.vaultName = vaultName;
     m_pendingSetup.normalName = normalName;
     m_pendingSetup.normalFs = normalFs;
+    m_pendingSetup.ownerLabel = ownerLabel;
     m_pendingSetup.valid = true;
 
     const qint64 nowMs = QDateTime::currentMSecsSinceEpoch();
@@ -2605,29 +2616,45 @@ void VaultController::beginUnlockVault()
     beginFingerprintUnlock();
 }
 
-void VaultController::beginLockVault()
+void VaultController::beginLockVault(bool force)
 {
+    const QString device = m_selectedDevice;
+
     m_isToggling = true;
     emit togglingChanged();
-    updateActivity("Locking vault...");
+    updateActivity(force ? "Force locking vault..." : "Locking vault...");
     emit statusChanged();
 
-    QFuture<bool> future = QtConcurrent::run(&VaultController::unmountVault, this);
-    auto watcher = new QFutureWatcher<bool>(this);
-    connect(watcher, &QFutureWatcher<bool>::finished, this, [this, watcher]() {
-        const bool success = watcher->result();
+    QFuture<LockResult> future = QtConcurrent::run([this, force]() {
+        return unmountVault(force);
+    });
+    auto watcher = new QFutureWatcher<LockResult>(this);
+    connect(watcher, &QFutureWatcher<LockResult>::finished, this, [this, watcher, force, device]() {
+        const LockResult result = watcher->result();
         m_isToggling = false;
         emit togglingChanged();
 
-        if (success) {
+        if (result == LockResult::Success) {
             m_isLocked = true;
             m_unlockedDevice.clear();
             saveState(QStringLiteral("locked"), false);
-            updateActivity("Vault locked successfully.");
-            emit notificationReceived("Vault locked and dismounted.", false);
+            updateActivity(force ? "Vault force-locked successfully." : "Vault locked successfully.");
+            emit notificationReceived(
+                force
+                    ? "Vault force-locked. Apps using the vault may have been closed."
+                    : "Vault locked and dismounted.",
+                false);
+        } else if (result == LockResult::Busy) {
+            updateActivity("Lock paused; vault is in use.");
+            emit notificationReceived(
+                "Vault is in use. Confirm force lock to close apps using it.",
+                true);
+            emit lockRequiresForceConfirmation(device);
         } else {
-            emit notificationReceived("Failed to lock vault!", true);
-            updateActivity("Lock failed.");
+            emit notificationReceived(
+                force ? "Force lock failed!" : "Failed to lock vault!",
+                true);
+            updateActivity(force ? "Force lock failed." : "Lock failed.");
         }
         emit statusChanged();
         watcher->deleteLater();
@@ -2667,6 +2694,26 @@ void VaultController::toggleVault()
     beginUnlockVault();
 }
 
+void VaultController::forceLockVault()
+{
+    if (m_isToggling)
+        return;
+
+    resetAutoLockTimer();
+
+    if (m_selectedDevice.isEmpty()) {
+        emit notificationReceived("Select a vault first.", true);
+        return;
+    }
+
+    if (!isVaultUnlockedForDevice(m_selectedDevice)) {
+        emit notificationReceived("Vault is not unlocked.", false);
+        return;
+    }
+
+    beginLockVault(true);
+}
+
 /* ─── Vault Setup (First-Time LUKS Format) ───────────────────────────────── */
 
 bool VaultController::setupVault(const QString &device, bool force, int ownerId, int vaultSizeMB,
@@ -2694,15 +2741,17 @@ bool VaultController::setupVault(const QString &device, bool force, int ownerId,
         m_setupOwnerFingerId = ownerId;
         return beginVaultSetupBiometric(device, force, vaultSizeMB, vaultName, normalName, normalFs);
     }
-    launchSetupAsync(device, ownerId, force, vaultSizeMB, vaultName, normalName, normalFs, QByteArray());
+    launchSetupAsync(device, ownerId, force, vaultSizeMB, vaultName, normalName, normalFs,
+                     m_setupOwnerLabel.trimmed(), QByteArray());
     return true;
 }
 
 void VaultController::launchSetupAsync(const QString &device, int ownerId, bool force, int vaultSizeMB,
                                        const QString &vaultName, const QString &normalName,
-                                       const QString &normalFs, const QByteArray &key32)
+                                       const QString &normalFs, const QString &ownerLabel,
+                                       const QByteArray &key32)
 {
-    const QString ownerLabelForRegistry = m_setupOwnerLabel.trimmed();
+    const QString ownerLabelForRegistry = ownerLabel.trimmed();
     if (ownerLabelForRegistry.isEmpty()) {
         emit notificationReceived(QStringLiteral("Enter a fingerprint name before setup."), true);
         return;
@@ -2776,6 +2825,7 @@ void VaultController::launchSetupAsync(const QString &device, int ownerId, bool 
             m_setupOwnerLabel.clear();
             emit setupOwnerLabelChanged();
         }
+        m_pendingSetup.ownerLabel.clear();
     });
 
     QStringList args;
@@ -2820,7 +2870,7 @@ void VaultController::finishSetupWithKey(const QByteArray &key32)
     const int ownerId = m_setupOwnerFingerId;
     launchSetupAsync(m_pendingSetup.device, ownerId, m_pendingSetup.force, m_pendingSetup.vaultSizeMB,
                      m_pendingSetup.vaultName, m_pendingSetup.normalName, m_pendingSetup.normalFs,
-                     key32);
+                     m_pendingSetup.ownerLabel, key32);
     m_pendingSetup.valid = false;
 }
 
@@ -4805,26 +4855,17 @@ QVariantList VaultController::availablePartitionActions(const QString &diskPath,
         actions << a;
     };
 
-    add(QStringLiteral("setup_encryption"), QStringLiteral("Set up encryption"), false);
-    if (!parts.isEmpty())
-        add(QStringLiteral("repartition_disk"), QStringLiteral("Repartition entire disk"), true);
-
     bool hasLuks = false;
-    bool hasNormal = false;
     for (const QVariant &v : parts) {
         const QString role = v.toMap().value(QStringLiteral("role")).toString();
         if (role == QStringLiteral("luks"))
             hasLuks = true;
-        else
-            hasNormal = true;
     }
 
+    if (!hasLuks)
+        add(QStringLiteral("setup_encryption"), QStringLiteral("Set up encryption"), false);
     if (hasLuks)
         add(QStringLiteral("delete_vault"), QStringLiteral("Delete vault"), true);
-    if (hasNormal)
-        add(QStringLiteral("format_normal"), QStringLiteral("Format normal partition"), true);
-    if (parts.size() >= 2)
-        add(QStringLiteral("merge_partitions"), QStringLiteral("Merge partitions…"), true);
 
     return actions;
 }
@@ -4874,7 +4915,14 @@ bool VaultController::applyStoragePlan(const QVariantMap &plan)
 
 QStringList VaultController::supportedFilesystems() const
 {
-    return {QStringLiteral("exfat"), QStringLiteral("ext4")};
+    return {
+        QStringLiteral("exfat"),
+        QStringLiteral("vfat"),
+        QStringLiteral("ext4"),
+        QStringLiteral("ntfs"),
+        QStringLiteral("xfs"),
+        QStringLiteral("btrfs")
+    };
 }
 
 QVariantList VaultController::managedDevices() const
@@ -5057,5 +5105,5 @@ void VaultController::handleAutoLock()
     if (m_isToggling || !isVaultRuntimeOpen())
         return;
     addLog("WARNING", "Inactivity timeout reached. Auto-locking vault...");
-    beginLockVault();
+    beginLockVault(false);
 }

@@ -10,6 +10,7 @@ Item {
     property string devicePath: ""
     property var layoutData: ({})
     property string selectedPartitionPath: ""
+    property int detailTabIndex: 0
 
     signal backRequested()
     signal partitionPathChanged(string path)
@@ -29,6 +30,8 @@ Item {
     readonly property var deviceData: deviceEntry()
 
     onDevicePathChanged: {
+        detailTabIndex = 0
+        root.partitionPathChanged("")
         if (accessCard)
             accessCard.refreshAccessList()
     }
@@ -51,6 +54,17 @@ Item {
                 title: deviceData.displayName || deviceData.name || devicePath || "Vault"
                 subtitle: devicePath
                 onBackRequested: root.backRequested()
+            }
+
+            Text {
+                width: parent.width
+                text: "Vault Manager / "
+                      + (deviceData.displayName || deviceData.name || "Vault")
+                      + " / "
+                      + (root.detailTabIndex === 0 ? "Layout" : "Access")
+                color: Theme.textMuted
+                font { pixelSize: 13; family: Theme.fontFamily }
+                elide: Text.ElideRight
             }
 
             Rectangle {
@@ -90,8 +104,13 @@ Item {
                                     id: summaryStatus
                                     anchors.centerIn: parent
                                     text: deviceData.statusLabel || "Locked"
-                                    color: Theme.textSecondary
-                                    font { pixelSize: 10; family: "Inter" }
+                                    color: {
+                                        const s = deviceData.statusLabel || ""
+                                        if (s === "Unlocked") return Theme.success
+                                        if (s === "Unavailable") return Theme.danger
+                                        return Theme.textSecondary
+                                    }
+                                    font { pixelSize: 12; bold: true; family: Theme.fontFamily }
                                 }
                             }
 
@@ -100,7 +119,7 @@ Item {
                                 anchors.verticalCenter: parent.verticalCenter
                                 text: "Unlock on Dashboard →"
                                 color: Theme.accent
-                                font { pixelSize: 11; family: "Inter" }
+                                font { pixelSize: 13; family: Theme.fontFamily }
                                 MouseArea {
                                     anchors.fill: parent
                                     cursorShape: Qt.PointingHandCursor
@@ -123,7 +142,7 @@ Item {
                                 anchors.centerIn: parent
                                 text: "Rename"
                                 color: Theme.textPrimary
-                                font { pixelSize: 11; family: "Inter" }
+                                font { pixelSize: 13; family: Theme.fontFamily }
                             }
 
                             MouseArea {
@@ -142,15 +161,134 @@ Item {
                         text: deviceData.description || ""
                         visible: text !== ""
                         color: Theme.textSecondary
-                        font { pixelSize: 11; family: "Inter" }
+                        font { pixelSize: 13; family: Theme.fontFamily }
                     }
                 }
             }
 
+            Rectangle {
+                id: detailTabs
+                width: parent.width
+                height: 76
+                radius: Theme.radius
+                color: Theme.bgCard
+                border.color: Theme.border
+                border.width: 1
+
+                Rectangle {
+                    anchors {
+                        left: parent.left
+                        right: parent.right
+                        top: parent.top
+                        leftMargin: 1
+                        rightMargin: 1
+                        topMargin: 42
+                    }
+                    height: 1
+                    color: Theme.border
+                }
+
+                Row {
+                    anchors {
+                        left: parent.left
+                        right: parent.right
+                        top: parent.top
+                        leftMargin: 8
+                        rightMargin: 8
+                        topMargin: 6
+                    }
+                    height: 38
+                    spacing: 0
+
+                    Repeater {
+                        model: [
+                            {
+                                label: "Layout",
+                                meta: (root.layoutData.partitions || []).length + " partitions",
+                                index: 0
+                            },
+                            {
+                                label: "Access",
+                                meta: accessCard.accessEntries.length + "/4 people",
+                                index: 1
+                            }
+                        ]
+
+                        delegate: Rectangle {
+                            id: tabItem
+                            width: parent.width / 2
+                            height: parent.height
+                            radius: 0
+                            color: root.detailTabIndex === modelData.index
+                                   ? Theme.bgSurface
+                                   : (tabMouse.containsMouse ? Theme.bgHover : "transparent")
+
+                            Row {
+                                anchors.centerIn: parent
+                                spacing: 8
+
+                                Text {
+                                    text: modelData.label
+                                    color: root.detailTabIndex === modelData.index
+                                           ? Theme.navActiveText
+                                           : Theme.textPrimary
+                                    font { pixelSize: 12; bold: true; family: Theme.fontFamily }
+                                }
+
+                                Text {
+                                    text: modelData.meta
+                                    color: Theme.textMuted
+                                    font { pixelSize: 12; family: Theme.fontFamily }
+                                }
+                            }
+
+                            Rectangle {
+                                anchors {
+                                    left: parent.left
+                                    right: parent.right
+                                    bottom: parent.bottom
+                                    leftMargin: 12
+                                    rightMargin: 12
+                                }
+                                height: 3
+                                radius: 2
+                                color: Theme.accent
+                                visible: root.detailTabIndex === modelData.index
+                            }
+
+                            MouseArea {
+                                id: tabMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: root.detailTabIndex = modelData.index
+                            }
+                        }
+                    }
+                }
+
+                Text {
+                    anchors {
+                        left: parent.left
+                        right: parent.right
+                        bottom: parent.bottom
+                        leftMargin: 14
+                        rightMargin: 14
+                        bottomMargin: 8
+                    }
+                    text: root.detailTabIndex === 0
+                          ? "Partition layout and storage actions for this vault."
+                          : "Fingerprints allowed to unlock this vault."
+                    color: Theme.textSecondary
+                    font { pixelSize: 13; family: Theme.fontFamily }
+                    elide: Text.ElideRight
+                }
+            }
 
             Rectangle {
                 id: accessCard
                 width: parent.width
+                visible: root.detailTabIndex === 1
                 radius: Theme.radius
                 color: Theme.bgCard
                 border.color: Theme.border
@@ -214,23 +352,24 @@ Item {
                     Text {
                         text: "People who can unlock this vault"
                         color: Theme.textPrimary
-                        font { pixelSize: 15; bold: true; family: "Inter" }
+                        font { pixelSize: 17; bold: true; family: Theme.fontFamily }
                     }
 
                     Text {
                         width: parent.width
                         wrapMode: Text.Wrap
-                        text: "Add, rename, or remove fingerprints for this vault."
+                        text: "Manage fingerprints that can unlock this vault."
                         color: Theme.textSecondary
-                        font { pixelSize: 11; family: "Inter" }
+                        font { pixelSize: 13; family: Theme.fontFamily }
                     }
 
                     Text {
                         width: parent.width
                         visible: accessCard.accessEntries.length === 0
-                        text: "No authorized fingerprints yet."
+                        wrapMode: Text.Wrap
+                        text: "No additional fingerprints yet. Owner access is created during setup; add another fingerprint to share access."
                         color: Theme.textMuted
-                        font { pixelSize: 11; family: "Inter" }
+                        font { pixelSize: 13; family: Theme.fontFamily }
                     }
 
                     Repeater {
@@ -238,7 +377,7 @@ Item {
                         delegate: Rectangle {
                             id: accessRow
                             width: parent.width
-                            height: 48
+                            height: 54
                             radius: 8
                             color: Theme.bgOverlay
                             border.color: Theme.border
@@ -261,7 +400,7 @@ Item {
                                         width: parent.width
                                         text: modelData.label || "Unnamed fingerprint"
                                         color: Theme.textPrimary
-                                        font { pixelSize: 13; bold: true; family: "Inter" }
+                                        font { pixelSize: 15; bold: true; family: Theme.fontFamily }
                                         elide: Text.ElideRight
                                     }
 
@@ -275,7 +414,7 @@ Item {
                                         color: Theme.textPrimary
                                         selectionColor: Theme.accent
                                         selectedTextColor: "white"
-                                        font { pixelSize: 13; family: "Inter" }
+                                        font { pixelSize: 15; family: Theme.fontFamily }
                                         verticalAlignment: TextInput.AlignVCenter
                                         clip: true
                                         onAccepted: {
@@ -297,16 +436,16 @@ Item {
 
                                 Row {
                                     id: actionGroup
-                                    width: accessRow.editing ? 104 : (modelData.isOwner ? 120 : 160)
+                                    width: accessRow.editing ? 128 : (modelData.isOwner ? 132 : 188)
                                     height: parent.height
                                     spacing: 6
                                     layoutDirection: Qt.RightToLeft
 
                                     Rectangle {
                                         visible: accessRow.editing
-                                        width: saveLbl.implicitWidth + 12
-                                        height: 28
-                                        radius: 14
+                                        width: saveLbl.implicitWidth + 16
+                                        height: 32
+                                        radius: Theme.radiusSm
                                         color: saveMouse.containsMouse ? Theme.accentGlow : "transparent"
 
                                         Text {
@@ -314,7 +453,7 @@ Item {
                                             anchors.centerIn: parent
                                             text: "Save"
                                             color: Theme.accent
-                                            font { pixelSize: 11; bold: true; family: "Inter" }
+                                            font { pixelSize: 13; bold: true; family: Theme.fontFamily }
                                         }
 
                                         MouseArea {
@@ -332,9 +471,9 @@ Item {
 
                                     Rectangle {
                                         visible: accessRow.editing
-                                        width: cancelLbl.implicitWidth + 12
-                                        height: 28
-                                        radius: 14
+                                        width: cancelLbl.implicitWidth + 16
+                                        height: 32
+                                        radius: Theme.radiusSm
                                         color: cancelMouse.containsMouse ? Theme.bgHover : "transparent"
 
                                         Text {
@@ -342,7 +481,7 @@ Item {
                                             anchors.centerIn: parent
                                             text: "Cancel"
                                             color: Theme.textSecondary
-                                            font { pixelSize: 11; bold: true; family: "Inter" }
+                                            font { pixelSize: 13; bold: true; family: Theme.fontFamily }
                                         }
 
                                         MouseArea {
@@ -359,9 +498,9 @@ Item {
 
                                     Rectangle {
                                         visible: !accessRow.editing
-                                        width: editLbl.implicitWidth + 12
-                                        height: 28
-                                        radius: 14
+                                        width: editLbl.implicitWidth + 16
+                                        height: 32
+                                        radius: Theme.radiusSm
                                         color: editMouse.containsMouse ? Theme.accentGlow : "transparent"
 
                                         Text {
@@ -369,7 +508,7 @@ Item {
                                             anchors.centerIn: parent
                                             text: "Rename"
                                             color: Theme.accent
-                                            font { pixelSize: 11; bold: true; family: "Inter" }
+                                            font { pixelSize: 13; bold: true; family: Theme.fontFamily }
                                         }
 
                                         MouseArea {
@@ -388,9 +527,9 @@ Item {
 
                                     Rectangle {
                                         visible: !modelData.isOwner && !accessRow.editing
-                                        width: removeLbl.implicitWidth + 12
-                                        height: 28
-                                        radius: 14
+                                        width: removeLbl.implicitWidth + 16
+                                        height: 32
+                                        radius: Theme.radiusSm
                                         color: removeMouse.containsMouse ? Theme.dangerBg : "transparent"
 
                                         Text {
@@ -398,7 +537,7 @@ Item {
                                             anchors.centerIn: parent
                                             text: "Remove"
                                             color: Theme.danger
-                                            font { pixelSize: 11; bold: true; family: "Inter" }
+                                            font { pixelSize: 13; bold: true; family: Theme.fontFamily }
                                         }
 
                                         MouseArea {
@@ -414,9 +553,9 @@ Item {
 
                                     Rectangle {
                                         visible: modelData.isOwner && !accessRow.editing
-                                        width: ownerLbl.implicitWidth + 12
-                                        height: 24
-                                        radius: 12
+                                        width: ownerLbl.implicitWidth + 16
+                                        height: 28
+                                        radius: Theme.radiusSm
                                         color: Theme.accentGlow
 
                                         Text {
@@ -424,7 +563,7 @@ Item {
                                             anchors.centerIn: parent
                                             text: "Owner"
                                             color: Theme.accent
-                                            font { pixelSize: 10; bold: true; family: "Inter" }
+                                            font { pixelSize: 12; bold: true; family: Theme.fontFamily }
                                         }
                                     }
                                 }
@@ -438,14 +577,14 @@ Item {
                         wrapMode: Text.Wrap
                         text: "Connect the fingerprint sensor to manage access."
                         color: Theme.textSecondary
-                        font { pixelSize: 11; family: "Inter" }
+                        font { pixelSize: 13; family: Theme.fontFamily }
                     }
 
                     Text {
                         visible: !accessCard.canUseSensor
                         text: "Open Settings"
                         color: Theme.accent
-                        font { pixelSize: 11; bold: true; family: "Inter" }
+                        font { pixelSize: 13; bold: true; family: Theme.fontFamily }
                         MouseArea {
                             anchors.fill: parent
                             anchors.margins: -4
@@ -459,7 +598,7 @@ Item {
                         visible: accessCard.atAccessCapacity
                         text: "Maximum of 4 access entries for this vault."
                         color: Theme.warning
-                        font { pixelSize: 11; family: "Inter" }
+                        font { pixelSize: 13; family: Theme.fontFamily }
                     }
 
                     WizardTextField {
@@ -479,7 +618,9 @@ Item {
             }
 
             Rectangle {
+                id: layoutCard
                 width: parent.width
+                visible: root.detailTabIndex === 0
                 radius: Theme.radius
                 color: Theme.bgCard
                 border.color: Theme.border
@@ -495,7 +636,15 @@ Item {
                     Text {
                         text: "Layout editor"
                         color: Theme.textPrimary
-                        font { pixelSize: 14; bold: true; family: "Inter" }
+                        font { pixelSize: 17; bold: true; family: Theme.fontFamily }
+                    }
+
+                    Text {
+                        width: parent.width
+                        wrapMode: Text.Wrap
+                        text: "Select a partition from the visual layout or table to see available actions."
+                        color: Theme.textSecondary
+                        font { pixelSize: 13; family: Theme.fontFamily }
                     }
 
                     PartitionLayoutView {
@@ -517,6 +666,31 @@ Item {
                         }
                     }
 
+                    Rectangle {
+                        width: parent.width
+                        height: selectHintText.implicitHeight + 20
+                        radius: Theme.radiusSm
+                        visible: root.selectedPartitionPath === ""
+                        color: Theme.bgOverlay
+                        border.color: Theme.border
+                        border.width: 1
+
+                        Text {
+                            id: selectHintText
+                            anchors {
+                                left: parent.left
+                                right: parent.right
+                                verticalCenter: parent.verticalCenter
+                                leftMargin: 12
+                                rightMargin: 12
+                            }
+                            wrapMode: Text.Wrap
+                            text: "No partition selected. Choose a row or segment before running storage actions."
+                            color: Theme.textSecondary
+                            font { pixelSize: 13; family: Theme.fontFamily }
+                        }
+                    }
+
                     StorageActionPanel {
                         width: parent.width
                         actions: vaultController.availablePartitionActions(
@@ -530,31 +704,62 @@ Item {
                                 root.deleteRequested()
                                 return
                             }
-                            vaultController.notifyUser(
-                                "This action will be available in a future update.", false)
                         }
                     }
 
                     Rectangle {
                         width: parent.width
-                        height: 36
-                        radius: 18
-                        color: delLayoutMouse.containsMouse ? Theme.dangerBg : Theme.dangerBg
+                        height: dangerZoneCol.implicitHeight + 24
+                        radius: Theme.radius
+                        color: Theme.dangerBg
                         border.color: Theme.danger
+                        border.width: 1
 
-                        Text {
-                            anchors.centerIn: parent
-                            text: "Delete vault"
-                            color: Theme.danger
-                            font { pixelSize: 12; bold: true; family: "Inter" }
-                        }
-
-                        MouseArea {
-                            id: delLayoutMouse
+                        Column {
+                            id: dangerZoneCol
                             anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: root.deleteRequested()
+                            anchors.margins: 12
+                            spacing: 10
+
+                            Text {
+                                width: parent.width
+                                text: "Danger zone"
+                                color: Theme.danger
+                                font { pixelSize: 12; bold: true; family: Theme.fontFamily }
+                            }
+
+                            Text {
+                                width: parent.width
+                                wrapMode: Text.Wrap
+                                text: "Deleting a vault can remove encrypted data and registry entries. Review the confirmation dialog before continuing."
+                                color: Theme.textPrimary
+                                font { pixelSize: 13; family: Theme.fontFamily }
+                            }
+
+                            Rectangle {
+                                width: deleteVaultLabel.implicitWidth + 24
+                                height: 34
+                                radius: Theme.radiusSm
+                                color: delLayoutMouse.containsMouse ? Theme.bgSurface : "transparent"
+                                border.color: Theme.danger
+                                border.width: 1
+
+                                Text {
+                                    id: deleteVaultLabel
+                                    anchors.centerIn: parent
+                                    text: "Delete vault"
+                                    color: Theme.danger
+                                    font { pixelSize: 12; bold: true; family: Theme.fontFamily }
+                                }
+
+                                MouseArea {
+                                    id: delLayoutMouse
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: root.deleteRequested()
+                                }
+                            }
                         }
                     }
                 }

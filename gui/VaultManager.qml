@@ -260,15 +260,33 @@ Item {
                     width: parent.width
                     text: "Delete vault?"
                     color: Theme.danger
-                    font { pixelSize: 18; bold: true; family: "Inter" }
+                    font { pixelSize: 18; bold: true; family: Theme.fontFamily }
                 }
 
                 Text {
                     width: parent.width
                     wrapMode: Text.Wrap
-                    text: "Encrypted vault data will be permanently destroyed. This cannot be undone."
-                    color: Theme.textSecondary
-                    font { pixelSize: 12; family: "Inter" }
+                    text: "Encrypted vault data will be permanently destroyed. This action cannot be undone."
+                    color: Theme.textPrimary
+                    font { pixelSize: 12; family: Theme.fontFamily }
+                }
+
+                Rectangle {
+                    width: parent.width
+                    height: deleteWarningText.implicitHeight + 20
+                    radius: Theme.radiusSm
+                    color: Theme.dangerBg
+                    border.color: Theme.danger
+                    border.width: 1
+
+                    Text {
+                        id: deleteWarningText
+                        anchors { left: parent.left; right: parent.right; verticalCenter: parent.verticalCenter; leftMargin: 12; rightMargin: 12 }
+                        wrapMode: Text.Wrap
+                        text: "Review the affected files below, then type the confirmation phrase exactly."
+                        color: Theme.textPrimary
+                        font { pixelSize: 13; family: Theme.fontFamily }
+                    }
                 }
 
                 StorageOutcomePreview {
@@ -279,8 +297,21 @@ Item {
                 WizardTextField {
                     id: deleteConfirmField
                     width: parent.width
-                    label: "Type vault name or DELETE to confirm"
+                    label: "Confirmation phrase"
+                    placeholderText: deleteVaultDialog.preview.confirmHint
+                                     ? ("Type " + deleteVaultDialog.preview.confirmHint)
+                                     : "Type DELETE"
                     text: ""
+                }
+
+                Text {
+                    width: parent.width
+                    wrapMode: Text.Wrap
+                    text: deleteBtn.enabled
+                          ? "Ready to delete."
+                          : "Delete stays disabled until the confirmation phrase matches."
+                    color: deleteBtn.enabled ? Theme.danger : Theme.textMuted
+                    font { pixelSize: 13; family: Theme.fontFamily }
                 }
 
                 Item {
@@ -350,7 +381,7 @@ Item {
                     width: parent.width
                     text: "Rename vault (display only)"
                     color: Theme.textPrimary
-                    font { pixelSize: 16; bold: true; family: "Inter" }
+                    font { pixelSize: 16; bold: true; family: Theme.fontFamily }
                 }
 
                 WizardTextField {
@@ -365,7 +396,7 @@ Item {
                     wrapMode: Text.Wrap
                     text: "Device path: " + renameDialog.targetPath + " (unchanged)"
                     color: Theme.textMuted
-                    font { pixelSize: 11; family: "Inter" }
+                    font { pixelSize: 13; family: Theme.fontFamily }
                 }
 
                 Item {
@@ -428,9 +459,9 @@ Item {
             id: createChrome
             width: 500
             stepCount: 2
-            wizardIcon: "🔁"
+            wizardIcon: "C"
             wizardTitle: "Create Loop Device"
-            gradientEndColor: "#7A5AF8"
+            gradientEndColor: Theme.accent
             finalLabel: "Create Loop Device"
             finalButtonWidth: 200
 
@@ -494,9 +525,9 @@ Item {
                     WizardStepTitle { title: "Step 2: Summary" }
                     WizardSummaryBox {
                         width: parent.width
-                        Text { text: "Backing image"; color: Theme.accent; font { pixelSize: 10; bold: true } }
-                        Text { id: createSummaryBacking; width: parent.width; wrapMode: Text.Wrap; color: Theme.textPrimary; font { pixelSize: 12 } }
-                        Text { id: createSummarySize; color: Theme.textPrimary; font { pixelSize: 12 } }
+                        Text { text: "Backing image"; color: Theme.accent; font { pixelSize: 13; bold: true; family: Theme.fontFamily } }
+                        Text { id: createSummaryBacking; width: parent.width; wrapMode: Text.Wrap; color: Theme.textPrimary; font { pixelSize: 13; family: Theme.fontFamily } }
+                        Text { id: createSummarySize; color: Theme.textPrimary; font { pixelSize: 13; family: Theme.fontFamily } }
                     }
                 }
             }
@@ -574,7 +605,7 @@ Item {
             width: 500
             stepCount: setupWarningDialog.setupStepCount
             progressStep: setupWarningDialog.setupLogicalStep
-            wizardIcon: "🔐"
+            wizardIcon: "V"
             wizardTitle: "Vault Setup Wizard"
             gradientEndColor: Theme.warning
             finalLabel: "Start Setup"
@@ -621,12 +652,12 @@ Item {
                                      : "Owner fingerprint registered. Add a name before continuing.")
                                   : "Enter a name, then enroll the owner fingerprint."
                             color: vaultController.setupOwnerFingerId > 0 ? Theme.success : Theme.textSecondary
-                            font { pixelSize: 12; family: "Inter" }
+                            font { pixelSize: 14; family: Theme.fontFamily }
                         }
                         Rectangle {
                             width: enrollBtnLbl.implicitWidth + 28
-                            height: 36
-                            radius: 18
+                            height: 42
+                            radius: Theme.radiusSm
                             color: enrollMouse.containsMouse ? Theme.accentHover : Theme.accent
                             Text {
                                 id: enrollBtnLbl
@@ -634,7 +665,7 @@ Item {
                                 text: vaultController.setupOwnerFingerId > 0
                                       ? "Re-enroll owner" : "Enroll owner fingerprint"
                                 color: "white"
-                                font { pixelSize: 12; bold: true; family: "Inter" }
+                                font { pixelSize: 14; bold: true; family: Theme.fontFamily }
                             }
                             MouseArea {
                                 id: enrollMouse
@@ -723,19 +754,23 @@ Item {
                     }
                     Rectangle {
                         width: parent.width
-                        height: 38
+                        height: forceConfirmText.implicitHeight + 20
                         radius: 8
                         color: forceCheckbox.checked ? Theme.dangerBg : Qt.rgba(1, 1, 1, 0.04)
                         border.color: forceCheckbox.checked ? Theme.danger : Theme.border
                         border.width: 1
                         Row {
                             anchors.centerIn: parent
+                            width: parent.width - 24
                             spacing: 10
                             CheckBox { id: forceCheckbox; anchors.verticalCenter: parent.verticalCenter }
                             Text {
+                                id: forceConfirmText
+                                width: Math.max(0, parent.width - forceCheckbox.width - parent.spacing)
                                 text: "I understand all data on " + setupWarningDialog.setupSession.devicePath + " will be ERASED."
                                 color: forceCheckbox.checked ? Theme.danger : Theme.textPrimary
-                                font { pixelSize: 11; bold: forceCheckbox.checked; family: "Inter" }
+                                font { pixelSize: 13; bold: forceCheckbox.checked; family: Theme.fontFamily }
+                                wrapMode: Text.Wrap
                                 anchors.verticalCenter: parent.verticalCenter
                             }
                         }
@@ -754,13 +789,13 @@ Item {
 
         function handlePrimary() {
             if (setupLogicalStep < setupStepCount - 1) {
+                if (setupLogicalStep === 0 && vaultController.setupOwnerFingerId < 1) {
+                    vaultController.notifyUser("Enroll the owner fingerprint before continuing.", true)
+                    return
+                }
                 if (setupLogicalStep === 0
                         && ownerFingerprintNameField.text.trim().length === 0) {
                     vaultController.notifyUser("Enter a fingerprint name before continuing.", true)
-                    return
-                }
-                if (setupLogicalStep === 0 && vaultController.setupOwnerFingerId < 1) {
-                    vaultController.notifyUser("Enroll the owner fingerprint before continuing.", true)
                     return
                 }
                 vaultController.setupOwnerLabel = ownerFingerprintNameField.text.trim()

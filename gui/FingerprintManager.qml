@@ -20,13 +20,13 @@ Item {
                 Text {
                     text: "Fingerprint Management"
                     color: Theme.textPrimary
-                    font { pixelSize: 26; bold: true; family: "Inter" }
+                    font { pixelSize: 26; bold: true; family: Theme.fontFamily }
                     Behavior on color { ColorAnimation { duration: 250 } }
                 }
                 Text {
                     text: vaultController.fingerprintCount + " enrolled fingerprints"
                     color: Theme.textSecondary
-                    font { pixelSize: 13; family: "Inter" }
+                    font { pixelSize: 13; family: Theme.fontFamily }
                     Behavior on color { ColorAnimation { duration: 250 } }
                 }
             }
@@ -48,7 +48,7 @@ Item {
                     anchors.centerIn: parent
                     spacing: 8
                     Text { text: "+"; color: "white"; font { pixelSize: 20; bold: true } }
-                    Text { text: "Add Fingerprint"; color: "white"; font { pixelSize: 14; bold: true; family: "Inter" } }
+                    Text { text: "Add Fingerprint"; color: "white"; font { pixelSize: 14; bold: true; family: Theme.fontFamily } }
                 }
                 MouseArea {
                     id: addMouse
@@ -80,12 +80,12 @@ Item {
                     Text {
                         text: "Place finger on sensor"
                         color: Theme.accent
-                        font { pixelSize: 13; bold: true; family: "Inter" }
+                        font { pixelSize: 13; bold: true; family: Theme.fontFamily }
                     }
                     Text {
                         text: "Add or rename fingerprints used by your vaults."
                         color: Theme.textSecondary
-                        font { pixelSize: 11; family: "Inter" }
+                        font { pixelSize: 11; family: Theme.fontFamily }
                         Behavior on color { ColorAnimation { duration: 250 } }
                     }
                 }
@@ -141,7 +141,7 @@ Item {
                                 visible: !editing
                                 text: vaultController.fingerprintLabel(index)
                                 color: Theme.textPrimary
-                                font { pixelSize: 14; bold: true; family: "Inter" }
+                                font { pixelSize: 14; bold: true; family: Theme.fontFamily }
                                 anchors.verticalCenter: parent.verticalCenter
                             }
                             
@@ -151,7 +151,7 @@ Item {
                                 anchors.fill: parent
                                 text: vaultController.fingerprintLabel(index)
                                 color: Theme.textPrimary
-                                font { pixelSize: 13; family: "Inter" }
+                                font { pixelSize: 13; family: Theme.fontFamily }
                                 background: Rectangle {
                                     color: Theme.bgOverlay
                                     border.color: Theme.accent
@@ -168,7 +168,7 @@ Item {
                         Text {
                             text: "Registered fingerprint"
                             color: Theme.textSecondary
-                            font { pixelSize: 11; family: "Inter" }
+                            font { pixelSize: 11; family: Theme.fontFamily }
                         }
                     }
 
@@ -210,7 +210,7 @@ Item {
                             anchors.centerIn: parent
                             text: "Active"
                             color: Theme.success
-                            font { pixelSize: 11; bold: true; family: "Inter" }
+                            font { pixelSize: 11; bold: true; family: Theme.fontFamily }
                         }
                     }
 
@@ -227,7 +227,7 @@ Item {
                             anchors.centerIn: parent
                             text: "Remove"
                             color: Theme.danger
-                            font { pixelSize: 12; bold: true; family: "Inter" }
+                            font { pixelSize: 12; bold: true; family: Theme.fontFamily }
                         }
                         MouseArea {
                             id: rmMouse
@@ -248,7 +248,7 @@ Item {
                 text: "No fingerprints enrolled yet.\nPress \"Add Fingerprint\" to register."
                 horizontalAlignment: Text.AlignHCenter
                 color: Theme.textMuted
-                font { pixelSize: 14; family: "Inter" }
+                font { pixelSize: 14; family: Theme.fontFamily }
                 visible: vaultController.fingerprintCount === 0
                 Behavior on color { ColorAnimation { duration: 250 } }
             }

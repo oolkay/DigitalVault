@@ -53,30 +53,61 @@ Item {
                     }
                     spacing: 10
 
-                    Text {
-                        text: "⚠"
-                        font.pixelSize: 14
-                        color: Theme.warning
+                    Rectangle {
+                        Layout.preferredWidth: 22
+                        Layout.preferredHeight: 22
+                        radius: 11
+                        color: Theme.bgSurface
+                        border.color: Theme.warning
+                        Text {
+                            anchors.centerIn: parent
+                            text: "!"
+                            color: Theme.warning
+                            font { pixelSize: 13; bold: true; family: Theme.fontFamily }
+                        }
                     }
 
-                    Text {
+                    ColumnLayout {
                         Layout.fillWidth: true
-                        text: vaultController.sensorStatusText
-                        color: Theme.textPrimary
-                        font { pixelSize: 12; family: "Inter" }
-                        wrapMode: Text.Wrap
-                        maximumLineCount: 2
+                        spacing: 2
+
+                        Text {
+                            Layout.fillWidth: true
+                            text: "Fingerprint sensor is not ready"
+                            color: Theme.textPrimary
+                            font { pixelSize: 12; bold: true; family: Theme.fontFamily }
+                            wrapMode: Text.Wrap
+                        }
+
+                        Text {
+                            Layout.fillWidth: true
+                            text: vaultController.sensorStatusText
+                            color: Theme.textSecondary
+                            font { pixelSize: 11; family: Theme.fontFamily }
+                            wrapMode: Text.Wrap
+                            maximumLineCount: 2
+                        }
                     }
 
-                    Text {
-                        id: sensorBannerLink
-                        text: "Open settings"
-                        color: Theme.accent
-                        font { pixelSize: 12; bold: true; family: "Inter" }
+                    Rectangle {
+                        Layout.preferredWidth: sensorBannerLink.implicitWidth + 22
+                        Layout.preferredHeight: 32
+                        radius: Theme.radiusSm
+                        color: sensorBannerMouse.containsMouse ? Theme.bgHover : Theme.bgSurface
+                        border.color: Theme.border
+
+                        Text {
+                            id: sensorBannerLink
+                            anchors.centerIn: parent
+                            text: "Open settings"
+                            color: Theme.accent
+                            font { pixelSize: 12; bold: true; family: Theme.fontFamily }
+                        }
 
                         MouseArea {
+                            id: sensorBannerMouse
                             anchors.fill: parent
-                            anchors.margins: -6
+                            hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
                             onClicked: vaultController.navigateToPage("Settings.qml")
                         }
@@ -90,12 +121,12 @@ Item {
                 Text {
                     text: "Vaults"
                     color: Theme.textPrimary
-                    font { pixelSize: 26; bold: true; family: "Inter" }
+                    font { pixelSize: 26; bold: true; family: Theme.fontFamily }
                 }
                 Text {
                     text: "Select a vault to unlock or manage access."
                     color: Theme.textSecondary
-                    font { pixelSize: 13; family: "Inter" }
+                    font { pixelSize: 13; family: Theme.fontFamily }
                     width: parent.width
                     wrapMode: Text.Wrap
                 }
@@ -140,10 +171,19 @@ Item {
                                 width: parent.width - 48
                                 spacing: 16
 
-                                Text {
+                                Rectangle {
                                     anchors.horizontalCenter: parent.horizontalCenter
-                                    text: "🔐"
-                                    font.pixelSize: 40
+                                    width: 48
+                                    height: 48
+                                    radius: Theme.radius
+                                    color: Theme.accentGlow
+                                    border.color: Theme.borderFocus
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: "VG"
+                                        color: Theme.accent
+                                        font { pixelSize: 15; bold: true; family: Theme.fontFamily }
+                                    }
                                 }
                                 Text {
                                     width: parent.width
@@ -151,7 +191,7 @@ Item {
                                     wrapMode: Text.Wrap
                                     text: "No vaults on this computer yet"
                                     color: Theme.textPrimary
-                                    font { pixelSize: 16; bold: true; family: "Inter" }
+                                    font { pixelSize: 16; bold: true; family: Theme.fontFamily }
                                 }
                                 Text {
                                     width: parent.width
@@ -159,7 +199,7 @@ Item {
                                     wrapMode: Text.Wrap
                                     text: "Set up encryption or create a container on the Vault Manager page."
                                     color: Theme.textSecondary
-                                    font { pixelSize: 12; family: "Inter" }
+                                    font { pixelSize: 12; family: Theme.fontFamily }
                                 }
                                 Rectangle {
                                     anchors.horizontalCenter: parent.horizontalCenter
@@ -172,7 +212,7 @@ Item {
                                         anchors.centerIn: parent
                                         text: "Create your first vault"
                                         color: "white"
-                                        font { pixelSize: 12; bold: true; family: "Inter" }
+                                        font { pixelSize: 12; bold: true; family: Theme.fontFamily }
                                     }
                                     MouseArea {
                                         id: ctaMouse
@@ -190,7 +230,13 @@ Item {
                 VaultDetailPanel {
                     id: detailPanel
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 420
+                    Layout.preferredHeight: {
+                        const actionExtra = detail.isUnlocked ? 46 : 0
+                        if (!accessListExpanded)
+                            return 420 + actionExtra
+                        const count = detail.accessList ? detail.accessList.length : 0
+                        return 420 + actionExtra + Math.min(count, 4) * 42
+                    }
                     Layout.alignment: Qt.AlignTop
                     devicePath: vaultController.selectedDevice
                     visible: vaultController.isSelectedDeviceVault
@@ -215,7 +261,7 @@ Item {
                         wrapMode: Text.Wrap
                         text: "Select a vault from the list to see details and unlock."
                         color: Theme.textMuted
-                        font { pixelSize: 14; family: "Inter" }
+                        font { pixelSize: 14; family: Theme.fontFamily }
                     }
                 }
             }

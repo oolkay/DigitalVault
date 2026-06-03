@@ -10,7 +10,7 @@ Item {
 
     property string wizardIcon: "W"
     property string wizardTitle: "Wizard"
-    property color gradientEndColor: Theme.warning
+    property color gradientEndColor: Theme.accent
     property int stepCount: 3
     property string cancelLabel: "Cancel"
     property string nextLabel: "Next →"
@@ -43,11 +43,7 @@ Item {
             width: parent.width
             height: 4
             radius: Theme.radius
-            gradient: Gradient {
-                orientation: Gradient.Horizontal
-                GradientStop { position: 0.0; color: Theme.accent }
-                GradientStop { position: 1.0; color: root.gradientEndColor }
-            }
+            color: root.gradientEndColor
         }
 
         Column {
@@ -64,15 +60,24 @@ Item {
             Row {
                 width: contentCol.innerWidth
                 spacing: 10
-                Text {
-                    text: root.wizardIcon
-                    font.pixelSize: 20
+                Rectangle {
+                    width: 28
+                    height: 28
+                    radius: Theme.radiusSm
+                    color: Theme.accentGlow
+                    border.color: Theme.borderFocus
                     anchors.verticalCenter: parent.verticalCenter
+                    Text {
+                        anchors.centerIn: parent
+                        text: root.wizardIcon
+                        color: Theme.accent
+                        font { pixelSize: 12; bold: true; family: Theme.fontFamily }
+                    }
                 }
                 Text {
                     text: root.wizardTitle
                     color: Theme.textPrimary
-                    font { pixelSize: 18; bold: true; family: "Inter" }
+                    font { pixelSize: 18; bold: true; family: Theme.fontFamily }
                     anchors.verticalCenter: parent.verticalCenter
                 }
             }
@@ -111,7 +116,7 @@ Item {
                     visible: false
                     wrapMode: Text.Wrap
                     horizontalAlignment: Text.AlignHCenter
-                    font { pixelSize: 12; bold: true; family: "Inter" }
+                    font { pixelSize: 12; bold: true; family: Theme.fontFamily }
                     color: Theme.danger
                 }
             }
@@ -126,7 +131,7 @@ Item {
                     Rectangle {
                         width: 100
                         height: 38
-                        radius: 19
+                        radius: Theme.radiusSm
                         color: "transparent"
                         border.color: Theme.border
                         border.width: 1
@@ -134,7 +139,7 @@ Item {
                             anchors.centerIn: parent
                             text: root.progressStep === 0 ? root.cancelLabel : "← Back"
                             color: Theme.textSecondary
-                            font { pixelSize: 12; bold: true; family: "Inter" }
+                            font { pixelSize: 12; bold: true; family: Theme.fontFamily }
                         }
                         MouseArea {
                             anchors.fill: parent
@@ -148,7 +153,7 @@ Item {
                         width: root.progressStep === root.stepCount - 1
                                ? root.finalButtonWidth : 120
                         height: 38
-                        radius: 19
+                        radius: Theme.radiusSm
                         color: root.progressStep === root.stepCount - 1 && root.finalButtonDanger
                                ? Theme.danger : Theme.accent
                         opacity: root.primaryEnabled ? 1.0 : 0.45
@@ -160,7 +165,7 @@ Item {
                             text: root.progressStep === root.stepCount - 1
                                   ? root.finalLabel : root.nextLabel
                             color: "white"
-                            font { pixelSize: 12; bold: true; family: "Inter" }
+                            font { pixelSize: 12; bold: true; family: Theme.fontFamily }
                         }
                         MouseArea {
                             anchors.fill: parent

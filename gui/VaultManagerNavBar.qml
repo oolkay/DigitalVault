@@ -26,7 +26,7 @@ Row {
             anchors.centerIn: parent
             text: "← Back"
             color: Theme.textPrimary
-            font { pixelSize: 12; family: "Inter" }
+            font { pixelSize: 12; family: Theme.fontFamily }
         }
 
         MouseArea {
@@ -47,7 +47,7 @@ Row {
             width: parent.width
             text: root.title
             color: Theme.textPrimary
-            font { pixelSize: root.showBack ? 18 : 26; bold: true; family: "Inter" }
+            font { pixelSize: root.showBack ? 18 : 26; bold: true; family: Theme.fontFamily }
             elide: Text.ElideRight
         }
 
@@ -56,7 +56,7 @@ Row {
             visible: root.subtitle !== ""
             text: root.subtitle
             color: Theme.textMuted
-            font { pixelSize: 11; family: "Inter" }
+            font { pixelSize: 11; family: Theme.fontFamily }
             elide: Text.ElideRight
         }
     }

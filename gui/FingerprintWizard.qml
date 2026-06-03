@@ -152,7 +152,7 @@ Popup {
                         anchors.centerIn: parent
                         text: iconText()
                         color: statusColor()
-                        font { pixelSize: 28; bold: true; family: "Inter" }
+                        font { pixelSize: 28; bold: true; family: Theme.fontFamily }
                     }
                 }
 
@@ -165,7 +165,7 @@ Popup {
                         horizontalAlignment: Text.AlignHCenter
                         text: headlineText()
                         color: Theme.textPrimary
-                        font { pixelSize: 18; bold: true; family: "Inter" }
+                        font { pixelSize: 18; bold: true; family: Theme.fontFamily }
                         wrapMode: Text.Wrap
                     }
 
@@ -175,7 +175,7 @@ Popup {
                         wrapMode: Text.Wrap
                         text: vaultController.fingerprintUnlockMessage
                         color: Theme.textPrimary
-                        font { pixelSize: 14; bold: true; family: "Inter" }
+                        font { pixelSize: 14; bold: true; family: Theme.fontFamily }
                     }
                 }
 
@@ -198,7 +198,7 @@ Popup {
                             width: 110
                             text: statusText()
                             color: statusColor()
-                            font { pixelSize: 12; bold: true; family: "Inter" }
+                            font { pixelSize: 12; bold: true; family: Theme.fontFamily }
                             elide: Text.ElideRight
                         }
 
@@ -208,7 +208,7 @@ Popup {
                             wrapMode: Text.Wrap
                             text: helperText()
                             color: Theme.textSecondary
-                            font { pixelSize: 12; family: "Inter" }
+                            font { pixelSize: 12; family: Theme.fontFamily }
                         }
                     }
                 }
@@ -227,7 +227,7 @@ Popup {
                         anchors.centerIn: parent
                         text: "Cancel"
                         color: Theme.textPrimary
-                        font { pixelSize: 12; bold: true; family: "Inter" }
+                        font { pixelSize: 12; bold: true; family: Theme.fontFamily }
                     }
 
                     MouseArea {

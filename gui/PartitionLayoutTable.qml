@@ -71,7 +71,7 @@ Column {
                         verticalAlignment: Text.AlignVCenter
                         text: "partition"
                         color: Theme.textMuted
-                        font { pixelSize: 9; bold: true; family: "Inter" }
+                        font { pixelSize: 9; bold: true; family: Theme.fontFamily }
                         elide: Text.ElideRight
                     }
                     Text {
@@ -80,7 +80,7 @@ Column {
                         verticalAlignment: Text.AlignVCenter
                         text: "name"
                         color: Theme.textMuted
-                        font { pixelSize: 9; bold: true; family: "Inter" }
+                        font { pixelSize: 9; bold: true; family: Theme.fontFamily }
                         elide: Text.ElideRight
                     }
                     Text {
@@ -89,7 +89,7 @@ Column {
                         verticalAlignment: Text.AlignVCenter
                         text: "filesystem"
                         color: Theme.textMuted
-                        font { pixelSize: 9; bold: true; family: "Inter" }
+                        font { pixelSize: 9; bold: true; family: Theme.fontFamily }
                         elide: Text.ElideRight
                     }
                     Text {
@@ -98,7 +98,7 @@ Column {
                         verticalAlignment: Text.AlignVCenter
                         text: "mount point"
                         color: Theme.textMuted
-                        font { pixelSize: 9; bold: true; family: "Inter" }
+                        font { pixelSize: 9; bold: true; family: Theme.fontFamily }
                         elide: Text.ElideRight
                     }
                     Text {
@@ -108,7 +108,7 @@ Column {
                         horizontalAlignment: Text.AlignRight
                         text: "size"
                         color: Theme.textMuted
-                        font { pixelSize: 9; bold: true; family: "Inter" }
+                        font { pixelSize: 9; bold: true; family: Theme.fontFamily }
                         elide: Text.ElideRight
                     }
                     Text {
@@ -118,7 +118,7 @@ Column {
                         horizontalAlignment: Text.AlignRight
                         text: "used"
                         color: Theme.textMuted
-                        font { pixelSize: 9; bold: true; family: "Inter" }
+                        font { pixelSize: 9; bold: true; family: Theme.fontFamily }
                         elide: Text.ElideRight
                     }
                     Text {
@@ -128,7 +128,7 @@ Column {
                         horizontalAlignment: Text.AlignRight
                         text: "unused"
                         color: Theme.textMuted
-                        font { pixelSize: 9; bold: true; family: "Inter" }
+                        font { pixelSize: 9; bold: true; family: Theme.fontFamily }
                         elide: Text.ElideRight
                     }
                 }
@@ -168,7 +168,7 @@ Column {
                                 verticalAlignment: Text.AlignVCenter
                                 text: modelData.path || ""
                                 color: Theme.textPrimary
-                                font { pixelSize: 10; family: "Inter" }
+                                font { pixelSize: 10; family: Theme.fontFamily }
                                 elide: Text.ElideMiddle
                             }
                             Text {
@@ -177,7 +177,7 @@ Column {
                                 verticalAlignment: Text.AlignVCenter
                                 text: modelData.roleLabel || modelData.label || ""
                                 color: Theme.textSecondary
-                                font { pixelSize: 10; family: "Inter" }
+                                font { pixelSize: 10; family: Theme.fontFamily }
                                 elide: Text.ElideRight
                             }
                             Text {
@@ -186,7 +186,7 @@ Column {
                                 verticalAlignment: Text.AlignVCenter
                                 text: modelData.fsLabel || "—"
                                 color: Theme.textSecondary
-                                font { pixelSize: 10; family: "Inter" }
+                                font { pixelSize: 10; family: Theme.fontFamily }
                                 elide: Text.ElideRight
                             }
                             Text {
@@ -195,7 +195,7 @@ Column {
                                 verticalAlignment: Text.AlignVCenter
                                 text: root.mountCellText(modelData)
                                 color: Theme.textMuted
-                                font { pixelSize: 10; family: "Inter" }
+                                font { pixelSize: 10; family: Theme.fontFamily }
                                 elide: Text.ElideMiddle
                             }
                             Text {
@@ -205,7 +205,7 @@ Column {
                                 horizontalAlignment: Text.AlignRight
                                 text: modelData.size || "—"
                                 color: Theme.textPrimary
-                                font { pixelSize: 10; family: "Inter" }
+                                font { pixelSize: 10; family: Theme.fontFamily }
                                 elide: Text.ElideRight
                             }
                             Text {
@@ -215,7 +215,7 @@ Column {
                                 horizontalAlignment: Text.AlignRight
                                 text: modelData.usedLabel || "—"
                                 color: Theme.textSecondary
-                                font { pixelSize: 10; family: "Inter" }
+                                font { pixelSize: 10; family: Theme.fontFamily }
                                 elide: Text.ElideRight
                             }
                             Text {
@@ -225,7 +225,7 @@ Column {
                                 horizontalAlignment: Text.AlignRight
                                 text: modelData.unusedLabel || "—"
                                 color: Theme.textSecondary
-                                font { pixelSize: 10; family: "Inter" }
+                                font { pixelSize: 10; family: Theme.fontFamily }
                                 elide: Text.ElideRight
                             }
                         }

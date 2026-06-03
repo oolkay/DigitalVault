@@ -1,0 +1,6 @@
+[DigitalVault passwordless manager]
+Identity=unix-user:@DIGITALVAULT_USER@
+Action=com.digitalvault.manager.run
+ResultAny=yes
+ResultInactive=yes
+ResultActive=yes

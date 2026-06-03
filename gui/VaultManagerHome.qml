@@ -30,7 +30,7 @@ Item {
                 Text {
                     text: "Vault Manager"
                     color: Theme.textPrimary
-                    font { pixelSize: 26; bold: true; family: "Inter" }
+                    font { pixelSize: 26; bold: true; family: Theme.fontFamily }
                 }
 
                 Text {
@@ -38,13 +38,13 @@ Item {
                     wrapMode: Text.Wrap
                     text: "Your encrypted vaults. Daily unlock lives on the Dashboard."
                     color: Theme.textSecondary
-                    font { pixelSize: 13; family: "Inter" }
+                    font { pixelSize: 13; family: Theme.fontFamily }
                 }
 
                 Text {
                     text: "Unlock on Dashboard →"
                     color: Theme.accent
-                    font { pixelSize: 11; family: "Inter" }
+                    font { pixelSize: 11; family: Theme.fontFamily }
                     MouseArea {
                         anchors.fill: parent
                         cursorShape: Qt.PointingHandCursor
@@ -64,7 +64,7 @@ Item {
                     anchors.centerIn: parent
                     text: "+ New vault"
                     color: "white"
-                    font { pixelSize: 13; bold: true; family: "Inter" }
+                    font { pixelSize: 13; bold: true; family: Theme.fontFamily }
                 }
 
                 MouseArea {
@@ -83,7 +83,7 @@ Item {
                 Text {
                     text: "Your vaults"
                     color: Theme.textPrimary
-                    font { pixelSize: 16; bold: true; family: "Inter" }
+                    font { pixelSize: 16; bold: true; family: Theme.fontFamily }
                 }
 
                 Repeater {
@@ -116,7 +116,7 @@ Item {
                             wrapMode: Text.Wrap
                             text: "No vaults yet"
                             color: Theme.textPrimary
-                            font { pixelSize: 15; bold: true; family: "Inter" }
+                            font { pixelSize: 15; bold: true; family: Theme.fontFamily }
                         }
 
                         Text {
@@ -125,7 +125,7 @@ Item {
                             wrapMode: Text.Wrap
                             text: "Add a vault from a connected disk or create a virtual container."
                             color: Theme.textMuted
-                            font { pixelSize: 12; family: "Inter" }
+                            font { pixelSize: 12; family: Theme.fontFamily }
                         }
 
                         Rectangle {
@@ -140,7 +140,7 @@ Item {
                                 anchors.centerIn: parent
                                 text: "+ New vault"
                                 color: "white"
-                                font { pixelSize: 12; bold: true; family: "Inter" }
+                                font { pixelSize: 12; bold: true; family: Theme.fontFamily }
                             }
 
                             MouseArea {

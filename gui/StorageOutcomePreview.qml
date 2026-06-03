@@ -34,7 +34,7 @@ Column {
         Text {
             text: "Deleted"
             color: Theme.danger
-            font { pixelSize: 12; bold: true; family: "Inter" }
+            font { pixelSize: 12; bold: true; family: Theme.fontFamily }
         }
         Repeater {
             model: root.deletedItems
@@ -44,7 +44,7 @@ Column {
                 wrapMode: Text.Wrap
                 text: "• " + modelData
                 color: Theme.textPrimary
-                font { pixelSize: 11; family: "Inter" }
+                font { pixelSize: 11; family: Theme.fontFamily }
             }
         }
     }
@@ -57,7 +57,7 @@ Column {
         Text {
             text: "Kept"
             color: Theme.success
-            font { pixelSize: 12; bold: true; family: "Inter" }
+            font { pixelSize: 12; bold: true; family: Theme.fontFamily }
         }
         Repeater {
             model: root.keptItems
@@ -67,7 +67,7 @@ Column {
                 wrapMode: Text.Wrap
                 text: "• " + modelData
                 color: Theme.textPrimary
-                font { pixelSize: 11; family: "Inter" }
+                font { pixelSize: 11; family: Theme.fontFamily }
             }
         }
     }
@@ -80,7 +80,7 @@ Column {
         Text {
             text: "Registry"
             color: Theme.textSecondary
-            font { pixelSize: 12; bold: true; family: "Inter" }
+            font { pixelSize: 12; bold: true; family: Theme.fontFamily }
         }
         Repeater {
             model: root.registryItems
@@ -90,7 +90,7 @@ Column {
                 wrapMode: Text.Wrap
                 text: "• " + modelData
                 color: Theme.textPrimary
-                font { pixelSize: 11; family: "Inter" }
+                font { pixelSize: 11; family: Theme.fontFamily }
             }
         }
     }
@@ -101,6 +101,6 @@ Column {
         visible: preview.after !== undefined && preview.after !== ""
         text: "After: " + (preview.after || "")
         color: Theme.textSecondary
-        font { pixelSize: 11; family: "Inter" }
+        font { pixelSize: 11; family: Theme.fontFamily }
     }
 }

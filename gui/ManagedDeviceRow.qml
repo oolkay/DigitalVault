@@ -36,7 +36,7 @@ Rectangle {
                 width: parent.width
                 text: deviceData.displayName || deviceData.name || deviceData.path || "Vault"
                 color: Theme.textPrimary
-                font { pixelSize: 14; bold: true; family: "Inter" }
+                font { pixelSize: 14; bold: true; family: Theme.fontFamily }
                 elide: Text.ElideRight
             }
 
@@ -44,7 +44,7 @@ Rectangle {
                 width: parent.width
                 text: deviceData.path || ""
                 color: Theme.textSecondary
-                font { pixelSize: 11; family: "Inter" }
+                font { pixelSize: 11; family: Theme.fontFamily }
                 elide: Text.ElideRight
             }
         }
@@ -65,8 +65,13 @@ Rectangle {
                 id: statusLabel
                 anchors.centerIn: parent
                 text: deviceData.statusLabel || "Locked"
-                color: Theme.textSecondary
-                font { pixelSize: 10; family: "Inter" }
+                color: {
+                    const s = deviceData.statusLabel || ""
+                    if (s === "Unlocked") return Theme.success
+                    if (s === "Unavailable") return Theme.danger
+                    return Theme.textSecondary
+                }
+                font { pixelSize: 10; bold: true; family: Theme.fontFamily }
             }
         }
 
@@ -75,7 +80,7 @@ Rectangle {
             anchors.verticalCenter: parent.verticalCenter
             text: "→"
             color: Theme.textMuted
-            font { pixelSize: 16; family: "Inter" }
+            font { pixelSize: 16; family: Theme.fontFamily }
         }
     }
 }

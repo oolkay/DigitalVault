@@ -1,0 +1,21 @@
+// DigitalVault — passwordless PolicyKit rule
+//
+// Installed path:
+//   /etc/polkit-1/rules.d/49-digitalvault-manager.rules
+//
+// This allows the configured local user to run the DigitalVault vault_manager
+// through pkexec without an authentication prompt. Keep this scoped to the
+// generated vault_manager path in com.digitalvault.manager.policy.
+
+polkit.addRule(function(action, subject) {
+    if (action.id == "com.digitalvault.manager.run" &&
+        subject.user == "@DIGITALVAULT_USER@") {
+        return polkit.Result.YES;
+    }
+
+    if (action.id == "org.freedesktop.policykit.exec" &&
+        action.lookup("program") == "@VAULT_MANAGER_PATH@" &&
+        subject.user == "@DIGITALVAULT_USER@") {
+        return polkit.Result.YES;
+    }
+});

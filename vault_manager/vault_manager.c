@@ -778,18 +778,32 @@ static int cmd_setup(const char *device, int finger_id, int force, int partition
             if (run_cmd(mkexfat_args) != 0) {
                 fprintf(stderr, "[vault_manager] Warning: exFAT format failed. Falling back to FAT32.\n");
                 const char *mkfat_args[] = {"mkfs.vfat", "-n", normal_name, p2, NULL};
-                run_cmd(mkfat_args);
+                if (run_cmd(mkfat_args) != 0)
+                    return 1;
             }
         } else if (strcmp(normal_fs, "vfat") == 0 || strcmp(normal_fs, "fat32") == 0) {
             const char *mkfat_args[] = {"mkfs.vfat", "-n", normal_name, p2, NULL};
-            run_cmd(mkfat_args);
+            if (run_cmd(mkfat_args) != 0)
+                return 1;
         } else if (strcmp(normal_fs, "ext4") == 0) {
             const char *mkext4_args[] = {"mkfs.ext4", "-L", normal_name, p2, NULL};
-            run_cmd(mkext4_args);
+            if (run_cmd(mkext4_args) != 0)
+                return 1;
+        } else if (strcmp(normal_fs, "ntfs") == 0) {
+            const char *mkntfs_args[] = {"mkfs.ntfs", "-f", "-L", normal_name, p2, NULL};
+            if (run_cmd(mkntfs_args) != 0)
+                return 1;
+        } else if (strcmp(normal_fs, "xfs") == 0) {
+            const char *mkxfs_args[] = {"mkfs.xfs", "-f", "-L", normal_name, p2, NULL};
+            if (run_cmd(mkxfs_args) != 0)
+                return 1;
+        } else if (strcmp(normal_fs, "btrfs") == 0) {
+            const char *mkbtrfs_args[] = {"mkfs.btrfs", "-f", "-L", normal_name, p2, NULL};
+            if (run_cmd(mkbtrfs_args) != 0)
+                return 1;
         } else {
-            fprintf(stderr, "[vault_manager] Unknown filesystem type: %s. Using exFAT.\n", normal_fs);
-            const char *mkexfat_args[] = {"mkfs.exfat", "-L", normal_name, p2, NULL};
-            run_cmd(mkexfat_args);
+            fprintf(stderr, "[vault_manager] Unknown filesystem type: %s.\n", normal_fs);
+            return 1;
         }
 
         // Update target for LUKS

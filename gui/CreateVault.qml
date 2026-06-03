@@ -9,6 +9,6 @@ Item {
         anchors.centerIn: parent
         text: "Opening Vault Manager…"
         color: Theme.textSecondary
-        font { pixelSize: 14; family: "Inter" }
+        font { pixelSize: 14; family: Theme.fontFamily }
     }
 }

@@ -108,7 +108,7 @@ Column {
                     Layout.fillWidth: true
                     verticalAlignment: TextInput.AlignVCenter
                     color: Theme.accent
-                    font { pixelSize: 13; bold: true; family: "Inter" }
+                    font { pixelSize: 13; bold: true; family: Theme.fontFamily }
                     validator: IntValidator {
                         bottom: sizeSlider.from
                         top: sizeSlider.to
@@ -123,7 +123,7 @@ Column {
                     id: unitLabel
                     text: "MB"
                     color: Theme.textMuted
-                    font { pixelSize: 11; bold: true; family: "Inter" }
+                    font { pixelSize: 13; bold: true; family: Theme.fontFamily }
                     Layout.alignment: Qt.AlignVCenter
                 }
             }
@@ -134,7 +134,7 @@ Column {
         visible: root.invalidInput
         text: "Enter a value between " + formatRangeLabel(from) + " and " + formatRangeLabel(to)
         color: Theme.danger
-        font { pixelSize: 10; family: "Inter" }
+        font { pixelSize: 12; family: Theme.fontFamily }
         width: parent.width
         wrapMode: Text.Wrap
     }
@@ -143,7 +143,7 @@ Column {
         visible: root.hintText !== "" && !root.invalidInput
         text: root.hintText
         color: Theme.textMuted
-        font { pixelSize: 10; family: "Inter" }
+        font { pixelSize: 12; family: Theme.fontFamily }
         width: parent.width
         wrapMode: Text.Wrap
     }

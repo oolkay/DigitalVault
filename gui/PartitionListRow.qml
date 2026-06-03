@@ -60,7 +60,7 @@ Rectangle {
                     horizontalAlignment: Text.AlignHCenter
                     text: partitionData.fsLabel || "—"
                     color: Theme.textSecondary
-                    font { pixelSize: 9; family: "Inter" }
+                    font { pixelSize: 9; family: Theme.fontFamily }
                     elide: Text.ElideRight
                 }
             }
@@ -74,7 +74,7 @@ Rectangle {
                     width: parent.width
                     text: partitionData.roleLabel || partitionData.label || "Partition"
                     color: Theme.textPrimary
-                    font { pixelSize: 12; bold: true; family: "Inter" }
+                    font { pixelSize: 12; bold: true; family: Theme.fontFamily }
                     elide: Text.ElideRight
                 }
 
@@ -82,7 +82,7 @@ Rectangle {
                     width: parent.width
                     text: partitionData.path || ""
                     color: Theme.textSecondary
-                    font { pixelSize: 10; family: "Inter" }
+                    font { pixelSize: 10; family: Theme.fontFamily }
                     elide: Text.ElideMiddle
                 }
             }
@@ -98,7 +98,7 @@ Rectangle {
                     horizontalAlignment: Text.AlignRight
                     text: partitionData.size || "—"
                     color: Theme.textPrimary
-                    font { pixelSize: 11; bold: true; family: "Inter" }
+                    font { pixelSize: 11; bold: true; family: Theme.fontFamily }
                     elide: Text.ElideRight
                 }
 
@@ -107,7 +107,7 @@ Rectangle {
                     horizontalAlignment: Text.AlignRight
                     text: partitionData.percentOfDisk || ""
                     color: Theme.textMuted
-                    font { pixelSize: 9; family: "Inter" }
+                    font { pixelSize: 9; family: Theme.fontFamily }
                     elide: Text.ElideRight
                     visible: text !== ""
                 }
@@ -118,7 +118,7 @@ Rectangle {
             width: parent.width
             text: partitionData.mountDisplay || ""
             color: Theme.textMuted
-            font { pixelSize: 9; family: "Inter" }
+            font { pixelSize: 9; family: Theme.fontFamily }
             elide: Text.ElideRight
         }
     }

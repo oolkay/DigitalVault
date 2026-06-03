@@ -39,6 +39,6 @@ Rectangle {
                 return Theme.warning
             return root.isUnlocked ? Theme.success : Theme.danger
         }
-        font { pixelSize: 11; bold: true; family: "Inter" }
+        font { pixelSize: 11; bold: true; family: Theme.fontFamily }
     }
 }

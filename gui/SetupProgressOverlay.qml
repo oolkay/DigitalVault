@@ -42,11 +42,24 @@ Item {
             Row {
                 anchors.horizontalCenter: parent.horizontalCenter
                 spacing: 10
-                Text { text: "🔐"; font.pixelSize: 22; anchors.verticalCenter: parent.verticalCenter }
+                Rectangle {
+                    width: 28
+                    height: 28
+                    radius: Theme.radiusSm
+                    color: Theme.accentGlow
+                    border.color: Theme.borderFocus
+                    anchors.verticalCenter: parent.verticalCenter
+                    Text {
+                        anchors.centerIn: parent
+                        text: "V"
+                        color: Theme.accent
+                        font { pixelSize: 12; bold: true; family: Theme.fontFamily }
+                    }
+                }
                 Text {
                     text: "Formatting Vault"
                     color: Theme.textPrimary
-                    font { pixelSize: 18; bold: true; family: "Inter" }
+                    font { pixelSize: 18; bold: true; family: Theme.fontFamily }
                     anchors.verticalCenter: parent.verticalCenter
                 }
             }
@@ -55,7 +68,7 @@ Item {
                 width: parent.width
                 text: vaultController.setupStatusText
                 color: Theme.textSecondary
-                font { pixelSize: 11; family: "Inter" }
+                font { pixelSize: 11; family: Theme.fontFamily }
                 horizontalAlignment: Text.AlignHCenter
                 wrapMode: Text.Wrap
             }
@@ -95,7 +108,7 @@ Item {
                 anchors.horizontalCenter: parent.horizontalCenter
                 text: "Do not close the application."
                 color: Theme.textMuted
-                font { pixelSize: 10; family: "Inter" }
+                font { pixelSize: 10; family: Theme.fontFamily }
             }
         }
     }

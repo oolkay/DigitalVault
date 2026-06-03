@@ -35,12 +35,12 @@ Item {
                 Text {
                     text: "Security History"
                     color: Theme.textPrimary
-                    font { pixelSize: 26; bold: true; family: "Inter" }
+                    font { pixelSize: 26; bold: true; family: Theme.fontFamily }
                 }
                 Text {
                     text: "Review access attempts and system events"
                     color: Theme.textSecondary
-                    font { pixelSize: 13; family: "Inter" }
+                    font { pixelSize: 13; family: Theme.fontFamily }
                 }
             }
 
@@ -56,7 +56,7 @@ Item {
                     anchors.centerIn: parent
                     text: "Clear"
                     color: Theme.danger
-                    font { pixelSize: 13; bold: true; family: "Inter" }
+                    font { pixelSize: 13; bold: true; family: Theme.fontFamily }
                 }
                 MouseArea {
                     id: clrMouse
@@ -102,7 +102,7 @@ Item {
                             width: 140
                             text: modelData.time
                             color: Theme.textMuted
-                            font { pixelSize: 12; family: "Courier New" }
+                            font { pixelSize: 12; family: Theme.monoFamily }
                             anchors.verticalCenter: parent.verticalCenter
                         }
 
@@ -122,7 +122,7 @@ Item {
                             width: parent.width - 260
                             text: modelData.message
                             color: Theme.textPrimary
-                            font { pixelSize: 13; family: "Inter" }
+                            font { pixelSize: 13; family: Theme.fontFamily }
                             anchors.verticalCenter: parent.verticalCenter
                             elide: Text.ElideRight
                         }

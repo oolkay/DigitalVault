@@ -81,6 +81,7 @@ public:
     bool    simulatorRunning() const;
 
     Q_INVOKABLE void        toggleVault();
+    Q_INVOKABLE void        forceLockVault();
     Q_INVOKABLE void        beginFingerprintUnlock();
     Q_INVOKABLE void        cancelFingerprintUnlock();
     Q_INVOKABLE void        beginSetupOwnerEnroll(int fingerId);
@@ -205,6 +206,7 @@ signals:
     void navigationRequested(const QString &pageFile);
     void sensorStatusChanged();
     void autoDetectUsbChanged();
+    void lockRequiresForceConfirmation(const QString &devicePath);
 
 private slots:
     void onSimFinished(int exitCode, QProcess::ExitStatus exitStatus);
@@ -227,7 +229,7 @@ private:
 
     void resetAutoLockTimer();
     void handleAutoLock();
-    void beginLockVault();
+    void beginLockVault(bool force = false);
     void beginUnlockVault();
     void finishUnlockWithKey(const QByteArray &key32);
     void finishSetupWithKey(const QByteArray &key32);
@@ -251,7 +253,7 @@ private:
     QString m_lastVaultManagerOutput;
     void launchSetupAsync(const QString &device, int ownerId, bool force, int vaultSizeMB,
                           const QString &vaultName, const QString &normalName, const QString &normalFs,
-                          const QByteArray &key32);
+                          const QString &ownerLabel, const QByteArray &key32);
     enum class SensorStatus { Unconfigured, Disconnected, Connecting, Connected, Error };
 
     QString resolveSerialPort();
@@ -286,6 +288,11 @@ private:
     void onListEnrolledCompleted(bool ok, const QList<int> &fingerIds, const QString &err);
     void startVaultSetupVerify();
     void requestVaultSetupKeyAfterEnroll();
+    enum class LockResult {
+        Success,
+        Busy,
+        Failed
+    };
 
     FpFlow m_fpFlow = FpFlow::None;
     QString m_fpContextDevice;
@@ -313,6 +320,7 @@ private:
         QString vaultName;
         QString normalName;
         QString normalFs;
+        QString ownerLabel;
         bool valid = false;
     } m_pendingSetup;
 
@@ -366,7 +374,7 @@ private:
 
     void updateActivity(const QString &msg);
     bool mountVault();
-    bool unmountVault();
+    LockResult unmountVault(bool force);
     void loadFingerprintsFromHAL();
 
     /* vault_manager binary'sinin yolunu bul */

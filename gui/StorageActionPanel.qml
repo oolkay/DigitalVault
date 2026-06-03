@@ -27,7 +27,7 @@ Flow {
                 anchors.centerIn: parent
                 text: modelData.label || modelData.id || ""
                 color: modelData.dangerous ? Theme.danger : Theme.textPrimary
-                font { pixelSize: 11; family: "Inter" }
+                font { pixelSize: 13; family: Theme.fontFamily }
             }
 
             MouseArea {

@@ -27,10 +27,10 @@ import DigitalVault
     property int edgeMargin: 6
 
     readonly property var navPages: [
-        { label: "Dashboard",      icon: "⬡", page: "Dashboard.qml" },
-        { label: "Vault Manager",  icon: "🗄", page: "VaultManager.qml" },
-        { label: "Security Log",   icon: "📋", page: "SecurityLog.qml" },
-        { label: "Settings",       icon: "⚙", page: "Settings.qml" }
+        { label: "Dashboard",      icon: "D", page: "Dashboard.qml" },
+        { label: "Vault Manager",  icon: "V", page: "VaultManager.qml" },
+        { label: "Security Log",   icon: "L", page: "SecurityLog.qml" },
+        { label: "Settings",       icon: "S", page: "Settings.qml" }
     ]
 
     function navigateToPageFile(pageFile) {
@@ -83,11 +83,23 @@ import DigitalVault
                 anchors.left: parent.left
                 anchors.leftMargin: 16
                 spacing: 10
-                Text { text: "🔐"; font.pixelSize: 14 }
+                Rectangle {
+                    width: 18
+                    height: 18
+                    radius: 5
+                    color: Theme.accentGlow
+                    border.color: Theme.borderFocus
+                    Text {
+                        anchors.centerIn: parent
+                        text: "VG"
+                        color: Theme.accent
+                        font { pixelSize: 8; bold: true; family: Theme.fontFamily }
+                    }
+                }
                 Text {
                     text: "VaultGuard — Biometric Digital Vault"
                     color: Theme.textSecondary
-                    font { pixelSize: 12; family: "Inter"; weight: Font.Medium }
+                    font { pixelSize: 12; family: Theme.fontFamily; weight: Font.Medium }
                 }
             }
 
@@ -180,16 +192,15 @@ import DigitalVault
                     spacing: 12
                     Rectangle {
                         width: 38; height: 38
-                        radius: 10
-                        gradient: Gradient {
-                            orientation: Gradient.Horizontal
-                            GradientStop { position: 0.0; color: "#4E6BF5" }
-                            GradientStop { position: 1.0; color: "#7A5AF8" }
-                        }
+                        radius: Theme.radiusSm
+                        color: Theme.accentGlow
+                        border.color: Theme.borderFocus
+                        border.width: 1
                         Text {
                             anchors.centerIn: parent
-                            text: "🔐"
-                            font.pixelSize: 18
+                            text: "VG"
+                            color: Theme.accent
+                            font { pixelSize: 12; bold: true; family: Theme.fontFamily }
                         }
                     }
                     Column {
@@ -198,13 +209,13 @@ import DigitalVault
                         Text {
                             text: "VaultGuard"
                             color: Theme.textPrimary
-                            font { pixelSize: 17; bold: true; family: "Inter" }
+                            font { pixelSize: 17; bold: true; family: Theme.fontFamily }
                             Behavior on color { ColorAnimation { duration: 250 } }
                         }
                         Text {
                             text: "Biometric Vault"
                             color: Theme.textMuted
-                            font { pixelSize: 11; family: "Inter" }
+                            font { pixelSize: 11; family: Theme.fontFamily }
                             Behavior on color { ColorAnimation { duration: 250 } }
                         }
                     }
@@ -222,8 +233,8 @@ import DigitalVault
                 bottomPadding: 6
                 text: "MAIN MENU"
                 color: Theme.textMuted
-                font { pixelSize: 10; bold: true; family: "Inter" }
-                font.letterSpacing: 1.5
+                font { pixelSize: 10; bold: true; family: Theme.fontFamily }
+                font.letterSpacing: 0
                 Behavior on color { ColorAnimation { duration: 250 } }
             }
 
@@ -259,15 +270,19 @@ import DigitalVault
                             anchors { verticalCenter: parent.verticalCenter; left: parent.left; leftMargin: 12 }
                             spacing: 12
                             Text {
+                                width: 22
+                                height: 22
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
                                 text: modelData.icon
-                                font.pixelSize: 16
+                                font { pixelSize: 11; bold: true; family: Theme.fontFamily }
                                 color: isActive ? Theme.accent : Theme.textSecondary
                                 Behavior on color { ColorAnimation { duration: 150 } }
                             }
                             Text {
                                 text: modelData.label
                                 color: isActive ? Theme.navActiveText : Theme.textSecondary
-                                font { pixelSize: 14; bold: isActive; family: "Inter" }
+                                font { pixelSize: 14; bold: isActive; family: Theme.fontFamily }
                                 Behavior on color { ColorAnimation { duration: 150 } }
                             }
                         }
@@ -316,9 +331,9 @@ import DigitalVault
                         }
                         Text {
                             anchors.verticalCenter: parent.verticalCenter
-                            text: vaultController.isLocked ? "Vault Locked" : "Vault Open"
+                            text: vaultController.isLocked ? "Vault locked" : "Vault accessible"
                             color: vaultController.isLocked ? Theme.danger : Theme.success
-                            font { pixelSize: 13; bold: true; family: "Inter" }
+                            font { pixelSize: 13; bold: true; family: Theme.fontFamily }
                         }
                     }
                 }
@@ -355,8 +370,8 @@ import DigitalVault
                     case "connected": return "Sensor connected"
                     case "connecting": return "Connecting…"
                     case "error":
-                    case "disconnected": return "Sensor disconnected"
-                    default: return "No port selected"
+                    case "disconnected": return "Sensor unavailable"
+                    default: return "Select sensor port"
                     }
                 }
                 function showPortLine() {
@@ -403,7 +418,7 @@ import DigitalVault
                                 width: parent.width
                                 text: sensorChip.chipTitle()
                                 color: sensorChip.chipFgColor()
-                                font { pixelSize: 12; bold: true; family: "Inter" }
+                                font { pixelSize: 12; bold: true; family: Theme.fontFamily }
                                 elide: Text.ElideRight
                                 maximumLineCount: 1
                             }
@@ -412,7 +427,7 @@ import DigitalVault
                                 visible: sensorChip.showPortLine()
                                 text: vaultController.sensorPortPath
                                 color: Theme.textSecondary
-                                font { pixelSize: 9; family: "Courier New" }
+                                font { pixelSize: 9; family: Theme.monoFamily }
                                 elide: Text.ElideMiddle
                                 maximumLineCount: 1
                             }
@@ -446,14 +461,15 @@ import DigitalVault
                     spacing: 10
                     Text {
                         anchors.verticalCenter: parent.verticalCenter
-                        text: Theme.isDark ? "🌙" : "☀️"
-                        font.pixelSize: 16
+                        text: Theme.isDark ? "D" : "L"
+                        color: Theme.textSecondary
+                        font { pixelSize: 12; bold: true; family: Theme.fontFamily }
                     }
                     Text {
                         anchors.verticalCenter: parent.verticalCenter
                         text: Theme.isDark ? "Dark Mode" : "Light Mode"
                         color: Theme.textSecondary
-                        font { pixelSize: 13; family: "Inter" }
+                        font { pixelSize: 13; family: Theme.fontFamily }
                         Behavior on color { ColorAnimation { duration: 250 } }
                     }
                     // Toggle switch
@@ -489,7 +505,7 @@ import DigitalVault
                     anchors { left: parent.left; leftMargin: 22; verticalCenter: parent.verticalCenter }
                     text: "v2.0.0 — CSE 496"
                     color: Theme.textMuted
-                    font { pixelSize: 10; family: "Inter" }
+                    font { pixelSize: 10; family: Theme.fontFamily }
                     Behavior on color { ColorAnimation { duration: 250 } }
                 }
             }
@@ -524,9 +540,9 @@ import DigitalVault
     Rectangle {
         id: toastBar
         anchors { bottom: parent.bottom; horizontalCenter: mainContent.horizontalCenter; bottomMargin: 28 }
-        width: toastText.width + 56
-        height: 48
-        radius: 24
+        width: Math.min(mainContent.width - 64, Math.max(280, toastRow.implicitWidth + 32))
+        height: toastRow.implicitHeight + 20
+        radius: Theme.radius
         color: toastIsError ? Theme.dangerBg : Theme.bgSurface
         border.color: toastIsError ? Theme.danger : Theme.border
         border.width: 1
@@ -539,19 +555,27 @@ import DigitalVault
         Behavior on color { ColorAnimation { duration: 220 } }
 
         Row {
+            id: toastRow
             anchors.centerIn: parent
+            width: parent.width - 32
             spacing: 10
             Text {
                 anchors.verticalCenter: parent.verticalCenter
-                text: toastBar.toastIsError ? "⚠" : "✓"
+                width: 20
+                horizontalAlignment: Text.AlignHCenter
+                text: toastBar.toastIsError ? "!" : "OK"
                 color: toastBar.toastIsError ? Theme.danger : Theme.success
-                font.pixelSize: 16
+                font { pixelSize: toastBar.toastIsError ? 16 : 10; bold: true; family: Theme.fontFamily }
             }
             Text {
                 id: toastText
+                width: Math.max(0, parent.width - 30)
                 anchors.verticalCenter: parent.verticalCenter
                 color: Theme.textPrimary
-                font { pixelSize: 14; family: "Inter" }
+                font { pixelSize: 14; family: Theme.fontFamily }
+                wrapMode: Text.Wrap
+                maximumLineCount: 3
+                elide: Text.ElideRight
                 Behavior on color { ColorAnimation { duration: 250 } }
             }
         }

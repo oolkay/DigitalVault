@@ -10,41 +10,45 @@ QtObject {
     function toggle() { isDark = !isDark }
 
     // ── Backgrounds ───────────────────────────────
-    property color bgBase:      isDark ? "#0A0C12" : "#F0F2F7"
-    property color bgSurface:   isDark ? "#12151F" : "#FFFFFF"
-    property color bgCard:      isDark ? "#181C28" : "#F8F9FC"
-    property color bgSidebar:   isDark ? "#0E1119" : "#FFFFFF"
-    property color bgOverlay:   isDark ? "#1E2335" : "#EDF0F7"
-    property color bgInput:     isDark ? "#1A1E2E" : "#EEF0F8"
-    property color bgHover:     isDark ? "#252A3D" : "#E6E9F4"
+    property color bgBase:      isDark ? "#1E1E1E" : "#F4F6F8"
+    property color bgSurface:   isDark ? "#252526" : "#FFFFFF"
+    property color bgCard:      isDark ? "#252526" : "#F9FAFB"
+    property color bgSidebar:   isDark ? "#252526" : "#FFFFFF"
+    property color bgOverlay:   isDark ? "#2D2D30" : "#EEF2F5"
+    property color bgInput:     isDark ? "#3C3C3C" : "#F0F3F6"
+    property color bgHover:     isDark ? "#2A2D2E" : "#E8EDF2"
 
     // ── Borders ───────────────────────────────────
-    property color border:      isDark ? "#2A3050" : "#D5D9E8"
-    property color borderFocus: isDark ? "#4E6BF5" : "#4E6BF5"
+    property color border:      isDark ? "#3C3C3C" : "#D8DEE6"
+    property color borderFocus: isDark ? "#007ACC" : "#247BA0"
 
     // ── Text ──────────────────────────────────────
-    property color textPrimary:   isDark ? "#E8ECF8" : "#0E1525"
-    property color textSecondary: isDark ? "#7A85A8" : "#6B789A"
-    property color textMuted:     isDark ? "#404868" : "#9BA5C4"
+    property color textPrimary:   isDark ? "#D4D4D4" : "#111827"
+    property color textSecondary: isDark ? "#CCCCCC" : "#5E6B78"
+    property color textMuted:     isDark ? "#858585" : "#8793A0"
 
     // ── Accent ────────────────────────────────────
-    property color accent:        "#4E6BF5"
-    property color accentHover:   "#6480FF"
-    property color accentGlow:    isDark ? "#1A2560" : "#D0D8FF"
+    property color accent:        isDark ? "#007ACC" : "#247BA0"
+    property color accentHover:   isDark ? "#1177BB" : "#1C6F91"
+    property color accentGlow:    isDark ? "#094771" : "#D7EEF6"
 
     // ── Status ────────────────────────────────────
-    property color success:       "#2ECC88"
-    property color successBg:     isDark ? "#0D2E20" : "#D4F5E5"
-    property color danger:        "#F25565"
-    property color dangerBg:      isDark ? "#2E0D14" : "#FADADF"
-    property color warning:       "#F5A623"
-    property color warningBg:     isDark ? "#2E1F0D" : "#FEF0D5"
+    property color success:       isDark ? "#89D185" : "#3FB984"
+    property color successBg:     isDark ? "#1E3A2B" : "#DDF3EA"
+    property color danger:        isDark ? "#F48771" : "#E05A5A"
+    property color dangerBg:      isDark ? "#4B1F1A" : "#F7DFDF"
+    property color warning:       isDark ? "#CCA700" : "#D99A2B"
+    property color warningBg:     isDark ? "#3A3200" : "#F7EBD2"
 
     // ── Sidebar nav active ────────────────────────
-    property color navActive:     isDark ? "#1E2646" : "#E0E5FF"
-    property color navActiveText: "#4E6BF5"
+    property color navActive:     isDark ? "#094771" : "#DDEFF5"
+    property color navActiveText: accent
 
     // ── Shadows / glow radius ─────────────────────
-    property int   radius:     16
+    property int   radius:     10
     property int   radiusSm:    8
+
+    // ── Typography ─────────────────────────────────
+    property string fontFamily: "Noto Sans"
+    property string monoFamily: "Courier New"
 }
