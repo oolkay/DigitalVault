@@ -1,0 +1,13 @@
+\babel@toc {english}{}\relax 
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\contentsline {figure}{\numberline {3.1}{\ignorespaces Use-case diagram of the digital vault system.}}{12}{figure.3.1}%
+\contentsline {figure}{\numberline {3.2}{\ignorespaces System architecture of the digital vault.}}{13}{figure.3.2}%
+\contentsline {figure}{\numberline {3.3}{\ignorespaces Authentication and key-access flow.}}{19}{figure.3.3}%
+\contentsline {figure}{\numberline {3.4}{\ignorespaces Unlock sequence diagram.}}{20}{figure.3.4}%
+\contentsline {figure}{\numberline {3.5}{\ignorespaces Vault lifecycle state diagram.}}{24}{figure.3.5}%
+\addvspace {10\p@ }
+\contentsline {figure}{\numberline {4.1}{\ignorespaces Physical prototype including the AS608 fingerprint sensor, STM32 Blue Pill, and PL2303 USB-UART bridge.}}{31}{figure.4.1}%
+\addvspace {10\p@ }
+\addvspace {10\p@ }

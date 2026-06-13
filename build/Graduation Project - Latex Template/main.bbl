@@ -1,0 +1,549 @@
+% $ biblatex auxiliary file $
+% $ biblatex bbl format version 3.2 $
+% Do not modify the above lines!
+%
+% This is an auxiliary file used by the 'biblatex' package.
+% This file may safely be deleted. It will be recreated by
+% biber as required.
+%
+\begingroup
+\makeatletter
+\@ifundefined{ver@biblatex.sty}
+  {\@latex@error
+     {Missing 'biblatex' package}
+     {The bibliography requires the 'biblatex' package.}
+      \aftergroup\endinput}
+  {}
+\endgroup
+
+
+\refsection{0}
+  \datalist[entry]{none/global//global/global}
+    \entry{nistFips197}{report}{}
+      \name{author}{1}{}{%
+        {{hash=ef9cb61878e61d434507444346b29d1a}{%
+           family={{National Institute of Standards and Technology}},
+           familyi={N\bibinitperiod}}}%
+      }
+      \list{institution}{2}{%
+        {National Institute of Standards}%
+        {Technology}%
+      }
+      \strng{namehash}{ef9cb61878e61d434507444346b29d1a}
+      \strng{fullhash}{ef9cb61878e61d434507444346b29d1a}
+      \strng{bibnamehash}{ef9cb61878e61d434507444346b29d1a}
+      \strng{authorbibnamehash}{ef9cb61878e61d434507444346b29d1a}
+      \strng{authornamehash}{ef9cb61878e61d434507444346b29d1a}
+      \strng{authorfullhash}{ef9cb61878e61d434507444346b29d1a}
+      \field{sortinit}{1}
+      \field{sortinithash}{4f6aaa89bab872aa0999fec09ff8e98a}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{Advanced Encryption Standard (AES), FIPS 197}}
+      \field{type}{techreport}
+      \field{urlday}{11}
+      \field{urlmonth}{6}
+      \field{urlyear}{2026}
+      \field{year}{2023}
+      \field{urldateera}{ce}
+      \verb{urlraw}
+      \verb https://doi.org/10.6028/NIST.FIPS.197-upd1
+      \endverb
+      \verb{url}
+      \verb https://doi.org/10.6028/NIST.FIPS.197-upd1
+      \endverb
+    \endentry
+    \entry{rfc8439ChaCha20}{report}{}
+      \name{author}{2}{}{%
+        {{hash=14de5ea3aa4217cf6aa1601f73af32d8}{%
+           family={Nir},
+           familyi={N\bibinitperiod},
+           given={Yoav},
+           giveni={Y\bibinitperiod}}}%
+        {{hash=9f7c1bea618246029e139c169baaf321}{%
+           family={Langley},
+           familyi={L\bibinitperiod},
+           given={Adam},
+           giveni={A\bibinitperiod}}}%
+      }
+      \list{institution}{1}{%
+        {RFC Editor}%
+      }
+      \strng{namehash}{5c62c25db8932d45c482f6273020745a}
+      \strng{fullhash}{5c62c25db8932d45c482f6273020745a}
+      \strng{bibnamehash}{5c62c25db8932d45c482f6273020745a}
+      \strng{authorbibnamehash}{5c62c25db8932d45c482f6273020745a}
+      \strng{authornamehash}{5c62c25db8932d45c482f6273020745a}
+      \strng{authorfullhash}{5c62c25db8932d45c482f6273020745a}
+      \field{sortinit}{2}
+      \field{sortinithash}{8b555b3791beccb63322c22f3320aa9a}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{number}{RFC 8439}
+      \field{title}{{ChaCha20 and Poly1305 for IETF Protocols}}
+      \field{type}{techreport}
+      \field{urlday}{14}
+      \field{urlmonth}{6}
+      \field{urlyear}{2026}
+      \field{year}{2018}
+      \field{urldateera}{ce}
+      \verb{urlraw}
+      \verb https://www.rfc-editor.org/rfc/rfc8439
+      \endverb
+      \verb{url}
+      \verb https://www.rfc-editor.org/rfc/rfc8439
+      \endverb
+    \endentry
+    \entry{andersonSerpent}{report}{}
+      \name{author}{3}{}{%
+        {{hash=e027c8df89339344ddc4de634d17acf1}{%
+           family={Anderson},
+           familyi={A\bibinitperiod},
+           given={Ross},
+           giveni={R\bibinitperiod}}}%
+        {{hash=92872083c95b6031ae30d43473ff1917}{%
+           family={Biham},
+           familyi={B\bibinitperiod},
+           given={Eli},
+           giveni={E\bibinitperiod}}}%
+        {{hash=04e6e1bef8f77a0a400815153974b618}{%
+           family={Knudsen},
+           familyi={K\bibinitperiod},
+           given={Lars},
+           giveni={L\bibinitperiod}}}%
+      }
+      \list{institution}{1}{%
+        {University of Cambridge Computer Laboratory}%
+      }
+      \strng{namehash}{1ab313175231f51281047b1b79239404}
+      \strng{fullhash}{1ab313175231f51281047b1b79239404}
+      \strng{bibnamehash}{1ab313175231f51281047b1b79239404}
+      \strng{authorbibnamehash}{1ab313175231f51281047b1b79239404}
+      \strng{authornamehash}{1ab313175231f51281047b1b79239404}
+      \strng{authorfullhash}{1ab313175231f51281047b1b79239404}
+      \field{sortinit}{3}
+      \field{sortinithash}{ad6fe7482ffbd7b9f99c9e8b5dccd3d7}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{Serpent: A Proposal for the Advanced Encryption Standard}}
+      \field{type}{techreport}
+      \field{urlday}{14}
+      \field{urlmonth}{6}
+      \field{urlyear}{2026}
+      \field{year}{1998}
+      \field{urldateera}{ce}
+      \verb{urlraw}
+      \verb https://www.cl.cam.ac.uk/~rja14/Papers/serpent.pdf
+      \endverb
+      \verb{url}
+      \verb https://www.cl.cam.ac.uk/~rja14/Papers/serpent.pdf
+      \endverb
+    \endentry
+    \entry{schneierTwofish}{report}{}
+      \name{author}{6}{}{%
+        {{hash=d8df23ab843a37bf97ea40354db74d15}{%
+           family={Schneier},
+           familyi={S\bibinitperiod},
+           given={Bruce},
+           giveni={B\bibinitperiod}}}%
+        {{hash=47fa73357b828aa53859b00946c179b1}{%
+           family={Kelsey},
+           familyi={K\bibinitperiod},
+           given={John},
+           giveni={J\bibinitperiod}}}%
+        {{hash=8e67c8e33f18398cb59f70bb4fcd4773}{%
+           family={Whiting},
+           familyi={W\bibinitperiod},
+           given={Doug},
+           giveni={D\bibinitperiod}}}%
+        {{hash=45a593fbd4e5b2f4d60199ccfdb4fe59}{%
+           family={Wagner},
+           familyi={W\bibinitperiod},
+           given={David},
+           giveni={D\bibinitperiod}}}%
+        {{hash=458d466e5fcd00c1909d701e31984ec3}{%
+           family={Hall},
+           familyi={H\bibinitperiod},
+           given={Chris},
+           giveni={C\bibinitperiod}}}%
+        {{hash=c68a361b78baf45f372a62e08b55eab4}{%
+           family={Ferguson},
+           familyi={F\bibinitperiod},
+           given={Niels},
+           giveni={N\bibinitperiod}}}%
+      }
+      \list{institution}{1}{%
+        {Counterpane Systems}%
+      }
+      \strng{namehash}{d4c6c5e489f12de8c01ff4e314c70218}
+      \strng{fullhash}{d7f3e64a66d18304f8a27b1537a3db23}
+      \strng{bibnamehash}{d7f3e64a66d18304f8a27b1537a3db23}
+      \strng{authorbibnamehash}{d7f3e64a66d18304f8a27b1537a3db23}
+      \strng{authornamehash}{d4c6c5e489f12de8c01ff4e314c70218}
+      \strng{authorfullhash}{d7f3e64a66d18304f8a27b1537a3db23}
+      \field{sortinit}{4}
+      \field{sortinithash}{9381316451d1b9788675a07e972a12a7}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{Twofish: A 128-Bit Block Cipher}}
+      \field{type}{techreport}
+      \field{urlday}{14}
+      \field{urlmonth}{6}
+      \field{urlyear}{2026}
+      \field{year}{1998}
+      \field{urldateera}{ce}
+      \verb{urlraw}
+      \verb https://www.schneier.com/wp-content/uploads/2016/02/paper-twofish-paper.pdf
+      \endverb
+      \verb{url}
+      \verb https://www.schneier.com/wp-content/uploads/2016/02/paper-twofish-paper.pdf
+      \endverb
+    \endentry
+    \entry{rfc3713Camellia}{report}{}
+      \name{author}{3}{}{%
+        {{hash=b63088e6d52b8ebc6003a1880e288050}{%
+           family={Matsui},
+           familyi={M\bibinitperiod},
+           given={Mitsuru},
+           giveni={M\bibinitperiod}}}%
+        {{hash=a61fc6276fe8bebc2493625e9ac4bbbc}{%
+           family={Nakajima},
+           familyi={N\bibinitperiod},
+           given={Junko},
+           giveni={J\bibinitperiod}}}%
+        {{hash=961f7f1295dad3241e86763e0073467e}{%
+           family={Moriai},
+           familyi={M\bibinitperiod},
+           given={Shiho},
+           giveni={S\bibinitperiod}}}%
+      }
+      \list{institution}{1}{%
+        {RFC Editor}%
+      }
+      \strng{namehash}{8de834e39079aa674a060c93fb9aaa38}
+      \strng{fullhash}{8de834e39079aa674a060c93fb9aaa38}
+      \strng{bibnamehash}{8de834e39079aa674a060c93fb9aaa38}
+      \strng{authorbibnamehash}{8de834e39079aa674a060c93fb9aaa38}
+      \strng{authornamehash}{8de834e39079aa674a060c93fb9aaa38}
+      \strng{authorfullhash}{8de834e39079aa674a060c93fb9aaa38}
+      \field{sortinit}{5}
+      \field{sortinithash}{20e9b4b0b173788c5dace24730f47d8c}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{number}{RFC 3713}
+      \field{title}{{A Description of the Camellia Encryption Algorithm}}
+      \field{type}{techreport}
+      \field{urlday}{14}
+      \field{urlmonth}{6}
+      \field{urlyear}{2026}
+      \field{year}{2004}
+      \field{urldateera}{ce}
+      \verb{urlraw}
+      \verb https://www.rfc-editor.org/rfc/rfc3713
+      \endverb
+      \verb{url}
+      \verb https://www.rfc-editor.org/rfc/rfc3713
+      \endverb
+    \endentry
+    \entry{nistXtsAes}{report}{}
+      \name{author}{1}{}{%
+        {{hash=cb698fb75e6c17d7b7bffc2da99a0db2}{%
+           family={Dworkin},
+           familyi={D\bibinitperiod},
+           given={Morris},
+           giveni={M\bibinitperiod}}}%
+      }
+      \list{institution}{2}{%
+        {National Institute of Standards}%
+        {Technology}%
+      }
+      \strng{namehash}{cb698fb75e6c17d7b7bffc2da99a0db2}
+      \strng{fullhash}{cb698fb75e6c17d7b7bffc2da99a0db2}
+      \strng{bibnamehash}{cb698fb75e6c17d7b7bffc2da99a0db2}
+      \strng{authorbibnamehash}{cb698fb75e6c17d7b7bffc2da99a0db2}
+      \strng{authornamehash}{cb698fb75e6c17d7b7bffc2da99a0db2}
+      \strng{authorfullhash}{cb698fb75e6c17d7b7bffc2da99a0db2}
+      \field{sortinit}{6}
+      \field{sortinithash}{b33bc299efb3c36abec520a4c896a66d}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{number}{NIST SP 800-38E}
+      \field{title}{{Recommendation for Block Cipher Modes of Operation: The XTS-AES Mode for Confidentiality on Storage Devices}}
+      \field{type}{techreport}
+      \field{urlday}{11}
+      \field{urlmonth}{6}
+      \field{urlyear}{2026}
+      \field{year}{2010}
+      \field{urldateera}{ce}
+      \verb{urlraw}
+      \verb https://doi.org/10.6028/NIST.SP.800-38E
+      \endverb
+      \verb{url}
+      \verb https://doi.org/10.6028/NIST.SP.800-38E
+      \endverb
+    \endentry
+    \entry{cryptsetupDocs}{online}{}
+      \name{author}{1}{}{%
+        {{hash=265951e1c0056493ac3d6f36599e84c2}{%
+           family={{cryptsetup Project}},
+           familyi={c\bibinitperiod}}}%
+      }
+      \strng{namehash}{265951e1c0056493ac3d6f36599e84c2}
+      \strng{fullhash}{265951e1c0056493ac3d6f36599e84c2}
+      \strng{bibnamehash}{265951e1c0056493ac3d6f36599e84c2}
+      \strng{authorbibnamehash}{265951e1c0056493ac3d6f36599e84c2}
+      \strng{authornamehash}{265951e1c0056493ac3d6f36599e84c2}
+      \strng{authorfullhash}{265951e1c0056493ac3d6f36599e84c2}
+      \field{sortinit}{7}
+      \field{sortinithash}{108d0be1b1bee9773a1173443802c0a3}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{cryptsetup Documentation}
+      \field{urlday}{11}
+      \field{urlmonth}{6}
+      \field{urlyear}{2026}
+      \field{year}{2026}
+      \field{urldateera}{ce}
+      \verb{urlraw}
+      \verb https://gitlab.com/cryptsetup/cryptsetup/-/wikis/home
+      \endverb
+      \verb{url}
+      \verb https://gitlab.com/cryptsetup/cryptsetup/-/wikis/home
+      \endverb
+    \endentry
+    \entry{linuxDmCryptDocs}{online}{}
+      \name{author}{1}{}{%
+        {{hash=9696eeca0031991d5a47c79005e7e71b}{%
+           family={{The Linux Kernel Documentation}},
+           familyi={T\bibinitperiod}}}%
+      }
+      \strng{namehash}{9696eeca0031991d5a47c79005e7e71b}
+      \strng{fullhash}{9696eeca0031991d5a47c79005e7e71b}
+      \strng{bibnamehash}{9696eeca0031991d5a47c79005e7e71b}
+      \strng{authorbibnamehash}{9696eeca0031991d5a47c79005e7e71b}
+      \strng{authornamehash}{9696eeca0031991d5a47c79005e7e71b}
+      \strng{authorfullhash}{9696eeca0031991d5a47c79005e7e71b}
+      \field{extraname}{1}
+      \field{sortinit}{7}
+      \field{sortinithash}{108d0be1b1bee9773a1173443802c0a3}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{Device Mapper Crypt Target (dm-crypt)}}
+      \field{urlday}{11}
+      \field{urlmonth}{6}
+      \field{urlyear}{2026}
+      \field{year}{2026}
+      \field{urldateera}{ce}
+      \verb{urlraw}
+      \verb https://docs.kernel.org/admin-guide/device-mapper/dm-crypt.html
+      \endverb
+      \verb{url}
+      \verb https://docs.kernel.org/admin-guide/device-mapper/dm-crypt.html
+      \endverb
+    \endentry
+    \entry{linuxExt4Docs}{online}{}
+      \name{author}{1}{}{%
+        {{hash=9696eeca0031991d5a47c79005e7e71b}{%
+           family={{The Linux Kernel Documentation}},
+           familyi={T\bibinitperiod}}}%
+      }
+      \strng{namehash}{9696eeca0031991d5a47c79005e7e71b}
+      \strng{fullhash}{9696eeca0031991d5a47c79005e7e71b}
+      \strng{bibnamehash}{9696eeca0031991d5a47c79005e7e71b}
+      \strng{authorbibnamehash}{9696eeca0031991d5a47c79005e7e71b}
+      \strng{authornamehash}{9696eeca0031991d5a47c79005e7e71b}
+      \strng{authorfullhash}{9696eeca0031991d5a47c79005e7e71b}
+      \field{extraname}{2}
+      \field{sortinit}{8}
+      \field{sortinithash}{a231b008ebf0ecbe0b4d96dcc159445f}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{ext4 Filesystem}}
+      \field{urlday}{11}
+      \field{urlmonth}{6}
+      \field{urlyear}{2026}
+      \field{year}{2026}
+      \field{urldateera}{ce}
+      \verb{urlraw}
+      \verb https://docs.kernel.org/filesystems/ext4/index.html
+      \endverb
+      \verb{url}
+      \verb https://docs.kernel.org/filesystems/ext4/index.html
+      \endverb
+    \endentry
+    \entry{microsoftBitlocker}{online}{}
+      \name{author}{1}{}{%
+        {{hash=140864078aeca1c7c35b4beb33c53c34}{%
+           family={{Microsoft}},
+           familyi={M\bibinitperiod}}}%
+      }
+      \strng{namehash}{140864078aeca1c7c35b4beb33c53c34}
+      \strng{fullhash}{140864078aeca1c7c35b4beb33c53c34}
+      \strng{bibnamehash}{140864078aeca1c7c35b4beb33c53c34}
+      \strng{authorbibnamehash}{140864078aeca1c7c35b4beb33c53c34}
+      \strng{authornamehash}{140864078aeca1c7c35b4beb33c53c34}
+      \strng{authorfullhash}{140864078aeca1c7c35b4beb33c53c34}
+      \field{sortinit}{1}
+      \field{sortinithash}{4f6aaa89bab872aa0999fec09ff8e98a}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{BitLocker Overview}
+      \field{urlday}{11}
+      \field{urlmonth}{6}
+      \field{urlyear}{2026}
+      \field{year}{2026}
+      \field{urldateera}{ce}
+      \verb{urlraw}
+      \verb https://learn.microsoft.com/en-us/windows/security/operating-system-security/data-protection/bitlocker/
+      \endverb
+      \verb{url}
+      \verb https://learn.microsoft.com/en-us/windows/security/operating-system-security/data-protection/bitlocker/
+      \endverb
+    \endentry
+    \entry{skorobogatovIronKey}{article}{}
+      \name{author}{1}{}{%
+        {{hash=28eb71f43c0831e9f4d27cb8518d2612}{%
+           family={Skorobogatov},
+           familyi={S\bibinitperiod},
+           given={Sergei},
+           giveni={S\bibinitperiod}}}%
+      }
+      \strng{namehash}{28eb71f43c0831e9f4d27cb8518d2612}
+      \strng{fullhash}{28eb71f43c0831e9f4d27cb8518d2612}
+      \strng{bibnamehash}{28eb71f43c0831e9f4d27cb8518d2612}
+      \strng{authorbibnamehash}{28eb71f43c0831e9f4d27cb8518d2612}
+      \strng{authornamehash}{28eb71f43c0831e9f4d27cb8518d2612}
+      \strng{authorfullhash}{28eb71f43c0831e9f4d27cb8518d2612}
+      \field{sortinit}{1}
+      \field{sortinithash}{4f6aaa89bab872aa0999fec09ff8e98a}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{journaltitle}{arXiv preprint arXiv:2110.14090}
+      \field{title}{Teardown and Feasibility Study of IronKey: The Most Secure USB Flash Drive}
+      \field{urlday}{11}
+      \field{urlmonth}{6}
+      \field{urlyear}{2026}
+      \field{year}{2021}
+      \field{urldateera}{ce}
+      \verb{urlraw}
+      \verb https://arxiv.org/abs/2110.14090
+      \endverb
+      \verb{url}
+      \verb https://arxiv.org/abs/2110.14090
+      \endverb
+    \endentry
+    \entry{swierczynskiHardwareTrojan}{article}{}
+      \name{author}{5}{}{%
+        {{hash=fe92f163e9636f4f5ebe46a83ddf15cf}{%
+           family={Swierczynski},
+           familyi={S\bibinitperiod},
+           given={Pawel},
+           giveni={P\bibinitperiod}}}%
+        {{hash=5360b74ee34962a6fc82bdad909241dc}{%
+           family={Fyrbiak},
+           familyi={F\bibinitperiod},
+           given={Marc},
+           giveni={M\bibinitperiod}}}%
+        {{hash=ce2194a0dbb8e59a2ca1cd5d15d31b00}{%
+           family={Koppe},
+           familyi={K\bibinitperiod},
+           given={Philipp},
+           giveni={P\bibinitperiod}}}%
+        {{hash=ecb99179163100c0796947c8691258ca}{%
+           family={Moradi},
+           familyi={M\bibinitperiod},
+           given={Amir},
+           giveni={A\bibinitperiod}}}%
+        {{hash=cee721c72e08c7c6c3c6a06458a36b9f}{%
+           family={Paar},
+           familyi={P\bibinitperiod},
+           given={Christof},
+           giveni={C\bibinitperiod}}}%
+      }
+      \strng{namehash}{86555622dd4eae16f971af8960a90232}
+      \strng{fullhash}{9da353fbd6650ac327a49a808e1745fb}
+      \strng{bibnamehash}{9da353fbd6650ac327a49a808e1745fb}
+      \strng{authorbibnamehash}{9da353fbd6650ac327a49a808e1745fb}
+      \strng{authornamehash}{86555622dd4eae16f971af8960a90232}
+      \strng{authorfullhash}{9da353fbd6650ac327a49a808e1745fb}
+      \field{sortinit}{1}
+      \field{sortinithash}{4f6aaa89bab872aa0999fec09ff8e98a}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{journaltitle}{arXiv preprint arXiv:1910.00947}
+      \field{title}{Interdiction in Practice: Hardware Trojan Against a High-Security USB Flash Drive}
+      \field{urlday}{11}
+      \field{urlmonth}{6}
+      \field{urlyear}{2026}
+      \field{year}{2019}
+      \field{urldateera}{ce}
+      \verb{urlraw}
+      \verb https://arxiv.org/abs/1910.00947
+      \endverb
+      \verb{url}
+      \verb https://arxiv.org/abs/1910.00947
+      \endverb
+    \endentry
+    \entry{libfuse}{online}{}
+      \name{author}{1}{}{%
+        {{hash=eb5be25444dc585b17e19b001d6a921c}{%
+           family={{libfuse Project}},
+           familyi={l\bibinitperiod}}}%
+      }
+      \strng{namehash}{eb5be25444dc585b17e19b001d6a921c}
+      \strng{fullhash}{eb5be25444dc585b17e19b001d6a921c}
+      \strng{bibnamehash}{eb5be25444dc585b17e19b001d6a921c}
+      \strng{authorbibnamehash}{eb5be25444dc585b17e19b001d6a921c}
+      \strng{authornamehash}{eb5be25444dc585b17e19b001d6a921c}
+      \strng{authorfullhash}{eb5be25444dc585b17e19b001d6a921c}
+      \field{sortinit}{1}
+      \field{sortinithash}{4f6aaa89bab872aa0999fec09ff8e98a}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{libfuse: The Reference Implementation of the Linux FUSE Interface}
+      \field{urlday}{11}
+      \field{urlmonth}{6}
+      \field{urlyear}{2026}
+      \field{year}{2026}
+      \field{urldateera}{ce}
+      \verb{urlraw}
+      \verb https://github.com/libfuse/libfuse
+      \endverb
+      \verb{url}
+      \verb https://github.com/libfuse/libfuse
+      \endverb
+    \endentry
+    \entry{linuxFuseDocs}{online}{}
+      \name{author}{1}{}{%
+        {{hash=9696eeca0031991d5a47c79005e7e71b}{%
+           family={{The Linux Kernel Documentation}},
+           familyi={T\bibinitperiod}}}%
+      }
+      \strng{namehash}{9696eeca0031991d5a47c79005e7e71b}
+      \strng{fullhash}{9696eeca0031991d5a47c79005e7e71b}
+      \strng{bibnamehash}{9696eeca0031991d5a47c79005e7e71b}
+      \strng{authorbibnamehash}{9696eeca0031991d5a47c79005e7e71b}
+      \strng{authornamehash}{9696eeca0031991d5a47c79005e7e71b}
+      \strng{authorfullhash}{9696eeca0031991d5a47c79005e7e71b}
+      \field{extraname}{3}
+      \field{sortinit}{1}
+      \field{sortinithash}{4f6aaa89bab872aa0999fec09ff8e98a}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{FUSE (Filesystem in Userspace) Technical Documentation}}
+      \field{urlday}{11}
+      \field{urlmonth}{6}
+      \field{urlyear}{2026}
+      \field{year}{2026}
+      \field{urldateera}{ce}
+      \verb{urlraw}
+      \verb https://docs.kernel.org/filesystems/fuse/index.html
+      \endverb
+      \verb{url}
+      \verb https://docs.kernel.org/filesystems/fuse/index.html
+      \endverb
+    \endentry
+  \enddatalist
+\endrefsection
+\endinput
+

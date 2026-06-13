@@ -1,0 +1,23 @@
+\babel@toc {english}{}\relax 
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {2.1}{\ignorespaces Comparison of common encryption modes for storage usage.}}{4}{table.2.1}%
+\contentsline {table}{\numberline {2.2}{\ignorespaces Storage layers used in the project.}}{6}{table.2.2}%
+\contentsline {table}{\numberline {2.3}{\ignorespaces Comparison of related secure storage approaches.}}{9}{table.2.3}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {3.1}{\ignorespaces Vault storage layout options.}}{17}{table.3.1}%
+\contentsline {table}{\numberline {3.2}{\ignorespaces Summary of vault lifecycle operations.}}{23}{table.3.2}%
+\contentsline {table}{\numberline {3.3}{\ignorespaces Comparison of considered storage design alternatives.}}{27}{table.3.3}%
+\contentsline {table}{\numberline {3.4}{\ignorespaces Threat and mitigation summary.}}{29}{table.3.4}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {4.1}{\ignorespaces Main implementation units.}}{30}{table.4.1}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {5.1}{\ignorespaces Test strategy overview.}}{35}{table.5.1}%
+\contentsline {table}{\numberline {5.2}{\ignorespaces Functional test cases.}}{36}{table.5.2}%
+\contentsline {table}{\numberline {5.3}{\ignorespaces Failure and edge case test cases.}}{37}{table.5.3}%
+\contentsline {table}{\numberline {5.4}{\ignorespaces Filesystem usage and stress test cases.}}{38}{table.5.4}%
+\contentsline {table}{\numberline {5.5}{\ignorespaces Serial communication test cases.}}{39}{table.5.5}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {6.1}{\ignorespaces UART packet format summary.}}{46}{table.6.1}%
+\contentsline {table}{\numberline {6.2}{\ignorespaces Host-to-firmware command summary.}}{47}{table.6.2}%
+\contentsline {table}{\numberline {6.3}{\ignorespaces Firmware event and response summary.}}{47}{table.6.3}%

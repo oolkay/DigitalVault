@@ -1,0 +1,17 @@
+\chapter*{Özet}
+\addcontentsline{toc}{chapter}{Özet}
+
+%% Edit below this line
+Şifreli depolama, hassas dosyaların korunmasında etkili bir yöntemdir. Ancak parola tabanlı erişim günlük kullanımda ek yönetim yükü oluşturabilir ve kullanım kolaylığını azaltabilir. Bu projede, parmak izi kontrollü erişim ile standart Linux disk şifreleme mekanizmalarını birleştiren biyometrik tabanlı şifreli bir dijital kasa sistemi geliştirilmiştir. Sistem, kullanıcının korumalı bir depolama alanını parmak izi doğrulaması ile açmasını ve kasa açıldıktan sonra bu alanı normal bir dosya sistemi gibi kullanmasını sağlar. Proje; kurulum, biyometrik yetkilendirme, kilitleme ve kilit açma işlemleri, sanal depolama desteği, acil kilitleme ve kasa silme gibi temel kasa yaşam döngüsü adımlarını kapsamaktadır.
+
+Prototipin donanım tarafında AS608 parmak izi sensörü, STM32 Blue Pill mikrodenetleyici ve PL2303 USB-UART dönüştürücü kullanılmaktadır. Parmak izi şablonları sensör içerisinde tutulduğu için ana bilgisayarda ham biyometrik veri saklanmaz. Kasa anahtarına erişim mikrodenetleyici içerisindeki gömülü yazılım tarafından kontrol edilir. Ana bilgisayar bu anahtarı yalnızca gerekli kasa işlemi sırasında kullanır ve işlem sonrasında bellekten temizler. Depolama katmanı, şifreli depolama birimleri için kullanılan standart Linux mekanizmaları olan LUKS2 ve dm-crypt üzerine kuruludur. Şifreli birimde AES-256-XTS şifreleme kullanılır ve açılmış kasa içerisinde ext4 dosya sistemi oluşturulur.
+
+Yazılım tarafı Qt/QML tabanlı kullanıcı arayüzü, ana bilgisayarda çalışan kontrol katmanı, seri haberleşme katmanı ve kasa yöneticisi olarak ayrılmıştır. Bu ayrım kullanıcı etkileşimini, gömülü yazılım haberleşmesini ve depolama işlemlerini daha anlaşılır hale getirir. Kasa işlemleri yanlış parmak izi, cihazın çıkarılması, sensör bağlantısının kopması, meşgul bağlama noktaları veya süreç kesintileri gibi durumlarla karşılaşabileceği için asenkron iş akışları ve durum tutarlılığına özellikle dikkat edilmiştir.
+
+Sistem; işlevsel akış testleri, yazılım birim testleri, seri haberleşme testleri, dosya sistemi kullanım testleri, stres testleri ve hata durumu testleri ile değerlendirilmiştir. Testler, prototipin hedeflenen kasa iş akışlarını doğru şekilde gerçekleştirdiğini ve yaygın hata durumlarını kontrollü biçimde ele alabildiğini göstermiştir. Proje, biyometrik doğrulama, gömülü yazılım kontrolü ve standart Linux şifreli depolama altyapısının kullanılabilir bir güvenli depolama iş akışı içinde birleştirilebileceğini göstermektedir.
+
+%% Until here
+\vfill
+%% Edit after {Anahtar Kelimeler:}
+\textbf{Anahtar Kelimeler:} biyometrik kimlik doğrulama, şifreli depolama, dijital kasa, LUKS2, dm-crypt, parmak izi sensörü, STM32.
+\clearpage

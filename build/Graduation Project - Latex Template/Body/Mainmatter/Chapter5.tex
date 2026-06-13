@@ -1,0 +1,136 @@
+\chapter{Testing and Evaluation}
+
+This chapter describes how the digital vault system was tested and evaluated. The tests were not limited to the normal successful path. Functional workflows, firmware communication, software components, and several failure cases were tested to check whether the system remains understandable and recoverable during abnormal situations.
+
+\section{Testing Approach}
+
+The project was tested with a combination of manual functional testing, unit-level software tests, communication tests, filesystem usage tests, and stress tests. Manual tests were used for complete user workflows such as creating a vault, enrolling a fingerprint, unlocking the vault, locking it again, and deleting it. These tests were important because the project includes hardware, operating-system storage commands, and GUI state transitions that need to work together.
+
+Unit-level tests were used for parts of the software that could be tested without the complete hardware setup. These tests focused on logic such as state handling, storage planning, validation behavior, and expected responses to different operation results.
+
+Serial communication was tested before the graphical interface was fully connected to the firmware flow. External test programs were used to check command and response behavior independently from the GUI. This made it easier to verify the communication protocol before combining it with the user interface and vault workflows.
+
+In the following tables, the status column summarizes the result of each test. \textit{Passed} means that the expected behavior was observed during testing. If a test only satisfies the expected behavior with an important limitation, it can be marked as \textit{Partially passed}; however, the listed tests in this chapter were completed successfully. The tests were not treated as formal performance benchmarks. Their main purpose was to check that the vault reached the expected final state after normal use, repeated use, and interrupted workflows.
+
+\begin{table}[!htbp]
+\centering
+\caption{\label{tab:test-strategy}Test strategy overview.}
+\small
+\begin{tabularx}{\textwidth}{lXX}
+\toprule
+Test type & Purpose & Example checks\\
+\midrule
+Functional workflow tests & Verify complete user-facing vault operations & Create vault, enroll fingerprint, format, unlock, lock, delete\\
+Unit-level software tests & Verify isolated software behavior without the full hardware setup & State transitions, validation checks, operation result handling\\
+Serial communication tests & Verify firmware command and response behavior before GUI integration & Enroll, verify, cancel, timeout, failure responses\\
+Filesystem usage tests & Verify normal file operations after the vault is unlocked & Read, write, copy, move, delete files\\
+Stress tests & Verify behavior under repeated or heavier usage & Repeated lock/unlock cycles, larger file operations\\
+Failure and edge case tests & Verify recovery behavior when hardware or storage state changes unexpectedly & Wrong fingerprint, USB removal, STM32 disconnection, killed process\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Functional Test Cases}
+
+The main functional tests checked whether the system can complete the expected vault lifecycle operations. These tests were performed from the user-facing workflow, so they verified not only the storage operation itself but also the GUI state transitions around the operation.
+
+\begin{table}[!htbp]
+\centering
+\caption{\label{tab:functional-tests}Functional test cases.}
+\small
+\begin{tabularx}{\textwidth}{lXXX}
+\toprule
+Test case & Expected behavior & Observed result & Status\\
+\midrule
+Vault creation & User selects a storage target and starts setup & Setup flow started correctly & Passed\\
+Fingerprint enrollment & User enrolls a fingerprint for vault access & Fingerprint slot was registered & Passed\\
+Vault formatting & Selected storage is prepared as an encrypted vault & Encrypted container and filesystem were created & Passed\\
+Vault unlock & Authorized fingerprint opens the vault & Vault became accessible at the mount point & Passed\\
+Vault lock & Mounted vault is closed from the GUI & Filesystem was unmounted and mapper was closed & Passed\\
+Force-lock & Busy vault mount is force-closed after confirmation & Holder processes were handled and the vault was locked & Passed\\
+Virtual container creation & User creates a virtual storage file as a vault target & Virtual container was attached as a block device & Passed\\
+Vault deletion & User deletes a managed vault through the workflow & Managed vault state was removed from the application & Passed\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Failure and Edge Case Tests}
+
+Failure tests were important because the project can interact with removable devices and external hardware. A vault application should not only work when every component behaves correctly; it should also respond clearly when a component disappears or an operation is interrupted.
+
+\begin{table}[!htbp]
+\centering
+\caption{\label{tab:failure-tests}Failure and edge case test cases.}
+\small
+\begin{tabularx}{\textwidth}{lXXX}
+\toprule
+Test case & Expected behavior & Observed result & Status\\
+\midrule
+Wrong fingerprint & Unlock is rejected and vault remains locked & Verification failed and vault did not open & Passed\\
+USB storage removal & Runtime state is reconciled after device removal & Removal was detected as an abnormal state & Passed\\
+STM32 disconnection & GUI reports sensor loss and stops fingerprint flow & Disconnection was reflected in the interface & Passed\\
+Application process killed & Remaining mapper or mount state is cleaned during recovery & Reconciliation and emergency close behavior were used & Passed\\
+Busy mount during lock & Busy state is reported instead of silently failing & Force-lock path handled the busy mount & Passed\\
+Interrupted operation & GUI avoids showing a misleading successful state & Controller state was updated after failure or cancellation & Passed\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+These tests also helped verify the importance of the state-machine style design described in Chapter 3. Pulling the USB cable of the STM32 in the middle of an unlock was one of the more useful cases: the first builds simply kept waiting for a response that never came, and only after the controller learned to treat a dropped connection as a failure did the interface recover cleanly. A fingerprint result, likewise, should only affect the workflow that is currently active, and a storage failure should not leave the interface showing a successful state.
+
+\section{Filesystem Usage and Stress Tests}
+
+After the vault was unlocked and mounted, normal filesystem behavior was also tested. This was important because the user should not need to think about the encryption layer during everyday file usage. The opened vault should behave like a normal folder while it is unlocked.
+
+\begin{table}[!htbp]
+\centering
+\caption{\label{tab:filesystem-tests}Filesystem usage and stress test cases.}
+\small
+\begin{tabularx}{\textwidth}{lXXX}
+\toprule
+Test case & Expected behavior & Observed result & Status\\
+\midrule
+File write & User writes a file into the unlocked vault & File was created successfully & Passed\\
+File read & User opens a stored file from the vault & File content was readable after unlock & Passed\\
+File copy & User copies files into and inside the vault & Copy operations completed normally & Passed\\
+File move & User moves or renames files in the vault & Move and rename operations completed normally & Passed\\
+File delete & User deletes files from the unlocked vault & Deleted files were removed from the vault & Passed\\
+Large file operation & User copies or writes a larger file into the vault & Operation completed without breaking vault state & Passed\\
+Repeated lock/unlock & User repeatedly opens and closes the vault & Vault returned to the expected state after each cycle & Passed\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+These tests were also a practical check for the storage design decision. Since the project uses block-device encryption, the filesystem inside the vault remains a standard filesystem after unlock. Therefore, normal file operations are handled by the operating system rather than by custom file-operation code. In the filesystem tests, the important observation was not only that individual file operations succeeded, but also that the vault could still be locked afterwards without leaving an open mapper or stale mount point behind.
+
+\section{Serial Communication Tests}
+
+The serial communication layer was tested before relying on the GUI workflow. The goal was to confirm that commands such as enroll, verify, cancel, delete, list enrolled fingerprints, and key request could be sent and interpreted correctly. Testing this layer separately made debugging easier because communication problems could be identified before they appeared as GUI workflow problems.
+
+The communication tests also checked timeout, busy, failed verification, and sensor-error responses. These cases are important because fingerprint operations depend on user action and sensor state. A delayed or failed response should not block the whole application indefinitely.
+
+\begin{table}[!htbp]
+\centering
+\caption{\label{tab:serial-tests}Serial communication test cases.}
+\small
+\begin{tabularx}{\textwidth}{lXXX}
+\toprule
+Test case & Expected behavior & Observed result & Status\\
+\midrule
+Enroll command & Firmware starts enrollment and returns a clear result & Enrollment response was received and interpreted & Passed\\
+Verify command & Firmware returns success only for an authorized fingerprint & Verification result was handled by the host flow & Passed\\
+Cancel command & Active fingerprint operation is cancelled cleanly & Cancel response returned control to the application & Passed\\
+Timeout response & Host stops waiting and shows a recoverable state & Timeout was treated as operation failure & Passed\\
+Sensor error response & Host reports the error and stops the current flow & Error response was handled without opening the vault & Passed\\
+Key request & Key is requested only after successful authorization & Key request was tied to the authenticated workflow & Passed\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Evaluation Summary}
+
+The tests showed that the main vault workflows were functional: vault creation, fingerprint enrollment, formatting, unlocking, locking, force-locking, virtual-container usage, and deletion were exercised. Normal filesystem operations such as reading, writing, copying, moving, and deleting files were also tested after unlock. Stress tests with repeated operations and larger file usage helped check that the vault did not remain in a misleading or unstable state. The most useful observations came from cases where the system was interrupted: a removed storage device, a disconnected STM32, or a killed application process should not leave the GUI claiming that the vault is safely open or safely closed without checking the real mapper and mount state.
+
+The most important result of the testing phase was confirming that the system should not be treated as a simple locked/unlocked toggle. The actual runtime state may include an open mapper, a mounted filesystem, a busy mount, a missing device, or a disconnected sensor. Testing these cases helped validate the design decision to use explicit state tracking and emergency recovery paths.
+
+The completed tests were sufficient to evaluate the main functional behavior, normal unlocked filesystem usage, stress behavior, and the most important failure-handling paths of the prototype.

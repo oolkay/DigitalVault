@@ -1,0 +1,39 @@
+\chapter{Conclusion and Future Work}
+
+This project presented a biometric based encrypted digital vault that combines fingerprint-controlled access with standard Linux storage encryption. The main goal was to make encrypted storage usable without turning the user workflow into a command-line or password-management task. For this purpose, the system was designed around three main parts: an embedded biometric access unit, a host application with a graphical interface, and a vault management layer that prepares and controls encrypted storage.
+
+The final design uses the AS608 fingerprint sensor and STM32 Blue Pill as the biometric access side of the system, while the host application manages the user workflow and encrypted storage operations. After successful authorization, the host can unlock a LUKS2/dm-crypt based vault and present it as a normal mounted folder. This keeps the everyday storage behavior close to the user's existing mental model: the user unlocks the vault, works with files normally, and locks the vault again when finished.
+
+The project also supports both physical storage devices and virtual storage containers. This makes the system more flexible because a user can prepare an external device as a vault or create a virtual block device from a storage file. In both cases, the same vault workflow can be used from the graphical interface.
+
+\section{Project Outcomes}
+
+The implemented system covers the main vault lifecycle operations: vault creation, fingerprint enrollment, formatting, unlocking, locking, force-locking, virtual container creation, and deletion. Authorized fingerprints are enrolled during vault creation, which keeps the access policy clear for the lifetime of the vault. The graphical interface hides low-level storage commands while still showing important system states such as locked/unlocked status, sensor connection, active operations, and abnormal conditions.
+
+An important design decision was to use block-device encryption with LUKS2/dm-crypt instead of a custom FUSE-based filesystem. This choice gave up fine-grained per-operation control, but it kept the standard Linux storage stack in charge of normal filesystem behavior, as discussed in Chapter 3.
+
+Another important result was the state-oriented design of the host application. Testing showed that the system cannot be represented only as locked or unlocked. A vault may have an open mapper, a mounted filesystem, a busy mount point, a missing storage device, or a disconnected fingerprint unit. The implementation therefore includes explicit state tracking, recovery behavior, and emergency locking paths.
+
+\section{Limitations}
+
+The project uses established components rather than proposing a new encryption algorithm or a new filesystem standard. This is a deliberate choice because the main contribution is the integration of biometric authorization, embedded control, graphical interaction, and encrypted storage into a usable vault workflow.
+
+The main limitations are related to key protection boundaries and cryptographic flexibility. The vault key is controlled by the firmware side, but the hardware platform still has physical extraction risks. A stronger hardware platform, protected storage, or secure element would reduce the risk of key leakage from the embedded device.
+
+Another limitation is that the key is still present on the host machine for a short time while the vault operation is performed. The implementation avoids persistent storage of the key and wipes the key buffer after use, but a compromised host operating system could still be a risk while the key or unlocked vault is active. This is a general limitation of systems where the host must temporarily open encrypted storage.
+
+The current system is also centered on one storage encryption configuration. AES-XTS is appropriate for this project because it is widely used for disk encryption, but future versions could support additional encryption algorithms or configurations if the storage backend and security requirements change.
+
+\section{Future Work}
+
+One future improvement is strengthening the embedded side of the system. A more secure hardware platform, secure element, or stronger firmware protection could reduce the risk of physical attacks against the device. This would also make the separation between biometric authorization and host-side storage control stronger.
+
+Another improvement is reducing host-side key exposure as much as possible. This could include stricter memory handling, shorter key lifetime on the host, process isolation, and additional checks around when the key can be requested and used.
+
+The user interface can also be improved with more detailed recovery guidance and clearer reporting for abnormal states. The current interface already follows a state-oriented workflow, but future versions could provide more structured diagnostics when a device is removed, a mount is busy, or the fingerprint unit is disconnected.
+
+The storage layer can also be extended with configurable encryption options. The current design uses a standard disk-encryption configuration, but supporting additional algorithms or profiles could make the project adaptable to different requirements.
+
+\section{Final Remarks}
+
+Overall, the project shows that biometric access control can be combined with standard encrypted storage tools to build a usable digital vault workflow. The work does not depend on a new cryptographic primitive; instead, it focuses on connecting existing security mechanisms with a clear hardware and software architecture. The most valuable part of the work was not only opening and closing an encrypted container, but also handling the surrounding states that occur in a real system: hardware disconnection, removable storage behavior, interrupted operations, and user-facing recovery. These decisions shaped the final architecture and provide a clear direction for future improvements.

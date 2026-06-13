@@ -1,0 +1,17 @@
+\chapter*{Abstract}
+\addcontentsline{toc}{chapter}{Abstract}
+
+%% Edit below this line
+Encrypted storage is an effective way to protect sensitive files. However, password-based access can be difficult to manage in daily use and may reduce usability. This project presents a biometric based encrypted digital vault that combines fingerprint-controlled access with standard Linux disk encryption. The system allows the user to unlock a protected storage area with fingerprint verification and then use it like a normal mounted filesystem. The project covers the main vault lifecycle, including setup, biometric authorization, lock and unlock operations, virtual storage support, emergency locking, and deletion.
+
+The hardware side of the prototype uses an AS608 fingerprint sensor, an STM32 Blue Pill microcontroller, and a PL2303 USB-UART bridge. Fingerprint templates are stored inside the sensor, so the host computer does not store raw biometric data. Access to the vault key is controlled by the firmware side. The host application uses the key only for the required vault operation and clears it from memory after use. The storage layer is based on Linux Unified Key Setup (LUKS2) and dm-crypt, which are standard Linux mechanisms for encrypted storage volumes. The encrypted volume uses AES-256-XTS encryption, and an ext4 filesystem is created inside the unlocked vault.
+
+The software architecture is divided into a Qt/QML graphical interface, a host-side controller, a serial communication layer, and a vault manager. This separation makes the system easier to understand. It also separates user interaction, firmware communication, and storage operations. Special attention is given to asynchronous workflows and state consistency, because vault operations can be interrupted by wrong fingerprints, device removal, sensor disconnection, busy mount points, or process termination.
+
+The system was evaluated through functional workflow tests, unit-level software tests, serial communication tests, filesystem usage tests, stress tests, and failure case tests. The results show that the prototype performs the intended vault workflows correctly and handles common failure cases in a controlled way. The project demonstrates how biometric authorization, embedded firmware control, and standard Linux storage encryption can be combined into a usable secure storage workflow.
+
+%% Until here
+\vfill
+%% Edit after {Keywords:}
+\textbf{Keywords:} biometric authentication, encrypted storage, digital vault, LUKS2, dm-crypt, fingerprint sensor, STM32.
+\clearpage

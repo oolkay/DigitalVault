@@ -1,0 +1,297 @@
+' PlantUML diagrams for the graduation project report.
+' Copy one @startuml ... @enduml block into PlantText at a time.
+' Suggested export format: SVG for clean text, PNG if LaTeX image inclusion is easier.
+'
+' These diagrams intentionally use conservative PlantUML syntax for PlantText compatibility.
+
+@startuml
+title System Architecture
+
+skinparam shadowing false
+skinparam backgroundColor white
+skinparam defaultFontName Arial
+
+package "Biometric Hardware Layer" {
+  rectangle "AS608 Fingerprint Sensor" as AS608
+  rectangle "STM32 Blue Pill Firmware Controller" as STM32
+  rectangle "PL2303 USB-UART Bridge" as PL2303
+}
+
+package "Host Application Layer" {
+  rectangle "Qt/QML GUI" as GUI
+  rectangle "VaultController" as Controller
+  rectangle "SerialBridge" as Serial
+  rectangle "vault_manager" as Manager
+}
+
+package "Encrypted Storage Layer" {
+  rectangle "cryptsetup" as Cryptsetup
+  rectangle "LUKS2 dm-crypt Encrypted Mapper" as LUKS
+  rectangle "ext4 Vault Filesystem" as FS
+  rectangle "Physical Device or Virtual Container" as Device
+}
+
+AS608 --> STM32 : fingerprint match result
+STM32 --> PL2303 : UART packets
+PL2303 --> Serial : USB serial
+GUI --> Controller : user actions
+Controller --> Serial : enroll, verify, key request
+Serial --> PL2303 : firmware commands
+Controller --> Manager : setup, unlock, lock
+Manager --> Cryptsetup : key through stdin
+Cryptsetup --> LUKS : open or format mapper
+LUKS --> FS : decrypted block device
+Device --> LUKS : encrypted storage
+
+note right of Controller
+Tracks vault state, active workflow,
+security logs, and recovery paths.
+end note
+
+note bottom of Manager
+Performs privileged storage operations:
+format, open, mount, unmount, close,
+force-lock, and cleanup.
+end note
+@enduml
+
+
+@startuml
+title Hardware Connection Diagram
+
+skinparam shadowing false
+skinparam backgroundColor white
+skinparam defaultFontName Arial
+
+rectangle "AS608 Fingerprint Sensor" as AS608
+rectangle "STM32 Blue Pill Firmware Controller" as STM32
+rectangle "PL2303 USB-UART Bridge" as PL2303
+rectangle "Host Computer Linux GUI Application" as Host
+
+AS608 --> STM32 : UART TX RX, VCC, GND
+STM32 --> PL2303 : UART TX RX, GND
+PL2303 --> Host : USB
+
+note bottom of AS608
+Stores fingerprint templates
+and performs biometric matching.
+end note
+
+note bottom of STM32
+Controls enrollment, verification,
+and firmware-side key access.
+end note
+
+note bottom of Host
+Runs GUI, serial bridge,
+vault controller, and vault manager.
+end note
+@enduml
+
+
+
+
+@startuml
+title Authentication and Key-Access Flow
+
+skinparam shadowing false
+skinparam backgroundColor white
+skinparam defaultFontName Arial
+
+start
+:User starts vault setup or unlock;
+:GUI starts fingerprint workflow;
+:VaultController requests verification;
+:SerialBridge sends command to STM32;
+:STM32 drives AS608 fingerprint scan;
+
+if (Fingerprint accepted?) then (yes)
+  :STM32 authorizes key access;
+  :Protected firmware-to-host key transfer;
+  :Host passes key to vault_manager;
+  :vault_manager sends key to cryptsetup through stdin;
+  :LUKS2 setup or open operation;
+  :Host key buffer is wiped;
+  if (Setup operation?) then (yes)
+    :Create ext4 filesystem;
+    :Close mapper;
+    :Vault remains locked;
+  else (unlock)
+    :Mount ext4 filesystem;
+    :Vault becomes accessible;
+  endif
+else (no)
+  :Reject operation;
+  :Vault remains locked;
+endif
+
+stop
+@enduml
+
+
+@startuml
+title Unlock Sequence Diagram
+
+skinparam shadowing false
+skinparam backgroundColor white
+skinparam defaultFontName Arial
+
+actor User
+participant "Qt/QML GUI" as GUI
+participant "VaultController" as Controller
+participant "SerialBridge" as Serial
+participant "STM32 Firmware" as STM32
+participant "AS608 Sensor" as AS608
+participant "vault_manager" as Manager
+participant "cryptsetup and dm-crypt" as Crypt
+participant "ext4 Mount Point" as Mount
+
+User -> GUI : Click Unlock
+GUI -> Controller : unlockVault(vaultId)
+Controller -> Serial : startVerification()
+Serial -> STM32 : VERIFY command
+STM32 -> AS608 : Capture and match fingerprint
+AS608 --> STM32 : Match result
+
+alt Authorized fingerprint
+  STM32 --> Serial : Verification OK
+  Controller -> Serial : requestKey()
+  Serial -> STM32 : KEY_REQUEST command
+  STM32 --> Serial : Protected key response
+  Serial --> Controller : keyReceived(key)
+  Controller -> Manager : open vault with short-lived key
+  Manager -> Crypt : cryptsetup open with stdin key
+  Crypt --> Manager : mapper opened
+  Manager -> Mount : mount ext4 filesystem
+  Mount --> Manager : mounted
+  Manager --> Controller : open success
+  Controller -> Controller : wipe key and start timer
+  Controller --> GUI : state unlocked
+  GUI --> User : Show vault as accessible
+else Unauthorized fingerprint or error
+  STM32 --> Serial : Verification failed or timeout
+  Serial --> Controller : verification failed
+  Controller --> GUI : state locked
+  GUI --> User : Show failure message
+end
+@enduml
+
+
+@startuml
+title Vault Lifecycle State Diagram
+
+skinparam shadowing false
+skinparam backgroundColor white
+skinparam defaultFontName Arial
+skinparam state {
+  BackgroundColor #FCFCFC
+  BorderColor #555555
+  FontSize 13
+}
+skinparam nodesep 18
+skinparam ranksep 24
+
+top to bottom direction
+
+state "New" as New
+state "Setting Up" as Setup
+state "Locked" as Locked
+state "Authenticating" as Auth
+state "Unlocking" as Unlocking
+state "Unlocked" as Unlocked
+state "Locking" as Locking
+state "Busy Mount" as Busy
+state "Force Locking" as Force
+state "Emergency Lock" as Emergency
+state "Recovery" as Recovery
+state "Deleting" as Deleting
+state "Removed" as Removed
+
+' Main path
+[*] --> New
+New --> Setup : create vault
+Setup --> Locked : format done
+Setup --> Recovery : setup failed
+
+Locked --> Auth : unlock request
+Auth --> Locked : auth failed
+Auth --> Unlocking : authorized
+Unlocking --> Unlocked : open + mount
+Unlocking --> Recovery : open failed
+
+Unlocked --> Locking : lock or timeout
+Unlocked --> Emergency : device removed
+Unlocked --> Busy : lock busy
+
+Locking --> Locked : closed
+Locking --> Busy : still busy
+Locking --> Recovery : close failed
+
+Busy --> Unlocked : cancel
+Busy --> Force : force lock
+Force --> Locked : holders stopped
+Force --> Recovery : cleanup failed
+
+Emergency --> Locked : cleanup ok
+Emergency --> Recovery : partial cleanup
+
+Recovery --> Locked : reconcile
+Recovery --> Removed : device missing
+
+Locked --> Deleting : delete request
+Deleting --> Removed : remove data
+Deleting --> Recovery : delete failed
+
+Removed --> [*]
+
+' Layout helpers
+New -[hidden]down-> Setup
+Locked -[hidden]down-> Auth
+Auth -[hidden]down-> Unlocking
+Unlocked -[hidden]down-> Locking
+Locking -[hidden]down-> Busy
+Busy -[hidden]down-> Force
+Force -[hidden]down-> Emergency
+Recovery -[hidden]down-> Deleting
+Deleting -[hidden]down-> Removed
+@enduml
+
+
+@startuml
+title Threat and Mitigation Overview
+
+skinparam shadowing false
+skinparam backgroundColor white
+skinparam defaultFontName Arial
+
+package "Risks" {
+  rectangle "Lost or stolen storage device" as R1
+  rectangle "Unauthorized fingerprint" as R2
+  rectangle "Biometric template exposure" as R3
+  rectangle "Host-side key exposure" as R4
+  rectangle "Vault left mounted unintentionally" as R5
+  rectangle "Device removal while active" as R6
+}
+
+package "Mitigations" {
+  rectangle "LUKS2 dm-crypt AES-256-XTS" as M1
+  rectangle "Firmware-controlled fingerprint verification" as M2
+  rectangle "Templates remain inside AS608" as M3
+  rectangle "Short-lived key use and memory wipe" as M4
+  rectangle "Auto-lock and emergency lock" as M5
+  rectangle "Runtime reconciliation and cleanup paths" as M6
+}
+
+R1 --> M1
+R2 --> M2
+R3 --> M3
+R4 --> M4
+R5 --> M5
+R6 --> M6
+
+note bottom
+The system protects data at rest and controls the unlock process.
+If the host is already compromised while the vault is unlocked,
+mounted files may still be accessible through the operating system.
+end note
+@enduml

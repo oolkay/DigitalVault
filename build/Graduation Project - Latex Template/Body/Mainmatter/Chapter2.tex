@@ -1,0 +1,121 @@
+\chapter{Background and Literature Review}
+
+This chapter reviews the main technical ideas behind the project. The purpose is not to present every detail of each technology, but to explain the storage encryption, biometric authentication, and secure storage approaches that shaped the design of the digital vault.
+
+\section{Symmetric Encryption for Stored Data}
+
+Encrypted storage systems generally rely on symmetric-key cryptography. In this model, the same secret key is used for both encryption and decryption. This is practical for disk encryption because large amounts of data must be processed quickly while the user reads and writes files.
+
+Several symmetric algorithms were reviewed before deciding on the storage encryption approach. AES is a standardized 128-bit block cipher with 128-, 192-, and 256-bit key options \cite{nistFips197}. ChaCha20 is a fast stream cipher and is attractive on systems without dedicated AES hardware, but its common standardized use is with nonce-based authenticated encryption protocols rather than as the direct block cipher for sector-based disk encryption \cite{rfc8439ChaCha20}. Serpent is a conservative block cipher design with a large security margin, but this project did not need to trade the selected storage stack for that extra margin \cite{andersonSerpent}.
+
+Twofish is a flexible 128-bit block cipher with key sizes up to 256 bits and several performance trade-offs \cite{schneierTwofish}. Camellia has the same basic block and key-size interface as AES and was designed for both software and hardware implementations \cite{rfc3713Camellia}. Both are valid algorithms to study, but the project storage layer already follows the LUKS2/dm-crypt AES-XTS path described in the next section. For that reason, AES is the more direct fit for this implementation.
+
+For this project, AES-256 was selected because it best matches the actual storage design. The choice was not only about cryptographic strength. AES is standardized, widely studied, and supported by a large software and security community. It is also directly supported by common Linux storage tools, including the LUKS2/dm-crypt stack used in this project. This matters in practice because the project can use existing, tested tooling instead of adding a custom cryptographic layer. The following section explains why AES-XTS is a suitable mode for encrypted block devices, which makes AES the most natural choice for this implementation.
+
+\section{XTS Mode for Disk Encryption}
+
+A block cipher alone is not enough for encrypting a disk. Storage encryption needs a mode of operation that handles sectors or blocks independently, supports random access, and avoids exposing obvious patterns when similar data appears in different disk locations.
+
+XTS-AES is a mode designed specifically for confidentiality on storage devices. NIST Special Publication 800-38E approves XTS-AES for protecting data on storage devices, while also noting an important limitation: XTS-AES does not provide authentication of the data or its source \cite{nistXtsAes}. This distinction matters. XTS protects confidentiality, but it does not by itself detect every possible malicious modification. In this project, the primary goal is to prevent unauthorized reading of vault contents when the storage device is lost, removed, or accessed without biometric authorization.
+
+The project uses AES-256-XTS through the LUKS2/dm-crypt layer. This choice fits the project better than modes such as ECB, CBC, or CTR for the reasons summarized in Table \ref{tab:modes}. In short, it is a better match for disk encryption and random access.
+
+\begin{table}[!htbp]
+\centering
+\caption{\label{tab:modes}Comparison of common encryption modes for storage usage.}
+\begin{tabularx}{\textwidth}{lXXX}
+\toprule
+Mode & Advantages & Limitations & Suitability for vault storage\\
+\midrule
+ECB & Simple and parallelizable & Reveals repeated plaintext patterns & Not suitable\\
+CBC & Historically common and simple to understand & Less convenient for random-access disk sectors; needs careful IV handling & Not preferred\\
+CTR & Fast and random-access friendly & Reusing counters or nonces is dangerous; integrity is not provided & Possible, but requires careful design\\
+XTS & Designed for sector-based storage; hides repeated data better across positions & Provides confidentiality but not authentication & Suitable for disk encryption\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{LUKS2 and dm-crypt Based Storage Encryption}
+
+Linux Unified Key Setup 2 (LUKS2) is used in this project as the container format for encrypted storage, while dm-crypt performs the block-level encryption in the Linux kernel \cite{cryptsetupDocs,linuxDmCryptDocs}. LUKS2 stores the metadata needed to identify and unlock the encrypted volume. dm-crypt then handles the actual encryption and decryption of block device sectors after the vault is opened.
+
+This approach keeps the project away from custom cryptographic storage design. Instead of implementing encryption and filesystem semantics manually, the project uses a standard encrypted block device and then creates a normal filesystem inside it. In the current implementation, the vault filesystem is formatted as ext4 after the LUKS2 container is opened \cite{linuxExt4Docs}. After mounting, applications can read and write files normally. When the vault is locked, the filesystem is unmounted and the dm-crypt mapper is closed.
+
+Using LUKS2/dm-crypt also makes the system easier to reason about. The project code is responsible for the workflow around the vault: fingerprint enrollment, biometric unlock, key handling, mount management, auto-lock, emergency lock, and user interface behavior. The lower-level encryption of disk sectors remains inside a mature operating system storage layer \cite{linuxDmCryptDocs}.
+
+\begin{table}[!htbp]
+\centering
+\caption{\label{tab:storage-layers}Storage layers used in the project.}
+\begin{tabularx}{\textwidth}{lXX}
+\toprule
+Layer & Role & Project usage\\
+\midrule
+Physical block device or loop device & Provides the raw storage area & USB storage, disk partition, or sparse-image-backed virtual container\\
+LUKS2 container & Stores encrypted volume metadata and unlock structure & Defines the protected vault volume\\
+dm-crypt mapper & Performs sector encryption and decryption after unlock & Exposes the decrypted block device while the vault is open\\
+ext4 filesystem & Stores user files inside the decrypted volume & Mounted for normal file access after biometric unlock\\
+Vault manager and GUI & Controls setup, unlock, lock, logging, and device workflows & Provides the user-facing secure vault experience\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Biometric Authentication and Key Access}
+
+Biometric authentication is used in this project as an access-control mechanism, not as an encryption algorithm. The fingerprint sensor checks whether the presented finger belongs to an authorized user. After successful verification, the firmware side can allow the vault key to be used for unlocking encrypted storage.
+
+This separation is important. Fingerprint data should not replace cryptographic keys directly. Biometric measurements can be noisy, and they cannot be changed like passwords if they are compromised. A safer design keeps fingerprint templates inside the sensor and uses the biometric match only as a gate before releasing or using a cryptographic key. In this project, fingerprint templates are stored on the AS608 sensor, while the host computer works only with verification results and short-lived key material.
+
+The access model is also intentionally simple: authorized fingerprints are registered when the vault is created, and the access list is not changed later during normal use. This reduces the risk of accidental or unauthorized changes to vault ownership after deployment.
+
+\section{Hardware-Backed Key Management}
+
+A common idea in secure storage systems is to keep long-term encryption keys away from the general-purpose host operating system. This does not mean the host never handles secret material, but it reduces how much permanent trust is placed in host-side files and application storage.
+
+Industrial systems use this idea in different ways. BitLocker can use a Trusted Platform Module (TPM) to help protect key release and verify the boot environment before a protected volume is unlocked \cite{microsoftBitlocker}. Hardware encrypted USB drives, such as IronKey-class devices, move encryption and access control into the device itself. The host sees an unlocked storage device only after device-side authentication succeeds \cite{skorobogatovIronKey}. Self-encrypting drives follow a similar direction by performing encryption inside the storage device controller and exposing plaintext storage only after successful authorization.
+
+The digital vault follows the same principle at a project scale. It is not the same as a TPM-backed system or a commercial encrypted USB drive, but it uses a similar idea: long-term key control is moved away from ordinary host-side files. In this project, the firmware manages access to the main vault key, and fingerprint verification acts as the gate for using that key. The host computer does not permanently store the key. During an unlock operation, any key material used by the host is short-lived and is cleared after the storage layer has been opened. The communication channel between firmware and host is protected so that the key is not transferred as plaintext.
+
+\section{Embedded Hardware Used for Biometric Access}
+
+The hardware side of the project is intentionally simple. The AS608 fingerprint sensor handles fingerprint enrollment, template storage, and matching. Because the templates never leave the sensor, the host computer never sees raw biometric data. The STM32 Blue Pill acts as the firmware controller between the sensor and the host-side software. It coordinates biometric operations and controls the key-access logic. The PL2303 USB-UART bridge provides the serial communication path between the STM32 firmware and the computer.
+
+This hardware split gives each component a clear role. The sensor focuses on biometric matching, the microcontroller controls the security decision and firmware protocol, and the host software manages encrypted storage and the graphical workflow.
+
+\section{Existing Secure Storage Approaches}
+
+Several existing systems solve similar problems with different trade-offs. BitLocker is a full-volume encryption feature in Windows. Microsoft describes it as a protection mechanism for entire volumes, mainly addressing data theft from lost, stolen, or improperly decommissioned devices. BitLocker can also work with a Trusted Platform Module (TPM), which helps protect startup integrity and key release \cite{microsoftBitlocker}. This approach is strong for operating-system drives and managed Windows environments, but it is closely tied to the Windows platform.
+
+Commercial encrypted USB drives, such as Kingston IronKey products, move more of the security boundary into the external device. These products commonly use hardware encryption, password or keypad-based unlocking, brute-force protection, and sometimes tamper-resistant designs. Public analyses of IronKey-class devices show why this design is attractive: encryption and access control can be handled inside the device rather than depending entirely on the host operating system \cite{skorobogatovIronKey}. At the same time, hardware-based storage products are not automatically perfect. Research on secure USB devices has also shown that firmware and hardware manipulation are realistic threat areas \cite{swierczynskiHardwareTrojan}.
+
+The project is closer to a hybrid approach. Like BitLocker and LUKS-based systems, it uses operating-system storage encryption instead of implementing a new filesystem encryption format. Like hardware encrypted drives, it moves authentication and key control toward external hardware. The difference is that the project combines a fingerprint sensor, STM32 firmware, and a Linux vault manager rather than using a closed commercial encrypted drive.
+
+\begin{table}[!htbp]
+\centering
+\caption{\label{tab:solutions}Comparison of related secure storage approaches.}
+\small
+\begin{tabularx}{\textwidth}{lXX}
+\toprule
+Approach & Main idea & Main trade-off\\
+\midrule
+BitLocker & Full-volume encryption integrated with Windows; can use TPM, PIN, password, or recovery key depending on configuration & Strong platform integration, but Windows-specific\\
+LUKS2/dm-crypt & Linux encrypted block device approach with a normal filesystem inside the decrypted mapper & Strong Linux integration, but authentication and key policy must be designed around it\\
+Hardware encrypted USB drive & Encryption and access control are handled inside the storage device hardware & Portable and self-contained, but often closed and costly\\
+Self-encrypting drive & Storage controller performs encryption internally and unlocks after authorization & Efficient and hardware-contained, but depends heavily on vendor implementation\\
+Application-level encrypted container & Files are protected by an application-managed container and opened through that application & Portable, but every file access depends on application behavior\\
+FUSE-based encrypted filesystem & User-space filesystem code intercepts file operations and can apply custom encryption logic & Flexible, but filesystem behavior and performance must be handled carefully\\
+This project & Fingerprint-controlled key access is combined with standard Linux encrypted storage & Keeps storage encryption standard while adding biometric hardware control\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{FUSE-Based Filesystem Approach}
+
+Filesystem in Userspace (FUSE) allows a filesystem to run as a normal user-space program. The Linux kernel sends file requests to this program through callbacks \cite{libfuse,linuxFuseDocs}.
+
+This idea is useful for a vault because the project code can be placed directly in the file access path. For example, a read operation could decrypt data, and a write operation could encrypt data. If the key is not available, the system could ask for fingerprint verification before continuing.
+
+This level of control was part of the initial design direction. However, it also adds filesystem complexity. This trade-off is discussed together with the final storage decision in Chapter 3.
+
+\section{Summary}
+
+The literature and existing systems point to a practical design direction: use well-established encryption primitives and storage layers, and focus the project work on authentication, key handling, device management, and user workflow. AES-256-XTS provides a suitable confidentiality layer for disk encryption. Biometric authentication is useful as a key-release gate, but it should not be treated as a cryptographic key by itself. Existing systems such as BitLocker and hardware encrypted USB drives show that secure storage usually depends on a combination of encryption, key protection, recovery policy, and usability. The proposed digital vault follows the same general idea while adapting it to a biometric embedded-hardware setting.
