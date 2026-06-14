@@ -114,6 +114,41 @@ static void refresh_partition_nodes(const char *device)
     }
 }
 
+static void release_device_users(const char *device)
+{
+    if (!device || !*device)
+        return;
+
+    char cmd[320];
+    snprintf(cmd, sizeof(cmd), "lsblk -rnpo NAME '%s' 2>/dev/null", device);
+    FILE *fp = popen(cmd, "r");
+    if (!fp)
+        return;
+
+    char paths[32][256];
+    int count = 0;
+    char line[256];
+    while (count < 32 && fgets(line, sizeof(line), fp)) {
+        line[strcspn(line, "\n")] = '\0';
+        if (line[0] == '\0')
+            continue;
+        snprintf(paths[count], sizeof(paths[count]), "%s", line);
+        count++;
+    }
+    pclose(fp);
+
+    for (int i = count - 1; i >= 0; --i) {
+        const char *swapoff_args[] = {"swapoff", paths[i], NULL};
+        run_cmd(swapoff_args);
+        const char *umount_args[] = {"umount", paths[i], NULL};
+        if (run_cmd(umount_args) != 0) {
+            const char *lazy_umount_args[] = {"umount", "-l", paths[i], NULL};
+            run_cmd(lazy_umount_args);
+        }
+    }
+    sync();
+}
+
 /**
  * cryptsetup'a key'i stdin üzerinden pipe'la.
  * Key asla komut satırında veya dosyada görünmez.
@@ -699,6 +734,8 @@ static int cmd_setup(const char *device, int finger_id, int force, int partition
         }
     } else {
         printf("[vault_manager] WARNING: Force flag detected. Overwriting existing data...\n");
+        printf("[vault_manager] Releasing existing mounts on %s...\n", device);
+        release_device_users(device);
     }
 
     char target_device[256];

@@ -276,6 +276,7 @@ private:
     void updateSensorStatus(SensorStatus status, const QString &customText = QString());
     void onSerialConnectionLost(const QString &reason);
     void triggerHardwareDisconnectLockdown(const QString &reason);
+    void triggerStorageDisconnectLockdown(const QString &reason);
     void endStartupConnectPhase();
     void clearFailedSerialPortSetting();
     void tryConnectSerial();
@@ -432,6 +433,8 @@ private:
     bool isVaultRuntimeOpen() const;
     bool isMapperPresent() const;
     bool isUserVaultMounted() const;
+    bool isBlockDevicePresent(const QString &path) const;
+    bool unlockedVaultBackingPresent() const;
     void syncRuntimeFromKernel();
     QString findLuksPartitionPath(const QString &devicePath) const;
     bool isRegistryManagedPath(const QString &path) const;

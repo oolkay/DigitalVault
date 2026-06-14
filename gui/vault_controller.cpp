@@ -744,6 +744,25 @@ void VaultController::triggerHardwareDisconnectLockdown(const QString &reason)
         !ok);
 }
 
+void VaultController::triggerStorageDisconnectLockdown(const QString &reason)
+{
+    if (!hardwareDisconnectLockdown())
+        return;
+    if (m_isToggling || s_emergencyClosing.load())
+        return;
+    if (m_unlockedDevice.isEmpty() && !isVaultRuntimeOpen())
+        return;
+
+    addLog(QStringLiteral("CRITICAL"),
+           QStringLiteral("Vault storage removed — emergency locking vault."));
+    const bool ok = emergencyClose();
+    emit notificationReceived(
+        ok ? QStringLiteral("Vault storage removed. Emergency lock complete.")
+           : QStringLiteral("Vault storage removed. Emergency lock failed."),
+        !ok);
+    Q_UNUSED(reason);
+}
+
 void VaultController::tryConnectSerial()
 {
     if (!m_serialBridge)
@@ -3226,8 +3245,18 @@ void VaultController::launchSetupAsync(const QString &device, int ownerId, bool 
                 for (const QString &line :
                      m_lastVaultManagerOutput.split(QLatin1Char('\n'))) {
                     const QString trimmed = line.trimmed();
-                    if (!trimmed.isEmpty())
+                    if (trimmed.isEmpty())
+                        continue;
+                    const QString lower = trimmed.toLower();
+                    if (lower.contains(QStringLiteral("failed"))
+                        || lower.contains(QStringLiteral("cannot"))
+                        || lower.contains(QStringLiteral("error"))
+                        || lower.contains(QStringLiteral("busy"))
+                        || lower.contains(QStringLiteral("in use"))) {
                         detail = trimmed;
+                        break;
+                    }
+                    detail = trimmed;
                 }
             }
             emit setupFinished(false, QStringLiteral("Setup failed."));
@@ -3598,6 +3627,11 @@ QVariantList VaultController::getStorageDevices()
             }
 
             if (type == QStringLiteral("disk")) {
+                if (isLuks) {
+                    devices << makeVaultPartitionEntry(devPath, size);
+                    continue;
+                }
+
                 QVariantMap entry = makeGenericStorageEntry(obj, devPath, type);
                 if (!children.isEmpty()) {
                     const ChildPartitionSummary summary = summarizePartitions(children);
@@ -3651,6 +3685,40 @@ void VaultController::refreshStorageDevices()
     emit devicesChanged();
 }
 
+bool VaultController::isBlockDevicePresent(const QString &path) const
+{
+    const QString p = path.trimmed();
+    if (p.isEmpty() || !p.startsWith(QStringLiteral("/dev/")))
+        return false;
+
+    QProcess lsblk;
+    lsblk.start(QStringLiteral("lsblk"), {QStringLiteral("-no"), QStringLiteral("NAME"), p});
+    return lsblk.waitForFinished(1000) && lsblk.exitCode() == 0
+           && !QString::fromUtf8(lsblk.readAllStandardOutput()).trimmed().isEmpty();
+}
+
+bool VaultController::unlockedVaultBackingPresent() const
+{
+    if (m_unlockedDevice.isEmpty())
+        return true;
+    if (isBlockDevicePresent(m_unlockedDevice))
+        return true;
+
+    const QString luksPath = findLuksPartitionPath(m_unlockedDevice);
+    if (!luksPath.isEmpty() && luksPath != m_unlockedDevice
+        && isBlockDevicePresent(luksPath)) {
+        return true;
+    }
+
+    const QString diskPath = resolveManagedDiskPath(m_unlockedDevice);
+    if (!diskPath.isEmpty() && diskPath != m_unlockedDevice
+        && isBlockDevicePresent(diskPath)) {
+        return true;
+    }
+
+    return false;
+}
+
 /* ─── Periodic Status Poll ───────────────────────────────────────────────── */
 
 void VaultController::pollStatus()
@@ -3660,6 +3728,13 @@ void VaultController::pollStatus()
      * /dev/mapper/digitalvault varsa vault açık demektir.
      */
     bool wasLocked = m_isLocked;
+
+    if (hardwareDisconnectLockdown() && !m_unlockedDevice.isEmpty()
+        && !unlockedVaultBackingPresent()) {
+        triggerStorageDisconnectLockdown(QStringLiteral("storage_removed"));
+        refreshStorageDevices();
+        return;
+    }
 
     /* 
      * HAL Bağlantısını Kontrol Et (Simülatör ya da Gerçek Donanım)
@@ -5460,11 +5535,32 @@ QVariantMap VaultController::enrichVaultEntry(const QVariantMap &entry) const
 QVariantList VaultController::registeredVaults() const
 {
     QVariantList vaults;
+    QSet<QString> seen;
+
+    auto appendVault = [&](const QVariantMap &entry) {
+        const QString path = entry.value(QStringLiteral("path")).toString();
+        if (path.isEmpty() || seen.contains(path))
+            return;
+        if (!entry.value(QStringLiteral("isVault")).toBool())
+            return;
+        seen.insert(path);
+        vaults << enrichVaultEntry(entry);
+    };
+
+    for (const QJsonValue &v : loadRegistryArray()) {
+        const QString path = v.toObject().value(QStringLiteral("path")).toString();
+        QVariantMap info = resolveDeviceInfo(path);
+        if (!info.value(QStringLiteral("valid")).toBool())
+            info = resolveDeviceInfo(resolveManagedDiskPath(path));
+        appendVault(info);
+    }
+
     for (const QVariant &v : m_storageDevices) {
         const QVariantMap entry = v.toMap();
-        if (!entry.value(QStringLiteral("isVault")).toBool())
+        const QString path = entry.value(QStringLiteral("path")).toString();
+        if (isRegistryManagedPath(path))
             continue;
-        vaults << enrichVaultEntry(entry);
+        appendVault(entry);
     }
     return vaults;
 }
