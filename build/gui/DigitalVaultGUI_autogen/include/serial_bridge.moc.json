@@ -1,0 +1,138 @@
+{
+    "classes": [
+        {
+            "className": "SerialWorker",
+            "object": true,
+            "qualifiedClassName": "SerialWorker",
+            "slots": [
+                {
+                    "access": "public",
+                    "name": "setupOnWorkerThread",
+                    "returnType": "void"
+                },
+                {
+                    "access": "public",
+                    "arguments": [
+                        {
+                            "name": "port",
+                            "type": "QString"
+                        }
+                    ],
+                    "name": "connectPort",
+                    "returnType": "void"
+                },
+                {
+                    "access": "public",
+                    "name": "disconnectPort",
+                    "returnType": "void"
+                },
+                {
+                    "access": "public",
+                    "name": "startVerify",
+                    "returnType": "bool"
+                },
+                {
+                    "access": "public",
+                    "name": "requestKey",
+                    "returnType": "void"
+                },
+                {
+                    "access": "public",
+                    "arguments": [
+                        {
+                            "name": "fingerId",
+                            "type": "int"
+                        }
+                    ],
+                    "name": "startEnroll",
+                    "returnType": "bool"
+                },
+                {
+                    "access": "public",
+                    "arguments": [
+                        {
+                            "name": "fingerId",
+                            "type": "int"
+                        }
+                    ],
+                    "name": "deleteFinger",
+                    "returnType": "bool"
+                },
+                {
+                    "access": "public",
+                    "name": "listEnrolled",
+                    "returnType": "void"
+                },
+                {
+                    "access": "public",
+                    "name": "cancelInventoryIfRunning",
+                    "returnType": "void"
+                },
+                {
+                    "access": "public",
+                    "name": "forceIdle",
+                    "returnType": "void"
+                },
+                {
+                    "access": "public",
+                    "name": "cancelOperation",
+                    "returnType": "void"
+                },
+                {
+                    "access": "private",
+                    "name": "onReadyRead",
+                    "returnType": "void"
+                },
+                {
+                    "access": "private",
+                    "name": "checkLink",
+                    "returnType": "void"
+                },
+                {
+                    "access": "private",
+                    "arguments": [
+                        {
+                            "name": "reason",
+                            "type": "QString"
+                        }
+                    ],
+                    "name": "reportLinkLost",
+                    "returnType": "void"
+                },
+                {
+                    "access": "private",
+                    "name": "onDeadline",
+                    "returnType": "void"
+                },
+                {
+                    "access": "private",
+                    "name": "onRecoveryDone",
+                    "returnType": "void"
+                },
+                {
+                    "access": "private",
+                    "name": "onHeartbeatDeadline",
+                    "returnType": "void"
+                },
+                {
+                    "access": "private",
+                    "name": "abortOpWithProtocolError",
+                    "returnType": "void"
+                },
+                {
+                    "access": "private",
+                    "name": "resetPort",
+                    "returnType": "void"
+                }
+            ],
+            "superClasses": [
+                {
+                    "access": "public",
+                    "name": "QObject"
+                }
+            ]
+        }
+    ],
+    "inputFile": "serial_bridge.cpp",
+    "outputRevision": 68
+}

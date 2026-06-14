@@ -100,7 +100,7 @@ Item {
             StackLayout {
                 id: wizardStack
                 width: contentCol.innerWidth
-                clip: true
+                clip: false
                 implicitHeight: currentItem ? currentItem.implicitHeight : 0
                 currentIndex: 0
             }

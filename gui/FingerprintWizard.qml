@@ -23,6 +23,7 @@ Popup {
 
     function isEnrollFlow() {
         return vaultController.fingerprintFlow === "setup_enroll"
+               || vaultController.fingerprintFlow === "setup_access_enroll"
                || vaultController.fingerprintFlow === "grant_enroll"
     }
 
@@ -31,6 +32,8 @@ Popup {
         case "setup_find_existing": return "Check existing fingerprint"
         case "setup_enroll": return "Add owner fingerprint"
         case "setup_verify": return "Confirm setup"
+        case "setup_access_find_existing": return "Check setup fingerprint"
+        case "setup_access_enroll": return "Add setup fingerprint"
         case "grant_verify": return "Confirm current access"
         case "grant_find_existing": return "Scan fingerprint to add"
         case "grant_enroll": return "Add new fingerprint"
@@ -83,6 +86,10 @@ Popup {
             return "If this fingerprint is already saved, it will be linked to this vault."
         if (flow === "grant_enroll")
             return "This is the new fingerprint being added. Use the same finger for both scans."
+        if (flow === "setup_access_find_existing")
+            return "If this fingerprint is already saved, it will be added to this vault setup."
+        if (flow === "setup_access_enroll")
+            return "This fingerprint will be saved only if setup completes."
         if (isEnrollFlow())
             return "Use the same finger for both scans."
         return "Touch the sensor with an authorized finger."

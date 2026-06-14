@@ -1,0 +1,42 @@
+file(REMOVE_RECURSE
+  "DigitalVault/AccessManager.qml"
+  "DigitalVault/CreateVault.qml"
+  "DigitalVault/Dashboard.qml"
+  "DigitalVault/DiscoveredStorageRow.qml"
+  "DigitalVault/FingerprintManager.qml"
+  "DigitalVault/FingerprintWizard.qml"
+  "DigitalVault/ManagedDeviceRow.qml"
+  "DigitalVault/ModalScrim.qml"
+  "DigitalVault/PartitionLayoutTable.qml"
+  "DigitalVault/PartitionLayoutView.qml"
+  "DigitalVault/PartitionListRow.qml"
+  "DigitalVault/SecurityLog.qml"
+  "DigitalVault/Settings.qml"
+  "DigitalVault/SetupProgressOverlay.qml"
+  "DigitalVault/StorageActionPanel.qml"
+  "DigitalVault/StorageOutcomePreview.qml"
+  "DigitalVault/StripeFill.qml"
+  "DigitalVault/Theme.qml"
+  "DigitalVault/VaultDetailPanel.qml"
+  "DigitalVault/VaultListItem.qml"
+  "DigitalVault/VaultManager.qml"
+  "DigitalVault/VaultManagerAddVault.qml"
+  "DigitalVault/VaultManagerHome.qml"
+  "DigitalVault/VaultManagerNavBar.qml"
+  "DigitalVault/VaultManagerVaultDetail.qml"
+  "DigitalVault/VaultStatusBadge.qml"
+  "DigitalVault/WizardActionButton.qml"
+  "DigitalVault/WizardChrome.qml"
+  "DigitalVault/WizardFieldLabel.qml"
+  "DigitalVault/WizardPartitionFields.qml"
+  "DigitalVault/WizardSizeSlider.qml"
+  "DigitalVault/WizardStepTitle.qml"
+  "DigitalVault/WizardSummaryBox.qml"
+  "DigitalVault/WizardTextField.qml"
+  "DigitalVault/main.qml"
+)
+
+# Per-language clean rules from dependency scanning.
+foreach(lang )
+  include(CMakeFiles/DigitalVaultGUI_tooling.dir/cmake_clean_${lang}.cmake OPTIONAL)
+endforeach()

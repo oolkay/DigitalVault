@@ -1,0 +1,6 @@
+<RCC>
+  <qresource prefix="/DigitalVault">
+    <file alias="qmldir">/home/omer/DigitalVault/build/gui/DigitalVault/qmldir</file>
+  </qresource>
+</RCC>
+

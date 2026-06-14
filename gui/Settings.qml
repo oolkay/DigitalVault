@@ -161,7 +161,12 @@ Item {
                         width: parent.width
                         label: "Hardware disconnect lockdown"
                         description: "Automatically unmount vault when STM32 is removed"
-                        control: ToggleSwitch { checked: true }
+                        control: ToggleSwitch {
+                            checked: vaultController.hardwareDisconnectLockdown
+                            onToggled: function(enabled) {
+                                vaultController.hardwareDisconnectLockdown = enabled
+                            }
+                        }
                     }
 
                     SettingsRow {

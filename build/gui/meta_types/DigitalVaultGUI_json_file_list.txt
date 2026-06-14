@@ -1,0 +1,3 @@
+/home/omer/DigitalVault/build/gui/DigitalVaultGUI_autogen/include/../EWIEGA46WW/moc_serial_bridge.cpp.json
+/home/omer/DigitalVault/build/gui/DigitalVaultGUI_autogen/include/../EWIEGA46WW/moc_vault_controller.cpp.json
+/home/omer/DigitalVault/build/gui/DigitalVaultGUI_autogen/include/serial_bridge.moc.json

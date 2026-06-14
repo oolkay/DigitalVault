@@ -23,6 +23,7 @@ constexpr quint8 kCmdDelete = 0x03;
 constexpr quint8 kCmdCancel = 0x04;
 constexpr quint8 kCmdGetKey = 0x05;
 constexpr quint8 kCmdListEnrolled = 0x06;
+constexpr quint8 kCmdStatus = 0x07;
 
 constexpr quint8 kEvtMin = 0x10;
 constexpr quint8 kEvtMax = 0x14;
@@ -48,7 +49,7 @@ QString enrollErrorMessage(quint8 code, const QByteArray &payload)
     case kResFailBadImage:
         return QStringLiteral("Parmak izi okunamadı — tekrar deneyin");
     case kResNoMatch:
-        return QStringLiteral("Parmak izi eşleşmedi");
+        return QStringLiteral("Fingerprint not recognized.");
     case kResFailAlreadyExists:
         if (existingId >= 0)
             return QStringLiteral("Sensor slot #%1 is already enrolled").arg(existingId);
@@ -78,7 +79,7 @@ QString verifyErrorMessage(quint8 code)
     case kResFailBadImage:
         return QStringLiteral("Parmak izi okunamadı — tekrar deneyin");
     case kResNoMatch:
-        return QStringLiteral("Parmak izi eşleşmedi");
+        return QStringLiteral("Fingerprint not recognized.");
     case kResCancelled:
         return QStringLiteral("Doğrulama iptal edildi");
     case kResTimeout:
@@ -95,6 +96,9 @@ QString verifyErrorMessage(quint8 code)
 constexpr int kVerifyTimeoutMs = 15000;
 constexpr int kEnrollTimeoutMs = 60000;
 constexpr int kPostCancelMs = 2000;
+constexpr int kHeartbeatIntervalMs = 200;
+constexpr int kHeartbeatTimeoutMs = 150;
+constexpr int kHeartbeatMaxFailures = 1;
 
 quint8 xorChecksum(const QByteArray &body)
 {
@@ -164,13 +168,16 @@ public slots:
 
         m_timer = new QTimer(this);
         m_recoveryTimer = new QTimer(this);
+        m_heartbeatTimer = new QTimer(this);
         m_timer->setSingleShot(true);
         m_recoveryTimer->setSingleShot(true);
+        m_heartbeatTimer->setSingleShot(true);
         connect(m_timer, &QTimer::timeout, this, &SerialWorker::onDeadline);
         connect(m_recoveryTimer, &QTimer::timeout, this, &SerialWorker::onRecoveryDone);
+        connect(m_heartbeatTimer, &QTimer::timeout, this, &SerialWorker::onHeartbeatDeadline);
 
         m_linkWatch = new QTimer(this);
-        m_linkWatch->setInterval(750);
+        m_linkWatch->setInterval(kHeartbeatIntervalMs);
         connect(m_linkWatch, &QTimer::timeout, this, &SerialWorker::checkLink);
     }
 
@@ -220,6 +227,7 @@ public slots:
         m_bridge->m_connected = true;
         m_bridge->m_portName = port;
         m_badChecksum = 0;
+        m_heartbeatFailures = 0;
         QSettings s;
         s.setValue(QStringLiteral("hal/serialPort"), port);
         if (m_linkWatch)
@@ -231,6 +239,8 @@ public slots:
     {
         if (m_linkWatch)
             m_linkWatch->stop();
+        if (m_heartbeatTimer)
+            m_heartbeatTimer->stop();
         if (m_notifier) {
             m_notifier->setEnabled(false);
             delete m_notifier;
@@ -247,6 +257,10 @@ public slots:
 
     bool startVerify()
     {
+        if (m_op == Op::Status) {
+            QTimer::singleShot(50, this, [this]() { startVerify(); });
+            return true;
+        }
         if (!beginOp())
             return false;
         m_op = Op::Verify;
@@ -259,12 +273,20 @@ public slots:
 
     void requestKey()
     {
+        if (m_op == Op::Status) {
+            QTimer::singleShot(50, this, [this]() { requestKey(); });
+            return;
+        }
         if (m_fd >= 0)
             writeAll(buildPacket(kCmdGetKey));
     }
 
     bool startEnroll(int fingerId)
     {
+        if (m_op == Op::Status) {
+            QTimer::singleShot(50, this, [this, fingerId]() { startEnroll(fingerId); });
+            return true;
+        }
         if (!beginOp())
             return false;
         m_op = Op::Enroll;
@@ -280,6 +302,10 @@ public slots:
 
     bool deleteFinger(int fingerId)
     {
+        if (m_op == Op::Status) {
+            QTimer::singleShot(50, this, [this, fingerId]() { deleteFinger(fingerId); });
+            return true;
+        }
         if (!beginOp())
             return false;
         m_op = Op::Delete;
@@ -295,6 +321,10 @@ public slots:
 
     void listEnrolled()
     {
+        if (m_op == Op::Status) {
+            QTimer::singleShot(50, this, [this]() { listEnrolled(); });
+            return;
+        }
         if (!beginOp())
             return;
         m_op = Op::List;
@@ -316,8 +346,13 @@ public slots:
             m_timer->stop();
         if (m_recoveryTimer)
             m_recoveryTimer->stop();
+        if (m_heartbeatTimer)
+            m_heartbeatTimer->stop();
         m_timeoutOp = Op::None;
-        if (m_op != Op::None) {
+        if (m_op == Op::Status) {
+            m_op = Op::None;
+            m_rx.clear();
+        } else if (m_op != Op::None) {
             if (m_fd >= 0)
                 writeAll(buildPacket(kCmdCancel));
             finishOp();
@@ -405,6 +440,10 @@ private slots:
          * detect true I/O failure. */
         if (pr > 0 && (pfd.revents & POLLNVAL))
             reportLinkLost(QStringLiteral("device_removed"));
+        if (m_fd >= 0 && m_bridge->m_connected && m_op == Op::None
+            && !m_bridge->m_busy.load(std::memory_order_acquire)) {
+            startHeartbeat();
+        }
     }
 
     void reportLinkLost(const QString &reason)
@@ -418,6 +457,8 @@ private slots:
             m_timer->stop();
         if (m_recoveryTimer)
             m_recoveryTimer->stop();
+        if (m_heartbeatTimer)
+            m_heartbeatTimer->stop();
         m_op = Op::None;
         m_timeoutOp = Op::None;
         if (m_bridge->m_busy.load(std::memory_order_acquire))
@@ -473,6 +514,17 @@ private slots:
                                             QStringLiteral("Delete timed out"));
         else if (timed == Op::List)
             emit m_bridge->listEnrolledCompleted(false, {}, QStringLiteral("List timed out"));
+        if (m_fd >= 0 && m_bridge->m_connected)
+            startHeartbeat();
+    }
+
+    void onHeartbeatDeadline()
+    {
+        if (m_op != Op::Status)
+            return;
+        m_op = Op::None;
+        m_rx.clear();
+        recordHeartbeatFailure(QStringLiteral("stm32_heartbeat_lost"));
     }
 
     void abortOpWithProtocolError()
@@ -495,6 +547,8 @@ private slots:
                                             QStringLiteral("Sensor protocol error"));
         else if (was == Op::List)
             emit m_bridge->listEnrolledCompleted(false, {}, QStringLiteral("Sensor protocol error"));
+        else if (was == Op::Status)
+            recordHeartbeatFailure(QStringLiteral("stm32_heartbeat_lost"));
     }
 
     void resetPort()
@@ -516,7 +570,7 @@ private slots:
     }
 
 private:
-    enum class Op { None, Verify, Enroll, Delete, List };
+    enum class Op { None, Verify, Enroll, Delete, List, Status };
 
     bool writeAll(const QByteArray &data)
     {
@@ -569,6 +623,11 @@ private:
     {
         if (m_fd < 0) {
             emit m_bridge->connectionLost(QStringLiteral("port closed"));
+            return false;
+        }
+        if (m_op != Op::None) {
+            emit m_bridge->operationRejected(
+                QStringLiteral("Sensor is busy — please wait"));
             return false;
         }
         if (m_bridge->m_busy.load(std::memory_order_acquire)) {
@@ -639,6 +698,21 @@ private:
             emit m_bridge->sensorEvent(static_cast<int>(code));
             return;
         }
+        if (m_op == Op::Status) {
+            if (m_heartbeatTimer)
+                m_heartbeatTimer->stop();
+            m_op = Op::None;
+            if (code == kResSuccess && payload.size() >= 1
+                && static_cast<quint8>(payload.at(0)) != 0) {
+                m_heartbeatFailures = 0;
+            } else {
+                m_rx.clear();
+                recordHeartbeatFailure(code == kResSuccess
+                                           ? QStringLiteral("sensor_not_ready")
+                                           : QStringLiteral("stm32_heartbeat_lost"));
+            }
+            return;
+        }
         if (code == kResKey && payload.size() == 32) {
             emit m_bridge->keyReceived(payload);
             finishOp();
@@ -703,6 +777,28 @@ private:
         }
     }
 
+    void startHeartbeat()
+    {
+        if (m_fd < 0 || !m_bridge->m_connected || m_op != Op::None)
+            return;
+        m_rx.clear();
+        m_op = Op::Status;
+        if (!writeAll(buildPacket(kCmdStatus))) {
+            m_op = Op::None;
+            recordHeartbeatFailure(QStringLiteral("stm32_heartbeat_lost"));
+            return;
+        }
+        if (m_heartbeatTimer)
+            m_heartbeatTimer->start(kHeartbeatTimeoutMs);
+    }
+
+    void recordHeartbeatFailure(const QString &reason)
+    {
+        ++m_heartbeatFailures;
+        if (m_heartbeatFailures >= kHeartbeatMaxFailures)
+            reportLinkLost(reason);
+    }
+
     SerialBridge *m_bridge;
     QString m_portPath;
     int m_fd = -1;
@@ -711,10 +807,12 @@ private:
     QTimer *m_timer = nullptr;
     QTimer *m_recoveryTimer = nullptr;
     QTimer *m_linkWatch = nullptr;
+    QTimer *m_heartbeatTimer = nullptr;
     Op m_op = Op::None;
     Op m_timeoutOp = Op::None;
     int m_deadlineMs = kVerifyTimeoutMs;
     int m_badChecksum = 0;
+    int m_heartbeatFailures = 0;
     int m_pendingDeleteFingerId = -1;
     int m_pendingEnrollFingerId = -1;
 };

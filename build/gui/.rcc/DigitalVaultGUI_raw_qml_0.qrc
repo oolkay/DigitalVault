@@ -1,0 +1,40 @@
+<RCC>
+  <qresource prefix="/DigitalVault/">
+    <file alias="main.qml">/home/omer/DigitalVault/gui/main.qml</file>
+    <file alias="Dashboard.qml">/home/omer/DigitalVault/gui/Dashboard.qml</file>
+    <file alias="CreateVault.qml">/home/omer/DigitalVault/gui/CreateVault.qml</file>
+    <file alias="VaultManager.qml">/home/omer/DigitalVault/gui/VaultManager.qml</file>
+    <file alias="VaultManagerNavBar.qml">/home/omer/DigitalVault/gui/VaultManagerNavBar.qml</file>
+    <file alias="VaultManagerHome.qml">/home/omer/DigitalVault/gui/VaultManagerHome.qml</file>
+    <file alias="VaultManagerAddVault.qml">/home/omer/DigitalVault/gui/VaultManagerAddVault.qml</file>
+    <file alias="VaultManagerVaultDetail.qml">/home/omer/DigitalVault/gui/VaultManagerVaultDetail.qml</file>
+    <file alias="ManagedDeviceRow.qml">/home/omer/DigitalVault/gui/ManagedDeviceRow.qml</file>
+    <file alias="DiscoveredStorageRow.qml">/home/omer/DigitalVault/gui/DiscoveredStorageRow.qml</file>
+    <file alias="PartitionLayoutView.qml">/home/omer/DigitalVault/gui/PartitionLayoutView.qml</file>
+    <file alias="PartitionLayoutTable.qml">/home/omer/DigitalVault/gui/PartitionLayoutTable.qml</file>
+    <file alias="PartitionListRow.qml">/home/omer/DigitalVault/gui/PartitionListRow.qml</file>
+    <file alias="StripeFill.qml">/home/omer/DigitalVault/gui/StripeFill.qml</file>
+    <file alias="StorageOutcomePreview.qml">/home/omer/DigitalVault/gui/StorageOutcomePreview.qml</file>
+    <file alias="StorageActionPanel.qml">/home/omer/DigitalVault/gui/StorageActionPanel.qml</file>
+    <file alias="VaultListItem.qml">/home/omer/DigitalVault/gui/VaultListItem.qml</file>
+    <file alias="VaultDetailPanel.qml">/home/omer/DigitalVault/gui/VaultDetailPanel.qml</file>
+    <file alias="VaultStatusBadge.qml">/home/omer/DigitalVault/gui/VaultStatusBadge.qml</file>
+    <file alias="ModalScrim.qml">/home/omer/DigitalVault/gui/ModalScrim.qml</file>
+    <file alias="SetupProgressOverlay.qml">/home/omer/DigitalVault/gui/SetupProgressOverlay.qml</file>
+    <file alias="FingerprintWizard.qml">/home/omer/DigitalVault/gui/FingerprintWizard.qml</file>
+    <file alias="AccessManager.qml">/home/omer/DigitalVault/gui/AccessManager.qml</file>
+    <file alias="FingerprintManager.qml">/home/omer/DigitalVault/gui/FingerprintManager.qml</file>
+    <file alias="SecurityLog.qml">/home/omer/DigitalVault/gui/SecurityLog.qml</file>
+    <file alias="Settings.qml">/home/omer/DigitalVault/gui/Settings.qml</file>
+    <file alias="Theme.qml">/home/omer/DigitalVault/gui/Theme.qml</file>
+    <file alias="WizardChrome.qml">/home/omer/DigitalVault/gui/WizardChrome.qml</file>
+    <file alias="WizardStepTitle.qml">/home/omer/DigitalVault/gui/WizardStepTitle.qml</file>
+    <file alias="WizardFieldLabel.qml">/home/omer/DigitalVault/gui/WizardFieldLabel.qml</file>
+    <file alias="WizardTextField.qml">/home/omer/DigitalVault/gui/WizardTextField.qml</file>
+    <file alias="WizardSizeSlider.qml">/home/omer/DigitalVault/gui/WizardSizeSlider.qml</file>
+    <file alias="WizardPartitionFields.qml">/home/omer/DigitalVault/gui/WizardPartitionFields.qml</file>
+    <file alias="WizardSummaryBox.qml">/home/omer/DigitalVault/gui/WizardSummaryBox.qml</file>
+    <file alias="WizardActionButton.qml">/home/omer/DigitalVault/gui/WizardActionButton.qml</file>
+  </qresource>
+</RCC>
+

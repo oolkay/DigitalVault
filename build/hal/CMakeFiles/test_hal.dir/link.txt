@@ -1,0 +1,1 @@
+/usr/bin/cc CMakeFiles/test_hal.dir/test_hal.c.o -o ../bin/test_hal  libhal.a -lcjson /usr/lib/x86_64-linux-gnu/libcrypto.so 

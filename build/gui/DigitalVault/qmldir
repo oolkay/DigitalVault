@@ -1,0 +1,38 @@
+module DigitalVault
+typeinfo DigitalVaultGUI.qmltypes
+prefer :/DigitalVault/
+Dashboard 1.0 Dashboard.qml
+CreateVault 1.0 CreateVault.qml
+VaultManager 1.0 VaultManager.qml
+VaultManagerNavBar 1.0 VaultManagerNavBar.qml
+VaultManagerHome 1.0 VaultManagerHome.qml
+VaultManagerAddVault 1.0 VaultManagerAddVault.qml
+VaultManagerVaultDetail 1.0 VaultManagerVaultDetail.qml
+ManagedDeviceRow 1.0 ManagedDeviceRow.qml
+DiscoveredStorageRow 1.0 DiscoveredStorageRow.qml
+PartitionLayoutView 1.0 PartitionLayoutView.qml
+PartitionLayoutTable 1.0 PartitionLayoutTable.qml
+PartitionListRow 1.0 PartitionListRow.qml
+StripeFill 1.0 StripeFill.qml
+StorageOutcomePreview 1.0 StorageOutcomePreview.qml
+StorageActionPanel 1.0 StorageActionPanel.qml
+VaultListItem 1.0 VaultListItem.qml
+VaultDetailPanel 1.0 VaultDetailPanel.qml
+VaultStatusBadge 1.0 VaultStatusBadge.qml
+ModalScrim 1.0 ModalScrim.qml
+SetupProgressOverlay 1.0 SetupProgressOverlay.qml
+FingerprintWizard 1.0 FingerprintWizard.qml
+AccessManager 1.0 AccessManager.qml
+FingerprintManager 1.0 FingerprintManager.qml
+SecurityLog 1.0 SecurityLog.qml
+Settings 1.0 Settings.qml
+singleton Theme 1.0 Theme.qml
+WizardChrome 1.0 WizardChrome.qml
+WizardStepTitle 1.0 WizardStepTitle.qml
+WizardFieldLabel 1.0 WizardFieldLabel.qml
+WizardTextField 1.0 WizardTextField.qml
+WizardSizeSlider 1.0 WizardSizeSlider.qml
+WizardPartitionFields 1.0 WizardPartitionFields.qml
+WizardSummaryBox 1.0 WizardSummaryBox.qml
+WizardActionButton 1.0 WizardActionButton.qml
+

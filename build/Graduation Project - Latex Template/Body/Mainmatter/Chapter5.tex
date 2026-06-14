@@ -1,6 +1,6 @@
 \chapter{Testing and Evaluation}
 
-This chapter describes how the digital vault system was tested and evaluated. The tests were not limited to the normal successful path. Functional workflows, firmware communication, software components, and several failure cases were tested to check whether the system remains understandable and recoverable during abnormal situations.
+This chapter describes how the digital vault system was tested and evaluated. Functional workflows, firmware communication, software components, and several failure cases were tested to check whether the system remains understandable and recoverable during abnormal situations.
 
 \section{Testing Approach}
 
@@ -10,7 +10,7 @@ Unit-level tests were used for parts of the software that could be tested withou
 
 Serial communication was tested before the graphical interface was fully connected to the firmware flow. External test programs were used to check command and response behavior independently from the GUI. This made it easier to verify the communication protocol before combining it with the user interface and vault workflows.
 
-In the following tables, the status column summarizes the result of each test. \textit{Passed} means that the expected behavior was observed during testing. If a test only satisfies the expected behavior with an important limitation, it can be marked as \textit{Partially passed}; however, the listed tests in this chapter were completed successfully. The tests were not treated as formal performance benchmarks. Their main purpose was to check that the vault reached the expected final state after normal use, repeated use, and interrupted workflows.
+In the following tables, the status column summarizes the result of each test. \textit{Passed} means that the expected behavior was observed during testing. If a test only satisfies the expected behavior with an important limitation, it can be marked as \textit{Partially passed}; however, the listed tests in this chapter were completed successfully. The tests were not treated as formal performance benchmarks. This is because the project does not implement a new filesystem or a custom file-operation layer. After the vault is unlocked and mounted, regular file operations such as reading, writing, copying, moving, and deleting are handled by the operating system and the standard filesystem inside the encrypted container. Therefore, the main purpose of the tests was to check that the vault reached the expected final state after normal use, repeated use, and interrupted workflows.
 
 \begin{table}[!htbp]
 \centering

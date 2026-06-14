@@ -54,7 +54,7 @@ Item {
                     Behavior on color { ColorAnimation { duration: 250 } }
                 }
                 Text {
-                    text: "Manage who can unlock the selected vault."
+                    text: "View who can unlock the selected vault. Access is configured during setup."
                     color: Theme.textSecondary
                     font { pixelSize: 13; family: Theme.fontFamily }
                     width: parent.width
@@ -108,7 +108,7 @@ Item {
                 color: Theme.bgCard
                 border.color: Theme.border
                 border.width: 1
-                visible: vaultController.selectedDevice !== ""
+                visible: false
                 Behavior on color { ColorAnimation { duration: 250 } }
                 Behavior on border.color { ColorAnimation { duration: 250 } }
                 Behavior on height { NumberAnimation { duration: 300; easing.type: Easing.OutQuart } }
@@ -502,7 +502,7 @@ Item {
                                         color: modelData.isOwner ? "transparent" : (revokeMouse.containsMouse ? Theme.dangerBg : "transparent")
                                         border.color: modelData.isOwner ? "transparent" : Theme.danger
                                         border.width: modelData.isOwner ? 0 : 1
-                                        visible: !modelData.isOwner
+                                        visible: false
                                         Behavior on color { ColorAnimation { duration: 150 } }
 
                                         Text {

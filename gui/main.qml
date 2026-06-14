@@ -537,27 +537,34 @@ import DigitalVault
     }
 
     // ── Toast Notification ───────────────────────────────────
-    Rectangle {
+    Popup {
         id: toastBar
-        anchors { bottom: parent.bottom; horizontalCenter: mainContent.horizontalCenter; bottomMargin: 28 }
+        z: 20000
+        x: mainContent.x + (mainContent.width - width) / 2
+        y: root.height - height - 28
         width: Math.min(mainContent.width - 64, Math.max(280, toastRow.implicitWidth + 32))
         height: toastRow.implicitHeight + 20
-        radius: Theme.radius
-        color: toastIsError ? Theme.dangerBg : Theme.bgSurface
-        border.color: toastIsError ? Theme.danger : Theme.border
-        border.width: 1
-        opacity: 0
-        visible: opacity > 0
+        modal: false
+        focus: false
+        padding: 0
+        closePolicy: Popup.NoAutoClose
 
         property bool toastIsError: false
 
         Behavior on opacity { NumberAnimation { duration: 220 } }
-        Behavior on color { ColorAnimation { duration: 220 } }
 
-        Row {
+        background: Rectangle {
+            radius: Theme.radius
+            color: toastBar.toastIsError ? Theme.dangerBg : Theme.bgSurface
+            border.color: toastBar.toastIsError ? Theme.danger : Theme.border
+            border.width: 1
+            Behavior on color { ColorAnimation { duration: 220 } }
+        }
+
+        contentItem: Row {
             id: toastRow
-            anchors.centerIn: parent
-            width: parent.width - 32
+            width: toastBar.width - 32
+            height: implicitHeight
             spacing: 10
             Text {
                 anchors.verticalCenter: parent.verticalCenter
@@ -583,7 +590,7 @@ import DigitalVault
         Timer {
             id: toastTimer
             interval: 3200
-            onTriggered: toastBar.opacity = 0
+            onTriggered: toastBar.close()
         }
 
         Connections {
@@ -591,10 +598,9 @@ import DigitalVault
             function onNotificationReceived(message, isError) {
                 toastText.text = message
                 toastBar.toastIsError = isError
-                toastBar.opacity = 1
+                toastBar.open()
                 toastTimer.restart()
             }
-        }
         }
     }
 
@@ -605,4 +611,5 @@ import DigitalVault
         height: root.height
         z: 10000
     }
+}
 }

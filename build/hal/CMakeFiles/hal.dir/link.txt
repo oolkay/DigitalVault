@@ -1,0 +1,2 @@
+/usr/bin/ar qc libhal.a CMakeFiles/hal.dir/hal_core.c.o CMakeFiles/hal.dir/hal_simulator.c.o CMakeFiles/hal.dir/hal_serial.c.o CMakeFiles/hal.dir/hal_protocol.c.o CMakeFiles/hal.dir/hal_common.c.o
+/usr/bin/ranlib libhal.a

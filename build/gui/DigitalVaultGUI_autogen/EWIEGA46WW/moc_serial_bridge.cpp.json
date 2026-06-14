@@ -1,0 +1,258 @@
+{
+    "classes": [
+        {
+            "className": "SerialBridge",
+            "methods": [
+                {
+                    "access": "public",
+                    "arguments": [
+                        {
+                            "name": "port",
+                            "type": "QString"
+                        }
+                    ],
+                    "name": "connectToPort",
+                    "returnType": "void"
+                },
+                {
+                    "access": "public",
+                    "name": "disconnectPort",
+                    "returnType": "void"
+                },
+                {
+                    "access": "public",
+                    "name": "startVerify",
+                    "returnType": "void"
+                },
+                {
+                    "access": "public",
+                    "name": "requestKey",
+                    "returnType": "void"
+                },
+                {
+                    "access": "public",
+                    "arguments": [
+                        {
+                            "name": "fingerId",
+                            "type": "int"
+                        }
+                    ],
+                    "name": "startEnroll",
+                    "returnType": "void"
+                },
+                {
+                    "access": "public",
+                    "arguments": [
+                        {
+                            "name": "fingerId",
+                            "type": "int"
+                        }
+                    ],
+                    "name": "deleteFinger",
+                    "returnType": "void"
+                },
+                {
+                    "access": "public",
+                    "name": "cancelOperation",
+                    "returnType": "void"
+                },
+                {
+                    "access": "public",
+                    "name": "listEnrolled",
+                    "returnType": "void"
+                },
+                {
+                    "access": "public",
+                    "name": "cancelInventoryIfRunning",
+                    "returnType": "void"
+                }
+            ],
+            "object": true,
+            "properties": [
+                {
+                    "constant": false,
+                    "designable": true,
+                    "final": false,
+                    "index": 0,
+                    "name": "connected",
+                    "notify": "connectionChanged",
+                    "read": "isConnected",
+                    "required": false,
+                    "scriptable": true,
+                    "stored": true,
+                    "type": "bool",
+                    "user": false
+                },
+                {
+                    "constant": false,
+                    "designable": true,
+                    "final": false,
+                    "index": 1,
+                    "name": "portName",
+                    "notify": "connectionChanged",
+                    "read": "portName",
+                    "required": false,
+                    "scriptable": true,
+                    "stored": true,
+                    "type": "QString",
+                    "user": false
+                },
+                {
+                    "constant": false,
+                    "designable": true,
+                    "final": false,
+                    "index": 2,
+                    "name": "busy",
+                    "notify": "busyChanged",
+                    "read": "isBusy",
+                    "required": false,
+                    "scriptable": true,
+                    "stored": true,
+                    "type": "bool",
+                    "user": false
+                }
+            ],
+            "qualifiedClassName": "SerialBridge",
+            "signals": [
+                {
+                    "access": "public",
+                    "name": "connectionChanged",
+                    "returnType": "void"
+                },
+                {
+                    "access": "public",
+                    "name": "busyChanged",
+                    "returnType": "void"
+                },
+                {
+                    "access": "public",
+                    "arguments": [
+                        {
+                            "name": "reason",
+                            "type": "QString"
+                        }
+                    ],
+                    "name": "operationRejected",
+                    "returnType": "void"
+                },
+                {
+                    "access": "public",
+                    "arguments": [
+                        {
+                            "name": "eventCode",
+                            "type": "int"
+                        }
+                    ],
+                    "name": "sensorEvent",
+                    "returnType": "void"
+                },
+                {
+                    "access": "public",
+                    "arguments": [
+                        {
+                            "name": "success",
+                            "type": "bool"
+                        },
+                        {
+                            "name": "matchedId",
+                            "type": "int"
+                        },
+                        {
+                            "name": "error",
+                            "type": "QString"
+                        }
+                    ],
+                    "name": "verifyCompleted",
+                    "returnType": "void"
+                },
+                {
+                    "access": "public",
+                    "arguments": [
+                        {
+                            "name": "key32",
+                            "type": "QByteArray"
+                        }
+                    ],
+                    "name": "keyReceived",
+                    "returnType": "void"
+                },
+                {
+                    "access": "public",
+                    "arguments": [
+                        {
+                            "name": "success",
+                            "type": "bool"
+                        },
+                        {
+                            "name": "fingerId",
+                            "type": "int"
+                        },
+                        {
+                            "name": "error",
+                            "type": "QString"
+                        }
+                    ],
+                    "name": "enrollCompleted",
+                    "returnType": "void"
+                },
+                {
+                    "access": "public",
+                    "arguments": [
+                        {
+                            "name": "success",
+                            "type": "bool"
+                        },
+                        {
+                            "name": "fingerId",
+                            "type": "int"
+                        },
+                        {
+                            "name": "error",
+                            "type": "QString"
+                        }
+                    ],
+                    "name": "deleteCompleted",
+                    "returnType": "void"
+                },
+                {
+                    "access": "public",
+                    "arguments": [
+                        {
+                            "name": "success",
+                            "type": "bool"
+                        },
+                        {
+                            "name": "fingerIds",
+                            "type": "QList<int>"
+                        },
+                        {
+                            "name": "error",
+                            "type": "QString"
+                        }
+                    ],
+                    "name": "listEnrolledCompleted",
+                    "returnType": "void"
+                },
+                {
+                    "access": "public",
+                    "arguments": [
+                        {
+                            "name": "reason",
+                            "type": "QString"
+                        }
+                    ],
+                    "name": "connectionLost",
+                    "returnType": "void"
+                }
+            ],
+            "superClasses": [
+                {
+                    "access": "public",
+                    "name": "QObject"
+                }
+            ]
+        }
+    ],
+    "inputFile": "serial_bridge.h",
+    "outputRevision": 68
+}

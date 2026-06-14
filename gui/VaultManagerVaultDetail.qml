@@ -301,7 +301,7 @@ Item {
                     || (vaultController.serialBridge && vaultController.serialBridge.connected)
                 readonly property bool fpActive: vaultController.fingerprintUnlockActive
                 readonly property bool atAccessCapacity: accessEntries.length >= 4
-                readonly property bool canManageAccess: canUseSensor && !fpActive
+                readonly property bool canManageAccess: false
 
                 function refreshAccessList() {
                     if (!root.devicePath) {
@@ -358,7 +358,7 @@ Item {
                     Text {
                         width: parent.width
                         wrapMode: Text.Wrap
-                        text: "Manage fingerprints that can unlock this vault."
+                        text: "Access was configured during setup and cannot be changed later."
                         color: Theme.textSecondary
                         font { pixelSize: 13; family: Theme.fontFamily }
                     }
@@ -367,7 +367,7 @@ Item {
                         width: parent.width
                         visible: accessCard.accessEntries.length === 0
                         wrapMode: Text.Wrap
-                        text: "No additional fingerprints yet. Owner access is created during setup; add another fingerprint to share access."
+                        text: "No additional fingerprints. Owner access was created during setup."
                         color: Theme.textMuted
                         font { pixelSize: 13; family: Theme.fontFamily }
                     }
@@ -436,7 +436,7 @@ Item {
 
                                 Row {
                                     id: actionGroup
-                                    width: accessRow.editing ? 128 : (modelData.isOwner ? 132 : 188)
+                                        width: modelData.isOwner ? 132 : 96
                                     height: parent.height
                                     spacing: 6
                                     layoutDirection: Qt.RightToLeft
@@ -497,7 +497,7 @@ Item {
                                     }
 
                                     Rectangle {
-                                        visible: !accessRow.editing
+                                        visible: false
                                         width: editLbl.implicitWidth + 16
                                         height: 32
                                         radius: Theme.radiusSm
@@ -526,7 +526,7 @@ Item {
                                     }
 
                                     Rectangle {
-                                        visible: !modelData.isOwner && !accessRow.editing
+                                        visible: false
                                         width: removeLbl.implicitWidth + 16
                                         height: 32
                                         radius: Theme.radiusSm
@@ -573,7 +573,7 @@ Item {
 
                     Text {
                         width: parent.width
-                        visible: !accessCard.canUseSensor
+                        visible: false
                         wrapMode: Text.Wrap
                         text: "Connect the fingerprint sensor to manage access."
                         color: Theme.textSecondary
@@ -581,7 +581,7 @@ Item {
                     }
 
                     Text {
-                        visible: !accessCard.canUseSensor
+                        visible: false
                         text: "Open Settings"
                         color: Theme.accent
                         font { pixelSize: 13; bold: true; family: Theme.fontFamily }
@@ -595,7 +595,7 @@ Item {
 
                     Text {
                         width: parent.width
-                        visible: accessCard.atAccessCapacity
+                        visible: false
                         text: "Maximum of 4 access entries for this vault."
                         color: Theme.warning
                         font { pixelSize: 13; family: Theme.fontFamily }
@@ -604,6 +604,7 @@ Item {
                     WizardTextField {
                         id: grantLabelField
                         width: parent.width
+                        visible: false
                         label: "Name for new fingerprint"
                         placeholderText: "Left index finger"
                     }
@@ -611,6 +612,7 @@ Item {
                     WizardActionButton {
                         text: "Authorize fingerprint"
                         variant: "primary"
+                        visible: false
                         enabled: accessCard.canManageAccess && !accessCard.atAccessCapacity
                         onClicked: accessCard.submitGrantAccess()
                     }

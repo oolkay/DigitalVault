@@ -9,6 +9,9 @@ Item {
 
     signal addVaultRequested()
     signal vaultOpenRequested(string path)
+    signal vaultDeleteRequested(string path)
+    signal vaultUnlockRequested(string path)
+    signal vaultSetupRequested(string path)
 
     ScrollView {
         anchors.fill: parent
@@ -92,6 +95,9 @@ Item {
                         width: parent.width
                         deviceData: modelData
                         onRowClicked: root.vaultOpenRequested(modelData.path)
+                        onDeleteClicked: root.vaultDeleteRequested(modelData.path)
+                        onUnlockClicked: root.vaultUnlockRequested(modelData.path)
+                        onSetupClicked: root.vaultSetupRequested(modelData.path)
                     }
                 }
 

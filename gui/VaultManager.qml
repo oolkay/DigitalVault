@@ -54,6 +54,13 @@ Item {
         vmStack.push(detailComp)
     }
 
+    function unlockVaultFromHome(devicePath) {
+        if (!devicePath)
+            return
+        vaultController.setSelectedDevice(devicePath)
+        vaultController.toggleVault()
+    }
+
     function openSetupWizard(devicePath) {
         var p = devicePath || ""
         if (!p) {
@@ -191,6 +198,9 @@ Item {
         VaultManagerHome {
             onAddVaultRequested: vaultManagerPage.openAddVault()
             onVaultOpenRequested: function(path) { vaultManagerPage.openVaultDetail(path) }
+            onVaultDeleteRequested: function(path) { vaultManagerPage.requestDeleteVault(path) }
+            onVaultUnlockRequested: function(path) { vaultManagerPage.unlockVaultFromHome(path) }
+            onVaultSetupRequested: function(path) { vaultManagerPage.openSetupWizard(path) }
         }
     }
 
@@ -501,7 +511,7 @@ Item {
                         id: createTotalSlider
                         width: parent.width
                         label: "Total disk size"
-                        from: 16
+                        from: 256
                         to: 8192
                         value: 1024
                     }
@@ -538,7 +548,7 @@ Item {
     Dialog {
         id: setupWarningDialog
         anchors.centerIn: parent
-        width: 500
+        width: 560
         implicitHeight: setupChrome.implicitHeight + 24
         modal: true
         padding: 0
@@ -547,7 +557,7 @@ Item {
 
         property var setupSession: ({ valid: false })
         property int setupLogicalStep: 0
-        readonly property int setupStepCount: canShowNormalStepNow() ? 3 : 2
+        readonly property int setupStepCount: canShowNormalStepNow() ? 4 : 3
 
         onOpened: Qt.callLater(resetSetupWizardFromSession)
 
@@ -559,10 +569,14 @@ Item {
                    && remaining >= setupSession.minNormalMB
         }
 
+        function wholeDeviceVaultSelected() {
+            return setupSession.valid && !canShowNormalStepNow()
+        }
+
         function stackIndexForLogical(logical) {
             if (canShowNormalStepNow())
                 return logical
-            return logical === 0 ? 0 : 2
+            return logical < 2 ? logical : 3
         }
 
         function applyLogicalStep(logical) {
@@ -602,7 +616,7 @@ Item {
 
         contentItem: WizardChrome {
             id: setupChrome
-            width: 500
+            width: 560
             stepCount: setupWarningDialog.setupStepCount
             progressStep: setupWarningDialog.setupLogicalStep
             wizardIcon: "V"
@@ -687,22 +701,161 @@ Item {
                     WizardSizeSlider {
                         id: setupVaultSizeSlider
                         width: parent.width
-                        label: "Vault partition size"
-                        from: 16
+                        label: "Vault size"
+                        from: 128
                         to: 2048
                         value: 1024
                         hintText: setupWarningDialog.setupSession.valid
                                   && !setupWarningDialog.canShowNormalStepNow()
-                                  ? "Device is small — setup will encrypt the whole device (no separate normal partition)."
+                                  ? "Setup will encrypt the whole device; no separate normal partition will be created."
                                   : ""
                         onValueChanged: {
                             if (!setupWarningDialog.visible)
                                 return
-                            if (setupWarningDialog.setupLogicalStep
-                                    >= setupWarningDialog.setupStepCount)
+                            if (setupWarningDialog.setupLogicalStep >= 2)
                                 setupWarningDialog.applyLogicalStep(
-                                    setupWarningDialog.setupStepCount - 1)
+                                    Math.min(setupWarningDialog.setupLogicalStep,
+                                             setupWarningDialog.setupStepCount - 1))
                         }
+                    }
+                }
+            }
+
+            Item {
+                width: setupChrome.stackLayout.width
+                implicitHeight: setupAccessStep.implicitHeight
+                Column {
+                    id: setupAccessStep
+                    width: parent.width
+                    spacing: 14
+                    WizardStepTitle { title: "Step 2: Authorized fingerprints" }
+
+                    Text {
+                        width: parent.width
+                        wrapMode: Text.Wrap
+                        text: "Owner access is required. Add up to three additional fingerprints now; after setup this list becomes read-only."
+                        color: Theme.textSecondary
+                        font { pixelSize: 13; family: Theme.fontFamily }
+                    }
+
+                    Rectangle {
+                        width: parent.width
+                        height: ownerAccessRow.implicitHeight + 18
+                        radius: 8
+                        color: Theme.bgOverlay
+                        border.color: Theme.border
+                        border.width: 1
+                        Row {
+                            id: ownerAccessRow
+                            anchors.centerIn: parent
+                            width: parent.width - 24
+                            spacing: 10
+                            Text {
+                                width: Math.max(0, parent.width - ownerBadge.implicitWidth - 16)
+                                text: vaultController.setupOwnerLabel.length > 0
+                                      ? vaultController.setupOwnerLabel
+                                      : "Owner fingerprint"
+                                color: Theme.textPrimary
+                                font { pixelSize: 14; bold: true; family: Theme.fontFamily }
+                                elide: Text.ElideRight
+                                anchors.verticalCenter: parent.verticalCenter
+                            }
+                            Text {
+                                id: ownerBadge
+                                text: "Owner"
+                                color: Theme.accent
+                                font { pixelSize: 12; bold: true; family: Theme.fontFamily }
+                                anchors.verticalCenter: parent.verticalCenter
+                            }
+                        }
+                    }
+
+                    Column {
+                        width: parent.width
+                        spacing: 8
+                        Repeater {
+                            model: vaultController.setupAccessEntries
+                            delegate: Rectangle {
+                                width: parent.width
+                                height: 42
+                                radius: 8
+                                color: Theme.bgOverlay
+                                border.color: Theme.border
+                                border.width: 1
+                                Row {
+                                    anchors.fill: parent
+                                    anchors.leftMargin: 12
+                                    anchors.rightMargin: 8
+                                    spacing: 8
+                                    Text {
+                                        width: Math.max(0, parent.width - removePendingLbl.implicitWidth - 32)
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        text: modelData.label || "Fingerprint"
+                                        color: Theme.textPrimary
+                                        font { pixelSize: 13; bold: true; family: Theme.fontFamily }
+                                        elide: Text.ElideRight
+                                    }
+                                    Rectangle {
+                                        width: removePendingLbl.implicitWidth + 16
+                                        height: 28
+                                        radius: Theme.radiusSm
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        color: removePendingMouse.containsMouse ? Theme.dangerBg : "transparent"
+                                        Text {
+                                            id: removePendingLbl
+                                            anchors.centerIn: parent
+                                            text: "Remove"
+                                            color: Theme.danger
+                                            font { pixelSize: 12; bold: true; family: Theme.fontFamily }
+                                        }
+                                        MouseArea {
+                                            id: removePendingMouse
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: vaultController.removePendingSetupAccess(modelData.fingerId)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Row {
+                        width: parent.width
+                        spacing: 10
+                        WizardTextField {
+                            id: setupAdditionalNameField
+                            width: Math.max(0, parent.width - setupAddAccessBtn.width - parent.spacing)
+                            label: "Additional fingerprint name"
+                            placeholderText: "Right thumb"
+                        }
+                        WizardActionButton {
+                            id: setupAddAccessBtn
+                            width: 190
+                            anchors.bottom: setupAdditionalNameField.bottom
+                            text: "Enroll"
+                            variant: "primary"
+                            enabled: vaultController.setupAccessEntries.length < 3
+                            onClicked: {
+                                if (setupAdditionalNameField.text.trim().length === 0) {
+                                    vaultController.notifyUser("Enter a fingerprint name before enrolling.", true)
+                                    return
+                                }
+                                vaultController.beginSetupAccessEnroll(setupAdditionalNameField.text.trim())
+                                setupAdditionalNameField.text = ""
+                            }
+                        }
+                    }
+
+                    Text {
+                        width: parent.width
+                        wrapMode: Text.Wrap
+                        text: vaultController.setupAccessEntries.length >= 3
+                              ? "Maximum access list size reached."
+                              : "You can skip this step if only the owner should unlock the vault."
+                        color: vaultController.setupAccessEntries.length >= 3 ? Theme.warning : Theme.textMuted
+                        font { pixelSize: 12; family: Theme.fontFamily }
                     }
                 }
             }
@@ -722,7 +875,7 @@ Item {
                         width: setupChrome.stackLayout.width
                         spacing: 16
                         property alias partitionFields: setupPartitionFields
-                        WizardStepTitle { title: "Step 2: Normal (unencrypted)" }
+                        WizardStepTitle { title: "Step 3: Normal (unencrypted)" }
                         WizardPartitionFields {
                             id: setupPartitionFields
                             width: parent.width
@@ -738,7 +891,11 @@ Item {
                     id: setupStep3
                     width: parent.width
                     spacing: 16
-                    WizardStepTitle { title: "Step 3: Setup Summary" }
+                    WizardStepTitle {
+                        title: setupWarningDialog.canShowNormalStepNow()
+                               ? "Step 4: Setup Summary"
+                               : "Step 3: Setup Summary"
+                    }
                     WizardSummaryBox {
                         width: parent.width
                         Text { text: "Target: " + setupWarningDialog.setupSession.devicePath; color: Theme.textPrimary; font { pixelSize: 12 } }
@@ -750,7 +907,48 @@ Item {
                             color: Theme.textPrimary
                             font { pixelSize: 12 }
                         }
-                        Text { text: "Size: " + (setupVaultSizeSlider.value / 1024).toFixed(1) + " GB"; color: Theme.textPrimary; font { pixelSize: 12 } }
+                        Text {
+                            text: "Vault filesystem: ext4"
+                            color: Theme.textPrimary
+                            font { pixelSize: 12 }
+                        }
+                        Text {
+                            text: vaultController.setupAccessEntries.length > 0
+                                  ? "Additional access:"
+                                  : "Additional access: none"
+                            color: Theme.textPrimary
+                            font { pixelSize: 12; bold: vaultController.setupAccessEntries.length > 0 }
+                        }
+                        Repeater {
+                            model: vaultController.setupAccessEntries
+                            Text {
+                                text: "  - " + (modelData.label || "Fingerprint")
+                                color: Theme.textPrimary
+                                font { pixelSize: 12 }
+                            }
+                        }
+                        Text {
+                            visible: setupWarningDialog.canShowNormalStepNow() && normalStepLoader.item
+                            text: "Normal filesystem: "
+                                  + (normalStepLoader.item
+                                     ? normalStepLoader.item.partitionFields.filesystemCombo.currentText
+                                     : setupWarningDialog.setupSession.defaultNormalFs || "exfat")
+                            color: Theme.textPrimary
+                            font { pixelSize: 12 }
+                        }
+                        Text {
+                            text: setupWarningDialog.wholeDeviceVaultSelected()
+                                  ? "Vault size: entire device"
+                                  : "Vault size: " + (setupVaultSizeSlider.value / 1024).toFixed(1) + " GB"
+                            color: Theme.textPrimary
+                            font { pixelSize: 12 }
+                        }
+                        Text {
+                            visible: setupWarningDialog.wholeDeviceVaultSelected()
+                            text: "Normal partition: none"
+                            color: Theme.textPrimary
+                            font { pixelSize: 12 }
+                        }
                     }
                     Rectangle {
                         width: parent.width

@@ -1,6 +1,546 @@
 [
     {
         "level": "SUCCESS",
+        "message": "Deleted vault: /dev/loop15",
+        "time": "2026-06-14 14:06:19"
+    },
+    {
+        "level": "INFO",
+        "message": "Deleting loop vault: /dev/loop15",
+        "time": "2026-06-14 14:06:19"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault setup complete: /dev/loop15",
+        "time": "2026-06-14 14:05:52"
+    },
+    {
+        "level": "INFO",
+        "message": "Formatting new encrypted vault on: /dev/loop15",
+        "time": "2026-06-14 14:05:42"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Loop device ready: /dev/loop15 (/home/omer/.local/share/DigitalVault/containers/asd.img)",
+        "time": "2026-06-14 14:04:49"
+    },
+    {
+        "level": "INFO",
+        "message": "Creating container: /home/omer/.local/share/DigitalVault/containers/asd.img",
+        "time": "2026-06-14 14:04:49"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Deleted vault: /dev/loop15",
+        "time": "2026-06-14 14:04:40"
+    },
+    {
+        "level": "INFO",
+        "message": "Deleting loop vault: /dev/loop15",
+        "time": "2026-06-14 14:04:39"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault unlocked via biometric",
+        "time": "2026-06-14 14:04:27"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault setup complete: /dev/loop15",
+        "time": "2026-06-14 13:59:31"
+    },
+    {
+        "level": "INFO",
+        "message": "Formatting new encrypted vault on: /dev/loop15",
+        "time": "2026-06-14 13:59:15"
+    },
+    {
+        "level": "ERROR",
+        "message": "partx: /dev/loop15: error adding partitions 1-2\n[vault_manager] execvp: No such file or directory\n[vault_manager] ═══════════════════════════════════════\n[vault_manager] Setting up new vault on: /dev/loop15 \n[vault_manager]   Vault Name  : My Vault\n[vault_manager]   Normal Name : Normal\n[vault_manager]   Normal FS   : btrfs\n[vault_manager] ═══════════════════════════════════════\n[vault_manager] Scanning device: /dev/loop15\n[vault_manager] STATUS: Device appears empty. Safe to format.\n[vault_manager] Partitioning device: /dev/loop15 (Vault: 128 MB, device 256 MB)\n[vault_manager] Waiting for partitions to settle...\n[vault_manager] Formatting normal partition: /dev/loop15p2 (btrfs)",
+        "time": "2026-06-14 13:58:41"
+    },
+    {
+        "level": "INFO",
+        "message": "Formatting new encrypted vault on: /dev/loop15",
+        "time": "2026-06-14 13:58:40"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Loop device ready: /dev/loop15 (/home/omer/.local/share/DigitalVault/containers/sadasd.img)",
+        "time": "2026-06-14 13:57:56"
+    },
+    {
+        "level": "INFO",
+        "message": "Creating container: /home/omer/.local/share/DigitalVault/containers/sadasd.img",
+        "time": "2026-06-14 13:57:56"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Loop device ready: /dev/loop23 (/home/omer/.local/share/DigitalVault/containers/gff.img)",
+        "time": "2026-06-14 13:47:50"
+    },
+    {
+        "level": "INFO",
+        "message": "Creating container: /home/omer/.local/share/DigitalVault/containers/gff.img",
+        "time": "2026-06-14 13:47:50"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Loop device ready: /dev/loop22 (/home/omer/.local/share/DigitalVault/containers/gggg.img)",
+        "time": "2026-06-14 13:38:15"
+    },
+    {
+        "level": "INFO",
+        "message": "Creating container: /home/omer/.local/share/DigitalVault/containers/gggg.img",
+        "time": "2026-06-14 13:38:15"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Loop device ready: /dev/loop21 (/home/omer/.local/share/DigitalVault/containers/g1.img)",
+        "time": "2026-06-14 13:35:22"
+    },
+    {
+        "level": "INFO",
+        "message": "Creating container: /home/omer/.local/share/DigitalVault/containers/g1.img",
+        "time": "2026-06-14 13:35:21"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Loop device ready: /dev/loop20 (/home/omer/.local/share/DigitalVault/containers/tr.img)",
+        "time": "2026-06-14 13:31:59"
+    },
+    {
+        "level": "INFO",
+        "message": "Creating container: /home/omer/.local/share/DigitalVault/containers/tr.img",
+        "time": "2026-06-14 13:31:58"
+    },
+    {
+        "level": "ERROR",
+        "message": "Requested offset is beyond real size of device /dev/loop19.\n[vault_manager] cryptsetup exited with code 1\n[vault_manager] LUKS open failed!\n[vault_manager] ═══════════════════════════════════════\n[vault_manager] Setting up new vault on: /dev/loop19 \n[vault_manager]   Vault Name  : My Vault\n[vault_manager] ═══════════════════════════════════════\n[vault_manager] Scanning device: /dev/loop19\n[vault_manager] STATUS: Device appears empty. Safe to format.\n[vault_manager] Formatting LUKS2 container (AES-256-XTS)...\n[vault_manager] Opening LUKS container...",
+        "time": "2026-06-14 13:24:57"
+    },
+    {
+        "level": "INFO",
+        "message": "Formatting new encrypted vault on: /dev/loop19",
+        "time": "2026-06-14 13:24:48"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Loop device ready: /dev/loop19 (/home/omer/.local/share/DigitalVault/containers/b1.img)",
+        "time": "2026-06-14 13:24:06"
+    },
+    {
+        "level": "INFO",
+        "message": "Creating container: /home/omer/.local/share/DigitalVault/containers/b1.img",
+        "time": "2026-06-14 13:24:06"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Deleted vault: /dev/loop19",
+        "time": "2026-06-14 13:23:27"
+    },
+    {
+        "level": "INFO",
+        "message": "Deleting loop vault: /dev/loop19",
+        "time": "2026-06-14 13:23:27"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault locked. Encryption keys cleared from kernel.",
+        "time": "2026-06-14 13:22:56"
+    },
+    {
+        "level": "INFO",
+        "message": "Locking vault and clearing kernel keys...",
+        "time": "2026-06-14 13:22:56"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault unlocked via biometric",
+        "time": "2026-06-14 13:22:07"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault setup complete: /dev/loop19",
+        "time": "2026-06-14 13:21:26"
+    },
+    {
+        "level": "INFO",
+        "message": "Formatting new encrypted vault on: /dev/loop19",
+        "time": "2026-06-14 13:21:16"
+    },
+    {
+        "level": "ERROR",
+        "message": "partx: /dev/loop19: error adding partitions 1-2\n[vault_manager] execvp: No such file or directory\n[vault_manager] ═══════════════════════════════════════\n[vault_manager] Setting up new vault on: /dev/loop19 \n[vault_manager]   Vault Name  : My Vault\n[vault_manager]   Normal Name : Normal\n[vault_manager]   Normal FS   : xfs\n[vault_manager] ═══════════════════════════════════════\n[vault_manager] Scanning device: /dev/loop19\n[vault_manager] STATUS: Device appears empty. Safe to format.\n[vault_manager] Partitioning device: /dev/loop19 (Vault: 125 MB, device 250 MB)\n[vault_manager] Waiting for partitions to settle...\n[vault_manager] Formatting normal partition: /dev/loop19p2 (xfs)",
+        "time": "2026-06-14 13:20:44"
+    },
+    {
+        "level": "INFO",
+        "message": "Formatting new encrypted vault on: /dev/loop19",
+        "time": "2026-06-14 13:20:43"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Loop device ready: /dev/loop19 (/home/omer/.local/share/DigitalVault/containers/asdad.img)",
+        "time": "2026-06-14 13:19:06"
+    },
+    {
+        "level": "INFO",
+        "message": "Creating container: /home/omer/.local/share/DigitalVault/containers/asdad.img",
+        "time": "2026-06-14 13:19:06"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault setup complete: /dev/loop18",
+        "time": "2026-06-14 13:14:56"
+    },
+    {
+        "level": "INFO",
+        "message": "Formatting new encrypted vault on: /dev/loop18",
+        "time": "2026-06-14 13:14:47"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Loop device ready: /dev/loop18 (/home/omer/.local/share/DigitalVault/containers/myvault123123.img)",
+        "time": "2026-06-14 13:14:11"
+    },
+    {
+        "level": "INFO",
+        "message": "Creating container: /home/omer/.local/share/DigitalVault/containers/myvault123123.img",
+        "time": "2026-06-14 13:14:11"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault setup complete: /dev/loop17",
+        "time": "2026-06-14 13:13:21"
+    },
+    {
+        "level": "INFO",
+        "message": "Formatting new encrypted vault on: /dev/loop17",
+        "time": "2026-06-14 13:13:10"
+    },
+    {
+        "level": "ERROR",
+        "message": "partx: /dev/loop17: error adding partitions 1-2\n[vault_manager] execvp: No such file or directory\n[vault_manager] ═══════════════════════════════════════\n[vault_manager] Setting up new vault on: /dev/loop17 \n[vault_manager]   Vault Name  : dsadsadas\n[vault_manager]   Normal Name : Normal\n[vault_manager]   Normal FS   : xfs\n[vault_manager] ═══════════════════════════════════════\n[vault_manager] Scanning device: /dev/loop17\n[vault_manager] STATUS: Device appears empty. Safe to format.\n[vault_manager] Partitioning device: /dev/loop17 (Vault: 128 MB, device 256 MB)\n[vault_manager] Waiting for partitions to settle...\n[vault_manager] Formatting normal partition: /dev/loop17p2 (xfs)",
+        "time": "2026-06-14 13:12:42"
+    },
+    {
+        "level": "INFO",
+        "message": "Formatting new encrypted vault on: /dev/loop17",
+        "time": "2026-06-14 13:12:41"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Loop device ready: /dev/loop17 (/home/omer/.local/share/DigitalVault/containers/myvault.img)",
+        "time": "2026-06-14 13:12:04"
+    },
+    {
+        "level": "INFO",
+        "message": "Creating container: /home/omer/.local/share/DigitalVault/containers/myvault.img",
+        "time": "2026-06-14 13:12:04"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Deleted vault: /dev/loop17",
+        "time": "2026-06-14 13:11:53"
+    },
+    {
+        "level": "INFO",
+        "message": "Deleting loop vault: /dev/loop17",
+        "time": "2026-06-14 13:11:53"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Loop device ready: /dev/loop17 (/home/omer/.local/share/DigitalVault/containers/myvault.img)",
+        "time": "2026-06-14 13:11:17"
+    },
+    {
+        "level": "INFO",
+        "message": "Creating container: /home/omer/.local/share/DigitalVault/containers/myvault.img",
+        "time": "2026-06-14 13:11:17"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Deleted vault: /dev/loop17",
+        "time": "2026-06-14 13:11:06"
+    },
+    {
+        "level": "INFO",
+        "message": "Deleting loop vault: /dev/loop17",
+        "time": "2026-06-14 13:11:06"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault setup complete: /dev/loop17",
+        "time": "2026-06-14 13:04:49"
+    },
+    {
+        "level": "INFO",
+        "message": "Formatting new encrypted vault on: /dev/loop17",
+        "time": "2026-06-14 13:04:40"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Loop device ready: /dev/loop17 (/home/omer/.local/share/DigitalVault/containers/ddada.img)",
+        "time": "2026-06-14 12:57:09"
+    },
+    {
+        "level": "INFO",
+        "message": "Creating container: /home/omer/.local/share/DigitalVault/containers/ddada.img",
+        "time": "2026-06-14 12:57:09"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault locked. Encryption keys cleared from kernel.",
+        "time": "2026-06-14 12:51:40"
+    },
+    {
+        "level": "INFO",
+        "message": "Locking vault and clearing kernel keys...",
+        "time": "2026-06-14 12:51:40"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault unlocked via biometric",
+        "time": "2026-06-14 12:51:37"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault setup complete: /dev/loop16",
+        "time": "2026-06-14 12:51:19"
+    },
+    {
+        "level": "INFO",
+        "message": "Formatting new encrypted vault on: /dev/loop16",
+        "time": "2026-06-14 12:51:08"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Loop device ready: /dev/loop16 (/home/omer/.local/share/DigitalVault/containers/sad.img)",
+        "time": "2026-06-14 12:30:40"
+    },
+    {
+        "level": "INFO",
+        "message": "Creating container: /home/omer/.local/share/DigitalVault/containers/sad.img",
+        "time": "2026-06-14 12:30:40"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault force-locked. Holders were closed and encryption keys cleared.",
+        "time": "2026-06-14 12:30:04"
+    },
+    {
+        "level": "INFO",
+        "message": "Force-locking vault and closing holders...",
+        "time": "2026-06-14 12:30:03"
+    },
+    {
+        "level": "WARNING",
+        "message": "Mount point is busy. Close file manager or terminal windows using the vault.",
+        "time": "2026-06-14 12:30:02"
+    },
+    {
+        "level": "INFO",
+        "message": "Locking vault and clearing kernel keys...",
+        "time": "2026-06-14 12:30:02"
+    },
+    {
+        "level": "WARNING",
+        "message": "Mount point is busy. Close file manager or terminal windows using the vault.",
+        "time": "2026-06-14 12:29:54"
+    },
+    {
+        "level": "INFO",
+        "message": "Locking vault and clearing kernel keys...",
+        "time": "2026-06-14 12:29:54"
+    },
+    {
+        "level": "INFO",
+        "message": "Opened terminal at /home/omer/VaultMount",
+        "time": "2026-06-14 12:29:49"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault unlocked via biometric",
+        "time": "2026-06-14 12:29:37"
+    },
+    {
+        "level": "CRITICAL",
+        "message": "Sensor disconnected — emergency locking vault.",
+        "time": "2026-06-14 12:29:28"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault unlocked via biometric",
+        "time": "2026-06-14 12:29:18"
+    },
+    {
+        "level": "CRITICAL",
+        "message": "Sensor disconnected — emergency locking vault.",
+        "time": "2026-06-14 12:24:18"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault unlocked via biometric",
+        "time": "2026-06-14 12:24:11"
+    },
+    {
+        "level": "CRITICAL",
+        "message": "Sensor disconnected — emergency locking vault.",
+        "time": "2026-06-14 12:09:40"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault unlocked via biometric",
+        "time": "2026-06-14 12:09:37"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault locked. Encryption keys cleared from kernel.",
+        "time": "2026-06-14 12:05:24"
+    },
+    {
+        "level": "INFO",
+        "message": "Locking vault and clearing kernel keys...",
+        "time": "2026-06-14 12:05:24"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault unlocked via biometric",
+        "time": "2026-06-14 12:05:19"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault locked. Encryption keys cleared from kernel.",
+        "time": "2026-06-14 12:04:51"
+    },
+    {
+        "level": "INFO",
+        "message": "Locking vault and clearing kernel keys...",
+        "time": "2026-06-14 12:04:51"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault unlocked via biometric",
+        "time": "2026-06-14 12:04:35"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault setup complete: /dev/loop15",
+        "time": "2026-06-14 12:04:01"
+    },
+    {
+        "level": "INFO",
+        "message": "Formatting new encrypted vault on: /dev/loop15",
+        "time": "2026-06-14 12:03:51"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Loop device ready: /dev/loop15 (/home/omer/.local/share/DigitalVault/containers/deneme.img)",
+        "time": "2026-06-14 12:02:55"
+    },
+    {
+        "level": "INFO",
+        "message": "Creating container: /home/omer/.local/share/DigitalVault/containers/deneme.img",
+        "time": "2026-06-14 12:02:55"
+    },
+    {
+        "level": "CRITICAL",
+        "message": "Sensor disconnected — emergency locking vault.",
+        "time": "2026-06-09 13:57:14"
+    },
+    {
+        "level": "INFO",
+        "message": "Opened terminal at /home/omer/VaultMount",
+        "time": "2026-06-09 13:56:29"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault unlocked via biometric",
+        "time": "2026-06-09 13:56:13"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault setup complete: /dev/loop15",
+        "time": "2026-06-09 13:55:44"
+    },
+    {
+        "level": "INFO",
+        "message": "Formatting new encrypted vault on: /dev/loop15",
+        "time": "2026-06-09 13:55:33"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Loop device ready: /dev/loop15 (/home/omer/.local/share/DigitalVault/containers/demo1.img)",
+        "time": "2026-06-09 13:53:33"
+    },
+    {
+        "level": "INFO",
+        "message": "Creating container: /home/omer/.local/share/DigitalVault/containers/demo1.img",
+        "time": "2026-06-09 13:53:33"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault locked. Encryption keys cleared from kernel.",
+        "time": "2026-06-09 13:40:51"
+    },
+    {
+        "level": "INFO",
+        "message": "Locking vault and clearing kernel keys...",
+        "time": "2026-06-09 13:40:50"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault unlocked via biometric",
+        "time": "2026-06-09 13:40:44"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault unlocked via biometric",
+        "time": "2026-06-09 13:31:54"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault unlocked via biometric",
+        "time": "2026-06-09 13:31:26"
+    },
+    {
+        "level": "CRITICAL",
+        "message": "Sensor disconnected — emergency locking vault.",
+        "time": "2026-06-09 13:30:58"
+    },
+    {
+        "level": "INFO",
+        "message": "Opened terminal at /home/omer/VaultMount",
+        "time": "2026-06-09 13:30:54"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault unlocked via biometric",
+        "time": "2026-06-09 13:30:52"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Vault setup complete: /dev/loop14",
+        "time": "2026-06-09 13:30:33"
+    },
+    {
+        "level": "INFO",
+        "message": "Formatting new encrypted vault on: /dev/loop14",
+        "time": "2026-06-09 13:30:24"
+    },
+    {
+        "level": "SUCCESS",
+        "message": "Loop device ready: /dev/loop14 (/home/omer/.local/share/DigitalVault/containers/denemeloopdev.img)",
+        "time": "2026-06-09 13:29:51"
+    },
+    {
+        "level": "INFO",
+        "message": "Creating container: /home/omer/.local/share/DigitalVault/containers/denemeloopdev.img",
+        "time": "2026-06-09 13:29:51"
+    },
+    {
+        "level": "SUCCESS",
         "message": "Vault force-locked. Holders were closed and encryption keys cleared.",
         "time": "2026-06-03 22:38:04"
     },

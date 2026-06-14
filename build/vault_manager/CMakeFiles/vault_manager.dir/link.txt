@@ -1,0 +1,1 @@
+/usr/bin/cc CMakeFiles/vault_manager.dir/vault_manager.c.o -o ../bin/vault_manager  ../hal/libhal.a -lcjson /usr/lib/x86_64-linux-gnu/libcrypto.so 
