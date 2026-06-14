@@ -36,6 +36,7 @@ class VaultController : public QObject
     Q_PROPERTY(QString fingerprintUnlockMessage READ fingerprintUnlockMessage NOTIFY fingerprintUnlockActiveChanged)
     Q_PROPERTY(QString fingerprintFlow READ fingerprintFlow NOTIFY fingerprintUnlockActiveChanged)
     Q_PROPERTY(int fingerprintPromptState READ fingerprintPromptState NOTIFY fingerprintPromptStateChanged)
+    Q_PROPERTY(bool fingerprintAwaitingDecision READ fingerprintAwaitingDecision NOTIFY fingerprintPromptStateChanged)
     Q_PROPERTY(int fingerprintEnrollStep READ fingerprintEnrollStep NOTIFY fingerprintEnrollStepChanged)
     Q_PROPERTY(int setupOwnerFingerId READ setupOwnerFingerId NOTIFY setupOwnerFingerIdChanged)
     Q_PROPERTY(QString setupOwnerLabel READ setupOwnerLabel WRITE setSetupOwnerLabel NOTIFY setupOwnerLabelChanged)
@@ -86,6 +87,7 @@ public:
     Q_INVOKABLE void        forceLockVault();
     Q_INVOKABLE void        beginFingerprintUnlock();
     Q_INVOKABLE void        cancelFingerprintUnlock();
+    Q_INVOKABLE void        continueAfterDecision();
     Q_INVOKABLE void        beginSetupOwnerEnroll(int fingerId);
     Q_INVOKABLE void        beginSetupOwnerEnrollForDevice(const QString &devicePath);
     Q_INVOKABLE void        prepareSetupOwnerSlot(const QString &devicePath);
@@ -149,6 +151,7 @@ public:
     bool fingerprintUnlockActive() const { return m_fpUnlockActive; }
     QString fingerprintUnlockMessage() const { return m_fpUnlockMessage; }
     int fingerprintPromptState() const { return m_fpPromptState; }
+    bool fingerprintAwaitingDecision() const { return m_fpAwaitingDecision; }
     int fingerprintEnrollStep() const { return m_fpEnrollStep; }
     QString fingerprintFlow() const;
     int setupOwnerFingerId() const { return m_setupOwnerFingerId; }
@@ -261,6 +264,7 @@ private:
     static bool isLiveFingerprintFlow(FpFlow flow);
     bool ensureFingerprintIdle();
     void cleanupGrantEnrollOrphan();
+    void cleanupSetupOwnerOrphan();
     int runVaultManagerWithKey(const QStringList &args, const QByteArray &key32, int timeoutMs);
     QString m_lastVaultManagerOutput;
     void launchSetupAsync(const QString &device, int ownerId, bool force, int vaultSizeMB,
@@ -382,6 +386,8 @@ private:
     bool m_fpUnlockActive = false;
     QString m_fpUnlockMessage;
     int m_fpPromptState = 0;
+    bool m_fpAwaitingDecision = false;
+    int m_fpDecisionMatchedId = -1;
     int m_fpEnrollStep = 0;
     QProcess *m_socatProcess = nullptr;
     int m_serialRetryGeneration = 0;

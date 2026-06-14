@@ -164,7 +164,7 @@ VaultController::VaultController(QObject *parent)
                 });
             } else {
                 const QString failMsg =
-                    err.isEmpty() ? QStringLiteral("Fingerprint enrollment failed") : err;
+                    err.isEmpty() ? QStringLiteral("Couldn't save the fingerprint.") : err;
                 m_pendingSetupAccessLabel.clear();
                 m_fpFlow = FpFlow::None;
                 clearFingerprintFlowState();
@@ -205,7 +205,7 @@ VaultController::VaultController(QObject *parent)
                 });
             } else {
                 const QString failMsg =
-                    err.isEmpty() ? QStringLiteral("Fingerprint enrollment failed") : err;
+                    err.isEmpty() ? QStringLiteral("Couldn't save the fingerprint.") : err;
                 m_fpFlow = FpFlow::None;
                 clearFingerprintFlowState();
                 m_pendingGrantOwnerId = -1;
@@ -240,7 +240,7 @@ VaultController::VaultController(QObject *parent)
             m_setupOwnerFingerId = -1;
             emit setupOwnerFingerIdChanged();
             const QString failMsg =
-                err.isEmpty() ? QStringLiteral("Fingerprint enrollment failed") : err;
+                err.isEmpty() ? QStringLiteral("Couldn't save the fingerprint.") : err;
             m_fpFlow = FpFlow::None;
             clearFingerprintFlowState();
             setFingerprintPromptOutcome(2, failMsg);
@@ -1203,7 +1203,12 @@ void VaultController::onDeleteCompletedForEnroll(bool ok, int fingerId, const QS
     m_pendingDeleteBeforeEnroll = false;
     m_pendingEnrollSlot = -1;
 
-    if (!ok) {
+    // "Not found" means the slot is already gone — that is exactly what we wanted,
+    // so treat it as success and continue clearing local state.
+    const bool slotAlreadyGone = !ok && err.contains(QStringLiteral("not found"),
+                                                      Qt::CaseInsensitive);
+
+    if (!ok && !slotAlreadyGone) {
         m_pendingEnrollRetryAfterExists = false;
         const QString msg =
             err.isEmpty()
@@ -1215,9 +1220,16 @@ void VaultController::onDeleteCompletedForEnroll(bool ok, int fingerId, const QS
     }
 
     markSensorSlot(fingerId, false);
+    // The previous owner slot is now cleared; drop the stale reference so a later
+    // re-attempt does not try to delete a slot that no longer exists.
+    if (m_setupOwnerFingerId == fingerId) {
+        m_setupOwnerFingerId = -1;
+        emit setupOwnerFingerIdChanged();
+    }
     m_fpUnlockMessage = QStringLiteral("Preparing sensor…");
     emit fingerprintUnlockActiveChanged();
-    beginOwnerEnrollAuto();
+    // Route replace through the normal Check -> Add flow (do not skip Check).
+    beginSetupFindExisting();
 }
 
 void VaultController::beginSetupOwnerEnrollForDevice(const QString &devicePath)
@@ -1649,6 +1661,8 @@ void VaultController::beginFingerprintOperationUi(FpFlow flow, const QString &me
     m_fpFlow = flow;
     m_fpUnlockMessage = message;
     m_fpPromptState = 0;
+    m_fpAwaitingDecision = false;
+    m_fpDecisionMatchedId = -1;
     m_fpEnrollStep = 0;
     m_fpUnlockActive = true;
     emit fingerprintUnlockActiveChanged();
@@ -1661,6 +1675,8 @@ void VaultController::abortFingerprintOperationUi()
     m_fpUnlockActive = false;
     m_fpUnlockMessage.clear();
     m_fpPromptState = 0;
+    m_fpAwaitingDecision = false;
+    m_fpDecisionMatchedId = -1;
     m_fpEnrollStep = 0;
     clearFingerprintFlowState();
     emit fingerprintUnlockActiveChanged();
@@ -1673,6 +1689,8 @@ void VaultController::endFingerprintOperationUi()
     m_fpUnlockActive = false;
     m_fpUnlockMessage.clear();
     m_fpPromptState = 0;
+    m_fpAwaitingDecision = false;
+    m_fpDecisionMatchedId = -1;
     m_fpEnrollStep = 0;
     clearFingerprintFlowState();
     emit fingerprintUnlockActiveChanged();
@@ -1905,20 +1923,21 @@ void VaultController::handleVerifyCompleted(bool ok, int matchedId, const QStrin
 
     if (m_fpFlow == FpFlow::SetupFindExisting) {
         if (ok && matchedId >= 1) {
-            m_setupOwnerFingerId = matchedId;
-            /* Reused slot: require verify again at Start Setup (no post-enroll key skip). */
-            m_setupOwnerEnrolledThisSession = false;
-            m_setupEnrollKeyGraceUntilMs = 0;
-            markSensorSlot(matchedId, true);
-            emit setupOwnerFingerIdChanged();
-            endFingerprintOperationUi();
-            emit notificationReceived(
-                QStringLiteral("Existing fingerprint reused as owner."),
-                false);
+            // Pause and let the user confirm reuse instead of closing instantly.
+            m_fpAwaitingDecision = true;
+            m_fpDecisionMatchedId = matchedId;
+            m_fpPromptState = 1;
+            m_fpUnlockMessage = QStringLiteral("Fingerprint found");
+            emit fingerprintUnlockActiveChanged();
+            emit fingerprintPromptStateChanged();
             return;
         }
         if (!ok && verifyFailureShouldStartSetupEnroll(err)) {
-            beginSetupEnrollAfterNoMatch();
+            // Pause for the user instead of auto-jumping to enroll.
+            m_fpAwaitingDecision = true;
+            m_fpUnlockMessage = QStringLiteral("No saved fingerprint found");
+            emit fingerprintUnlockActiveChanged();
+            emit fingerprintPromptStateChanged();
             return;
         }
         m_fpUnlockMessage =
@@ -1961,16 +1980,21 @@ void VaultController::handleVerifyCompleted(bool ok, int matchedId, const QStrin
     if (m_fpFlow == FpFlow::SetupAccessFindExisting) {
         const QString label = m_pendingSetupAccessLabel;
         if (ok && matchedId >= 1) {
-            const bool saved = appendPendingSetupAccess(matchedId, label, false);
-            m_fpUnlockActive = false;
-            clearFingerprintFlowState();
+            // Pause and let the user confirm reuse instead of closing instantly.
+            m_fpAwaitingDecision = true;
+            m_fpDecisionMatchedId = matchedId;
+            m_fpPromptState = 1;
+            m_fpUnlockMessage = QStringLiteral("Fingerprint found");
             emit fingerprintUnlockActiveChanged();
-            if (saved)
-                emit setupAccessEntriesChanged();
+            emit fingerprintPromptStateChanged();
             return;
         }
         if (!ok && verifyFailureShouldStartSetupEnroll(err)) {
-            beginSetupAccessEnrollAfterNoMatch();
+            // Pause for the user instead of auto-jumping to enroll.
+            m_fpAwaitingDecision = true;
+            m_fpUnlockMessage = QStringLiteral("No saved fingerprint found");
+            emit fingerprintUnlockActiveChanged();
+            emit fingerprintPromptStateChanged();
             return;
         }
         m_fpUnlockMessage =
@@ -2750,11 +2774,40 @@ void VaultController::beginSetupOwnerEnroll(int fingerId)
     beginOwnerEnrollAuto();
 }
 
+void VaultController::cleanupSetupOwnerOrphan()
+{
+    // Only remove an owner print that was newly enrolled in this session and is
+    // not referenced by any vault. Reused/shared slots must never be deleted.
+    if (!m_setupOwnerEnrolledThisSession)
+        return;
+    if (m_pendingSetup.valid || m_isSetupRunning)
+        return;
+    const int slot = m_setupOwnerFingerId;
+    if (slot < 1)
+        return;
+    if (!isOrphanSensorSlot(slot))
+        return;
+
+    m_setupOwnerFingerId = -1;
+    m_setupOwnerEnrolledThisSession = false;
+    emit setupOwnerFingerIdChanged();
+
+    if (m_serialBridge && m_serialBridge->isConnected() && !m_serialBridge->isBusy())
+        m_serialBridge->deleteFinger(slot);
+    else
+        markSensorSlot(slot, false);
+
+    emit notificationReceived(
+        QStringLiteral("Setup canceled. No fingerprint was saved."), false);
+}
+
 void VaultController::clearSetupWizardSession()
 {
     const bool setupCommitInProgress = m_pendingSetup.valid || m_isSetupRunning;
-    if (!setupCommitInProgress)
+    if (!setupCommitInProgress) {
         rollbackPendingSetupAccess();
+        cleanupSetupOwnerOrphan();
+    }
     m_setupOwnerEnrolledThisSession = false;
     m_setupEnrollKeyGraceUntilMs = 0;
     if (!setupCommitInProgress)
@@ -2852,6 +2905,48 @@ bool VaultController::beginVaultSetupBiometric(const QString &device, bool force
     else
         startVaultSetupVerify();
     return true;
+}
+
+void VaultController::continueAfterDecision()
+{
+    if (!m_fpAwaitingDecision)
+        return;
+    m_fpAwaitingDecision = false;
+    const int matched = m_fpDecisionMatchedId;
+    m_fpDecisionMatchedId = -1;
+    const FpFlow flow = m_fpFlow;
+
+    if (matched >= 1) {
+        // Reuse the existing fingerprint that was found during the Check step.
+        if (flow == FpFlow::SetupFindExisting) {
+            m_setupOwnerFingerId = matched;
+            /* Reused slot: require verify again at Start Setup (no post-enroll key skip). */
+            m_setupOwnerEnrolledThisSession = false;
+            m_setupEnrollKeyGraceUntilMs = 0;
+            markSensorSlot(matched, true);
+            emit setupOwnerFingerIdChanged();
+            endFingerprintOperationUi();
+            emit notificationReceived(
+                QStringLiteral("Existing fingerprint reused as owner."), false);
+        } else if (flow == FpFlow::SetupAccessFindExisting) {
+            const QString label = m_pendingSetupAccessLabel;
+            const bool saved = appendPendingSetupAccess(matched, label, false);
+            endFingerprintOperationUi();
+            if (saved)
+                emit setupAccessEntriesChanged();
+        } else {
+            endFingerprintOperationUi();
+        }
+        return;
+    }
+
+    // No match: proceed to enrolling a new fingerprint.
+    if (flow == FpFlow::SetupFindExisting)
+        beginSetupEnrollAfterNoMatch();
+    else if (flow == FpFlow::SetupAccessFindExisting)
+        beginSetupAccessEnrollAfterNoMatch();
+    else
+        endFingerprintOperationUi();
 }
 
 void VaultController::cancelFingerprintUnlock()
@@ -3106,6 +3201,12 @@ void VaultController::launchSetupAsync(const QString &device, int ownerId, bool 
             addLog("SUCCESS", "Vault setup complete: " + device);
             refreshStorageDevices();
             selectDeviceByPath(device, true);
+            // Registry-only change (isVault/ownerFingerId) may not alter the cached
+            // storage list, so force the managed-device bindings to refresh now —
+            // otherwise the Vault Manager buttons stay empty until the page is
+            // re-entered. Mirrors the rename path.
+            emit devicesChanged();
+            emit statusChanged();
             emit setupFinished(true, QStringLiteral("Vault setup complete!"));
             emit notificationReceived(QStringLiteral("Vault initialized!"), false);
             emit navigationRequested(QStringLiteral("VaultManager.qml"));

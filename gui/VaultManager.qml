@@ -662,13 +662,14 @@ Item {
                             wrapMode: Text.Wrap
                             text: vaultController.setupOwnerFingerId > 0
                                   ? (vaultController.setupOwnerLabel.length > 0
-                                     ? "Owner fingerprint registered as " + vaultController.setupOwnerLabel + "."
-                                     : "Owner fingerprint registered. Add a name before continuing.")
-                                  : "Enter a name, then enroll the owner fingerprint."
+                                     ? "Owner fingerprint saved as " + vaultController.setupOwnerLabel + "."
+                                     : "Owner fingerprint saved. Add a name before continuing.")
+                                  : "Enter a name, then add the owner fingerprint."
                             color: vaultController.setupOwnerFingerId > 0 ? Theme.success : Theme.textSecondary
                             font { pixelSize: 14; family: Theme.fontFamily }
                         }
                         Rectangle {
+                            visible: vaultController.setupOwnerFingerId < 1
                             width: enrollBtnLbl.implicitWidth + 28
                             height: 42
                             radius: Theme.radiusSm
@@ -676,8 +677,7 @@ Item {
                             Text {
                                 id: enrollBtnLbl
                                 anchors.centerIn: parent
-                                text: vaultController.setupOwnerFingerId > 0
-                                      ? "Re-enroll owner" : "Enroll owner fingerprint"
+                                text: "Add owner fingerprint"
                                 color: "white"
                                 font { pixelSize: 14; bold: true; family: Theme.fontFamily }
                             }
@@ -688,7 +688,7 @@ Item {
                                 cursorShape: Qt.PointingHandCursor
                                 onClicked: {
                                     if (ownerFingerprintNameField.text.trim().length === 0) {
-                                        vaultController.notifyUser("Enter a fingerprint name before enrolling.", true)
+                                        vaultController.notifyUser("Enter a fingerprint name before adding.", true)
                                         return
                                     }
                                     vaultController.setupOwnerLabel = ownerFingerprintNameField.text.trim()
@@ -788,12 +788,19 @@ Item {
                                     anchors.rightMargin: 8
                                     spacing: 8
                                     Text {
-                                        width: Math.max(0, parent.width - removePendingLbl.implicitWidth - 32)
+                                        width: Math.max(0, parent.width - removePendingLbl.implicitWidth - pendingBadge.implicitWidth - 44)
                                         anchors.verticalCenter: parent.verticalCenter
                                         text: modelData.label || "Fingerprint"
                                         color: Theme.textPrimary
                                         font { pixelSize: 13; bold: true; family: Theme.fontFamily }
                                         elide: Text.ElideRight
+                                    }
+                                    Text {
+                                        id: pendingBadge
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        text: "Saved when setup finishes"
+                                        color: Theme.textMuted
+                                        font { pixelSize: 11; family: Theme.fontFamily }
                                     }
                                     Rectangle {
                                         width: removePendingLbl.implicitWidth + 16
@@ -834,12 +841,12 @@ Item {
                             id: setupAddAccessBtn
                             width: 190
                             anchors.bottom: setupAdditionalNameField.bottom
-                            text: "Enroll"
+                            text: "Add fingerprint"
                             variant: "primary"
                             enabled: vaultController.setupAccessEntries.length < 3
                             onClicked: {
                                 if (setupAdditionalNameField.text.trim().length === 0) {
-                                    vaultController.notifyUser("Enter a fingerprint name before enrolling.", true)
+                                    vaultController.notifyUser("Enter a fingerprint name before adding.", true)
                                     return
                                 }
                                 vaultController.beginSetupAccessEnroll(setupAdditionalNameField.text.trim())

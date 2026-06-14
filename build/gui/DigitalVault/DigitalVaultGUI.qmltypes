@@ -118,11 +118,19 @@ Module {
             isReadonly: true
         }
         Property {
+            name: "fingerprintAwaitingDecision"
+            type: "bool"
+            read: "fingerprintAwaitingDecision"
+            notify: "fingerprintPromptStateChanged"
+            index: 13
+            isReadonly: true
+        }
+        Property {
             name: "fingerprintEnrollStep"
             type: "int"
             read: "fingerprintEnrollStep"
             notify: "fingerprintEnrollStepChanged"
-            index: 13
+            index: 14
             isReadonly: true
         }
         Property {
@@ -130,7 +138,7 @@ Module {
             type: "int"
             read: "setupOwnerFingerId"
             notify: "setupOwnerFingerIdChanged"
-            index: 14
+            index: 15
             isReadonly: true
         }
         Property {
@@ -139,14 +147,14 @@ Module {
             read: "setupOwnerLabel"
             write: "setSetupOwnerLabel"
             notify: "setupOwnerLabelChanged"
-            index: 15
+            index: 16
         }
         Property {
             name: "setupAccessEntries"
             type: "QVariantList"
             read: "setupAccessEntries"
             notify: "setupAccessEntriesChanged"
-            index: 16
+            index: 17
             isReadonly: true
         }
         Property {
@@ -154,7 +162,7 @@ Module {
             type: "QObject"
             isPointer: true
             read: "serialBridgeObject"
-            index: 17
+            index: 18
             isReadonly: true
         }
         Property {
@@ -162,7 +170,7 @@ Module {
             type: "bool"
             read: "sensorConnected"
             notify: "statusChanged"
-            index: 18
+            index: 19
             isReadonly: true
         }
         Property {
@@ -170,7 +178,7 @@ Module {
             type: "QString"
             read: "sensorStatus"
             notify: "sensorStatusChanged"
-            index: 19
+            index: 20
             isReadonly: true
         }
         Property {
@@ -178,7 +186,7 @@ Module {
             type: "QString"
             read: "sensorStatusText"
             notify: "sensorStatusChanged"
-            index: 20
+            index: 21
             isReadonly: true
         }
         Property {
@@ -186,7 +194,7 @@ Module {
             type: "QString"
             read: "sensorPortPath"
             notify: "sensorStatusChanged"
-            index: 21
+            index: 22
             isReadonly: true
         }
         Property {
@@ -195,7 +203,7 @@ Module {
             read: "autoDetectUsb"
             write: "setAutoDetectUsb"
             notify: "autoDetectUsbChanged"
-            index: 22
+            index: 23
         }
         Property {
             name: "hardwareDisconnectLockdown"
@@ -203,7 +211,7 @@ Module {
             read: "hardwareDisconnectLockdown"
             write: "setHardwareDisconnectLockdown"
             notify: "hardwareDisconnectLockdownChanged"
-            index: 23
+            index: 24
         }
         Property {
             name: "autoLockTimeout"
@@ -211,14 +219,14 @@ Module {
             read: "autoLockTimeout"
             write: "setAutoLockTimeout"
             notify: "autoLockTimeoutChanged"
-            index: 24
+            index: 25
         }
         Property {
             name: "setupStatusText"
             type: "QString"
             read: "setupStatusText"
             notify: "setupRunningChanged"
-            index: 25
+            index: 26
             isReadonly: true
         }
         Property {
@@ -226,7 +234,7 @@ Module {
             type: "bool"
             read: "isSelectedDeviceVault"
             notify: "statusChanged"
-            index: 26
+            index: 27
             isReadonly: true
         }
         Property {
@@ -234,7 +242,7 @@ Module {
             type: "int"
             read: "selectedDeviceCapacityMB"
             notify: "statusChanged"
-            index: 27
+            index: 28
             isReadonly: true
         }
         Property {
@@ -242,7 +250,7 @@ Module {
             type: "QVariantMap"
             read: "selectedDeviceInfo"
             notify: "statusChanged"
-            index: 28
+            index: 29
             isReadonly: true
         }
         Property {
@@ -250,7 +258,7 @@ Module {
             type: "QVariantList"
             read: "storageDevices"
             notify: "devicesChanged"
-            index: 29
+            index: 30
             isReadonly: true
         }
         Property {
@@ -258,7 +266,7 @@ Module {
             type: "QVariantList"
             read: "registeredVaults"
             notify: "devicesChanged"
-            index: 30
+            index: 31
             isReadonly: true
         }
         Property {
@@ -266,7 +274,7 @@ Module {
             type: "QVariantList"
             read: "managedDevices"
             notify: "devicesChanged"
-            index: 31
+            index: 32
             isReadonly: true
         }
         Property {
@@ -274,7 +282,7 @@ Module {
             type: "QVariantList"
             read: "discoveredStorageDevices"
             notify: "devicesChanged"
-            index: 32
+            index: 33
             isReadonly: true
         }
         Signal { name: "statusChanged" }
@@ -342,6 +350,7 @@ Module {
         Method { name: "forceLockVault" }
         Method { name: "beginFingerprintUnlock" }
         Method { name: "cancelFingerprintUnlock" }
+        Method { name: "continueAfterDecision" }
         Method {
             name: "beginSetupOwnerEnroll"
             Parameter { name: "fingerId"; type: "int" }

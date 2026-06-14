@@ -96,9 +96,9 @@ QString verifyErrorMessage(quint8 code)
 constexpr int kVerifyTimeoutMs = 15000;
 constexpr int kEnrollTimeoutMs = 60000;
 constexpr int kPostCancelMs = 2000;
-constexpr int kHeartbeatIntervalMs = 200;
-constexpr int kHeartbeatTimeoutMs = 150;
-constexpr int kHeartbeatMaxFailures = 1;
+constexpr int kHeartbeatIntervalMs = 1000;
+constexpr int kHeartbeatTimeoutMs = 1000;
+constexpr int kHeartbeatMaxFailures = 3;
 
 quint8 xorChecksum(const QByteArray &body)
 {
@@ -514,8 +514,14 @@ private slots:
                                             QStringLiteral("Delete timed out"));
         else if (timed == Op::List)
             emit m_bridge->listEnrolledCompleted(false, {}, QStringLiteral("List timed out"));
-        if (m_fd >= 0 && m_bridge->m_connected)
-            startHeartbeat();
+        // Give the freshly reopened port / sensor a moment before probing again,
+        // otherwise an immediate heartbeat can spuriously drop the link.
+        if (m_fd >= 0 && m_bridge->m_connected) {
+            QTimer::singleShot(kHeartbeatIntervalMs, this, [this]() {
+                if (m_fd >= 0 && m_bridge->m_connected && m_op == Op::None)
+                    startHeartbeat();
+            });
+        }
     }
 
     void onHeartbeatDeadline()
@@ -704,6 +710,9 @@ private:
             m_op = Op::None;
             if (code == kResSuccess && payload.size() >= 1
                 && static_cast<quint8>(payload.at(0)) != 0) {
+                m_heartbeatFailures = 0;
+            } else if (code == kResBusy) {
+                // STM32 is busy with another operation — the link is alive, not lost.
                 m_heartbeatFailures = 0;
             } else {
                 m_rx.clear();

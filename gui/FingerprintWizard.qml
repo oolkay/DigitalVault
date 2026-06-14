@@ -44,58 +44,119 @@ Popup {
         }
     }
 
-    function headlineText() {
+    // Macro steps for the current task, used by the stepper at the top of the card.
+    function taskSteps(flow) {
+        switch (flow) {
+        case "setup_find_existing":
+        case "setup_enroll":
+        case "setup_verify":
+            return ["Check", "Add", "Confirm"]
+        case "setup_access_find_existing":
+        case "setup_access_enroll":
+            return ["Check", "Add"]
+        case "grant_verify":
+        case "grant_find_existing":
+        case "grant_enroll":
+            return ["Confirm", "Check", "Add"]
+        case "revoke_verify":
+            return ["Verify"]
+        case "delete_verify":
+            return ["Verify"]
+        case "unlock":
+            return ["Scan"]
+        default:
+            return ["Scan"]
+        }
+    }
+
+    function activeStepIndex(flow) {
+        switch (flow) {
+        case "setup_find_existing": return 0
+        case "setup_enroll": return 1
+        case "setup_verify": return 2
+        case "setup_access_find_existing": return 0
+        case "setup_access_enroll": return 1
+        case "grant_verify": return 0
+        case "grant_find_existing": return 1
+        case "grant_enroll": return 2
+        default: return 0
+        }
+    }
+
+    // Plain-language explanation of what the current scan is for.
+    function purposeText(flow) {
+        switch (flow) {
+        case "unlock":
+            return "Unlock this vault with an authorized fingerprint."
+        case "setup_find_existing":
+            return "Checking if this finger is already saved on the sensor."
+        case "setup_enroll":
+            return "New finger — saving it as the vault owner."
+        case "setup_verify":
+            return "Confirm with the owner finger to start setup."
+        case "setup_access_find_existing":
+            return "Checking if this finger is already saved. If it is, we link it; if not, we add it."
+        case "setup_access_enroll":
+            return "New finger — adding it to this vault."
+        case "grant_verify":
+            return "Confirm you can manage access for this vault."
+        case "grant_find_existing":
+            return "Checking if the finger you want to add is already saved."
+        case "grant_enroll":
+            return "New finger — adding it to this vault."
+        case "revoke_verify":
+            return "Confirm with an authorized finger to remove access."
+        case "delete_verify":
+            return "Verify with an authorized finger to delete this vault."
+        default:
+            return ""
+        }
+    }
+
+    function awaitingFound() {
+        return vaultController.fingerprintAwaitingDecision
+               && vaultController.fingerprintPromptState === 1
+    }
+
+    // Short, single primary line (lean overlay).
+    function primaryText() {
+        if (vaultController.fingerprintAwaitingDecision)
+            return awaitingFound() ? "Fingerprint found" : "No saved fingerprint found"
         const ps = vaultController.fingerprintPromptState
         if (ps === 1)
             return isEnrollFlow() ? "Fingerprint added" : "Fingerprint verified"
         if (ps === 2)
             return isEnrollFlow() ? "Fingerprint not added" : "Verification failed"
-        return flowTitle(vaultController.fingerprintFlow)
-    }
-
-    function statusText() {
-        const ps = vaultController.fingerprintPromptState
         const msg = vaultController.fingerprintUnlockMessage
-        if (ps === 1)
-            return isEnrollFlow() ? "Complete" : "Verified"
-        if (ps === 2)
-            return "Try again"
-        if (!isEnrollFlow())
-            return "Waiting for touch"
-
-        const lower = msg.toLowerCase()
-        if (lower.indexOf("remove") >= 0)
-            return "Lift finger"
-        if (vaultController.fingerprintEnrollStep >= 2)
-            return "Second scan"
-        if (vaultController.fingerprintEnrollStep >= 1)
-            return "First scan"
-        return "Get ready"
+        return msg.length > 0 ? msg : "Scan your finger"
     }
 
-    function helperText() {
+    // Small secondary line: scan counter, short purpose, or decision hint.
+    function subText() {
+        if (vaultController.fingerprintAwaitingDecision)
+            return awaitingFound()
+                   ? "This fingerprint is already saved and will be reused."
+                   : "Add it as a new fingerprint to continue."
         const ps = vaultController.fingerprintPromptState
-        if (ps === 1)
-            return "You can continue."
-        if (ps === 2)
-            return "Cancel and start again when you are ready."
+        if (ps !== 0)
+            return ""
         const flow = vaultController.fingerprintFlow
-        if (flow === "grant_verify")
-            return "This confirms you can manage access for this vault."
-        if (flow === "grant_find_existing")
-            return "If this fingerprint is already saved, it will be linked to this vault."
-        if (flow === "grant_enroll")
-            return "This is the new fingerprint being added. Use the same finger for both scans."
-        if (flow === "setup_access_find_existing")
-            return "If this fingerprint is already saved, it will be added to this vault setup."
-        if (flow === "setup_access_enroll")
-            return "This fingerprint will be saved only if setup completes."
-        if (isEnrollFlow())
-            return "Use the same finger for both scans."
-        return "Touch the sensor with an authorized finger."
+        if (isEnrollFlow()) {
+            if (vaultController.fingerprintEnrollStep >= 2)
+                return "Scan 2 of 2"
+            if (vaultController.fingerprintEnrollStep >= 1)
+                return "Scan 1 of 2"
+            return ""
+        }
+        if (flow === "setup_find_existing" || flow === "setup_access_find_existing"
+            || flow === "grant_find_existing")
+            return "If it's already saved it's reused, otherwise it's added."
+        return ""
     }
 
     function statusColor() {
+        if (vaultController.fingerprintAwaitingDecision)
+            return awaitingFound() ? Theme.success : Theme.warning
         const ps = vaultController.fingerprintPromptState
         if (ps === 1)
             return Theme.success
@@ -105,6 +166,8 @@ Popup {
     }
 
     function statusBg() {
+        if (vaultController.fingerprintAwaitingDecision)
+            return awaitingFound() ? Theme.successBg : Theme.warningBg
         const ps = vaultController.fingerprintPromptState
         if (ps === 1)
             return Theme.successBg
@@ -114,6 +177,8 @@ Popup {
     }
 
     function iconText() {
+        if (vaultController.fingerprintAwaitingDecision)
+            return awaitingFound() ? "✓" : "?"
         const ps = vaultController.fingerprintPromptState
         if (ps === 1)
             return "✓"
@@ -146,6 +211,59 @@ Popup {
                 width: parent.width - 44
                 spacing: 16
 
+                Row {
+                    id: stepperRow
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    spacing: 6
+                    property var steps: root.taskSteps(vaultController.fingerprintFlow)
+                    property int activeIndex: root.activeStepIndex(vaultController.fingerprintFlow)
+                    visible: steps.length > 1
+
+                    Repeater {
+                        model: stepperRow.steps
+                        delegate: Row {
+                            spacing: 6
+                            property bool isActive: index === stepperRow.activeIndex
+                            property bool isDone: index < stepperRow.activeIndex
+
+                            Text {
+                                visible: index > 0
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: "›"
+                                color: Theme.textMuted
+                                font { pixelSize: 13; family: Theme.fontFamily }
+                            }
+
+                            Rectangle {
+                                height: 24
+                                radius: 12
+                                width: pillLabel.implicitWidth + 22
+                                color: parent.isActive ? Theme.accentGlow
+                                       : parent.isDone ? Theme.successBg
+                                       : "transparent"
+                                border.width: 1
+                                border.color: parent.isActive ? Theme.accent
+                                              : parent.isDone ? Theme.success
+                                              : Theme.border
+
+                                Text {
+                                    id: pillLabel
+                                    anchors.centerIn: parent
+                                    text: (parent.parent.isDone ? "✓ " : "") + modelData
+                                    color: parent.parent.isActive ? Theme.accent
+                                           : parent.parent.isDone ? Theme.success
+                                           : Theme.textMuted
+                                    font {
+                                        pixelSize: 11
+                                        bold: parent.parent.isActive
+                                        family: Theme.fontFamily
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
                 Rectangle {
                     anchors.horizontalCenter: parent.horizontalCenter
                     width: 64
@@ -170,79 +288,74 @@ Popup {
                     Text {
                         width: parent.width
                         horizontalAlignment: Text.AlignHCenter
-                        text: headlineText()
-                        color: Theme.textPrimary
-                        font { pixelSize: 18; bold: true; family: Theme.fontFamily }
                         wrapMode: Text.Wrap
+                        text: root.primaryText()
+                        color: Theme.textPrimary
+                        font { pixelSize: 16; bold: true; family: Theme.fontFamily }
                     }
 
                     Text {
                         width: parent.width
                         horizontalAlignment: Text.AlignHCenter
                         wrapMode: Text.Wrap
-                        text: vaultController.fingerprintUnlockMessage
-                        color: Theme.textPrimary
-                        font { pixelSize: 14; bold: true; family: Theme.fontFamily }
+                        visible: text.length > 0
+                        text: root.subText()
+                        color: Theme.textSecondary
+                        font { pixelSize: 12; family: Theme.fontFamily }
                     }
                 }
 
-                Rectangle {
-                    width: parent.width
-                    height: 44
-                    radius: 8
-                    color: Theme.bgOverlay
-                    border.color: Theme.border
-                    border.width: 1
-
-                    Row {
-                        anchors.fill: parent
-                        anchors.leftMargin: 14
-                        anchors.rightMargin: 14
-                        spacing: 10
-
-                        Text {
-                            anchors.verticalCenter: parent.verticalCenter
-                            width: 110
-                            text: statusText()
-                            color: statusColor()
-                            font { pixelSize: 12; bold: true; family: Theme.fontFamily }
-                            elide: Text.ElideRight
-                        }
-
-                        Text {
-                            anchors.verticalCenter: parent.verticalCenter
-                            width: Math.max(0, parent.width - 120)
-                            wrapMode: Text.Wrap
-                            text: helperText()
-                            color: Theme.textSecondary
-                            font { pixelSize: 12; family: Theme.fontFamily }
-                        }
-                    }
-                }
-
-                Rectangle {
+                Row {
                     anchors.horizontalCenter: parent.horizontalCenter
-                    width: cancelLbl.implicitWidth + 28
-                    height: 36
-                    radius: 18
-                    color: cancelMouse.containsMouse ? Theme.bgHover : Theme.bgOverlay
-                    border.color: Theme.border
-                    border.width: 1
+                    spacing: 10
 
-                    Text {
-                        id: cancelLbl
-                        anchors.centerIn: parent
-                        text: "Cancel"
-                        color: Theme.textPrimary
-                        font { pixelSize: 12; bold: true; family: Theme.fontFamily }
+                    Rectangle {
+                        visible: vaultController.fingerprintAwaitingDecision
+                        width: addLbl.implicitWidth + 32
+                        height: 36
+                        radius: 18
+                        color: addMouse.containsMouse ? Theme.accentHover : Theme.accent
+
+                        Text {
+                            id: addLbl
+                            anchors.centerIn: parent
+                            text: root.awaitingFound() ? "Continue" : "Add fingerprint"
+                            color: "white"
+                            font { pixelSize: 12; bold: true; family: Theme.fontFamily }
+                        }
+
+                        MouseArea {
+                            id: addMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: vaultController.continueAfterDecision()
+                        }
                     }
 
-                    MouseArea {
-                        id: cancelMouse
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: vaultController.cancelFingerprintUnlock()
+                    Rectangle {
+                        width: cancelLbl.implicitWidth + 28
+                        height: 36
+                        radius: 18
+                        color: cancelMouse.containsMouse ? Theme.bgHover : Theme.bgOverlay
+                        border.color: Theme.border
+                        border.width: 1
+
+                        Text {
+                            id: cancelLbl
+                            anchors.centerIn: parent
+                            text: "Cancel"
+                            color: Theme.textPrimary
+                            font { pixelSize: 12; bold: true; family: Theme.fontFamily }
+                        }
+
+                        MouseArea {
+                            id: cancelMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: vaultController.cancelFingerprintUnlock()
+                        }
                     }
                 }
             }

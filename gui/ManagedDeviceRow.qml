@@ -115,14 +115,14 @@ Rectangle {
                 width: setupText.implicitWidth + 18
                 height: 30
                 radius: 8
-                color: setupMouse.containsMouse ? Theme.bgHover : Theme.bgOverlay
-                border.color: Theme.border
+                color: setupMouse.containsMouse ? Qt.darker(Theme.warning, 1.15) : Theme.warning
+                border.color: Theme.warning
                 border.width: 1
                 Text {
                     id: setupText
                     anchors.centerIn: parent
                     text: "Setup encryption"
-                    color: Theme.textPrimary
+                    color: "white"
                     font { pixelSize: 11; bold: true; family: Theme.fontFamily }
                 }
                 MouseArea {
