@@ -298,7 +298,6 @@ Item {
                 property var accessEntries: []
 
                 readonly property bool canUseSensor: vaultController.sensorConnected
-                    || (vaultController.serialBridge && vaultController.serialBridge.connected)
                 readonly property bool fpActive: vaultController.fingerprintUnlockActive
                 readonly property bool atAccessCapacity: accessEntries.length >= 4
                 readonly property bool canManageAccess: false

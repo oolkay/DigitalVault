@@ -40,21 +40,23 @@
 \contentsline {section}{\numberline {4.1}Implementation Overview}{30}{section.4.1}%
 \contentsline {section}{\numberline {4.2}Physical Prototype}{31}{section.4.2}%
 \contentsline {section}{\numberline {4.3}Host Application}{31}{section.4.3}%
-\contentsline {section}{\numberline {4.4}Firmware Communication}{32}{section.4.4}%
-\contentsline {section}{\numberline {4.5}Vault Manager}{32}{section.4.5}%
-\contentsline {section}{\numberline {4.6}Runtime Recovery}{33}{section.4.6}%
-\contentsline {chapter}{\numberline {5}Testing and Evaluation}{34}{chapter.5}%
-\contentsline {section}{\numberline {5.1}Testing Approach}{34}{section.5.1}%
-\contentsline {section}{\numberline {5.2}Functional Test Cases}{35}{section.5.2}%
-\contentsline {section}{\numberline {5.3}Failure and Edge Case Tests}{37}{section.5.3}%
-\contentsline {section}{\numberline {5.4}Filesystem Usage and Stress Tests}{38}{section.5.4}%
-\contentsline {section}{\numberline {5.5}Serial Communication Tests}{39}{section.5.5}%
-\contentsline {section}{\numberline {5.6}Evaluation Summary}{39}{section.5.6}%
-\contentsline {chapter}{\numberline {6}Conclusion and Future Work}{41}{chapter.6}%
-\contentsline {section}{\numberline {6.1}Project Outcomes}{41}{section.6.1}%
-\contentsline {section}{\numberline {6.2}Limitations}{42}{section.6.2}%
-\contentsline {section}{\numberline {6.3}Future Work}{42}{section.6.3}%
-\contentsline {section}{\numberline {6.4}Final Remarks}{43}{section.6.4}%
+\contentsline {section}{\numberline {4.4}Graphical User Interface}{32}{section.4.4}%
+\contentsline {section}{\numberline {4.5}Firmware Communication}{33}{section.4.5}%
+\contentsline {section}{\numberline {4.6}Vault Manager}{33}{section.4.6}%
+\contentsline {section}{\numberline {4.7}Runtime Recovery}{35}{section.4.7}%
+\contentsline {chapter}{\numberline {5}Testing and Evaluation}{36}{chapter.5}%
+\contentsline {section}{\numberline {5.1}Testing Approach}{36}{section.5.1}%
+\contentsline {section}{\numberline {5.2}Functional Test Cases}{37}{section.5.2}%
+\contentsline {section}{\numberline {5.3}Failure and Edge Case Tests}{39}{section.5.3}%
+\contentsline {section}{\numberline {5.4}Filesystem Usage and Stress Tests}{40}{section.5.4}%
+\contentsline {section}{\numberline {5.5}Storage Verification Evidence}{41}{section.5.5}%
+\contentsline {section}{\numberline {5.6}Serial Communication Tests}{43}{section.5.6}%
+\contentsline {section}{\numberline {5.7}Evaluation Summary}{43}{section.5.7}%
+\contentsline {chapter}{\numberline {6}Conclusion and Future Work}{45}{chapter.6}%
+\contentsline {section}{\numberline {6.1}Project Outcomes}{45}{section.6.1}%
+\contentsline {section}{\numberline {6.2}Limitations}{46}{section.6.2}%
+\contentsline {section}{\numberline {6.3}Future Work}{46}{section.6.3}%
+\contentsline {section}{\numberline {6.4}Final Remarks}{47}{section.6.4}%
 \vspace {18pt}
-\contentsline {chapter}{Bibliography}{45}{chapter*.8}%
-\contentsline {chapter}{Appendices}{46}{chapter*.9}%
+\contentsline {chapter}{Bibliography}{49}{chapter*.8}%
+\contentsline {chapter}{Appendices}{50}{chapter*.9}%

@@ -1,6 +1,6 @@
 \chapter{Conclusion and Future Work}
 
-This project presented a biometric based encrypted digital vault that combines fingerprint-controlled access with standard Linux storage encryption. The main goal was to make encrypted storage usable without turning the user workflow into a command-line or password-management task. For this purpose, the system was designed around three main parts: an embedded biometric access unit, a host application with a graphical interface, and a vault management layer that prepares and controls encrypted storage.
+This project presented a biometric-based encrypted digital vault that combines fingerprint-controlled access with standard Linux storage encryption. The main goal was to make encrypted storage usable without turning the user workflow into a command-line or password-management task. For this purpose, the system was designed around three main parts: an embedded biometric access unit, a host application with a graphical interface, and a vault management layer that prepares and controls encrypted storage.
 
 The final design uses the AS608 fingerprint sensor and STM32 Blue Pill as the biometric access side of the system, while the host application manages the user workflow and encrypted storage operations. After successful authorization, the host can unlock a LUKS2/dm-crypt based vault and present it as a normal mounted folder. This keeps the everyday storage behavior close to the user's existing mental model: the user unlocks the vault, works with files normally, and locks the vault again when finished.
 
@@ -10,7 +10,7 @@ The project also supports both physical storage devices and virtual storage cont
 
 The implemented system covers the main vault lifecycle operations: vault creation, fingerprint enrollment, formatting, unlocking, locking, force-locking, virtual container creation, and deletion. Authorized fingerprints are enrolled during vault creation, which keeps the access policy clear for the lifetime of the vault. The graphical interface hides low-level storage commands while still showing important system states such as locked/unlocked status, sensor connection, active operations, and abnormal conditions.
 
-An important design decision was to use block-device encryption with LUKS2/dm-crypt instead of a custom FUSE-based filesystem. This choice gave up fine-grained per-operation control, but it kept the standard Linux storage stack in charge of normal filesystem behavior, as discussed in Chapter 3.
+An important design decision was to use LUKS2/dm-crypt based block-device encryption instead of a custom FUSE-based filesystem. This choice gave up fine-grained per-operation control, but it kept the standard Linux storage stack in charge of normal filesystem behavior, as discussed in Chapter 3.
 
 Another important result was the state-oriented design of the host application. Testing showed that the system cannot be represented only as locked or unlocked. A vault may have an open mapper, a mounted filesystem, a busy mount point, a missing storage device, or a disconnected fingerprint unit. The implementation therefore includes explicit state tracking, recovery behavior, and emergency locking paths.
 
@@ -31,6 +31,8 @@ One future improvement is strengthening the embedded side of the system. A more 
 Another improvement is reducing host-side key exposure as much as possible. This could include stricter memory handling, shorter key lifetime on the host, process isolation, and additional checks around when the key can be requested and used.
 
 The user interface can also be improved with more detailed recovery guidance and clearer reporting for abnormal states. The current interface already follows a state-oriented workflow, but future versions could provide more structured diagnostics when a device is removed, a mount is busy, or the fingerprint unit is disconnected.
+
+The host application also keeps some metadata files, such as vault configuration and interface state, in JSON format. These files are used for usability and state tracking; they do not store the encrypted file contents or the plaintext vault key. Future versions could make these metadata updates more robust by using atomic writes, backup copies, or a small recovery mechanism for interrupted updates.
 
 The storage layer can also be extended with configurable encryption options. The current design uses a standard disk-encryption configuration, but supporting additional algorithms or profiles could make the project adaptable to different requirements.
 

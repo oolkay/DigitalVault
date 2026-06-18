@@ -305,6 +305,18 @@ VaultController::VaultController(QObject *parent)
     });
     connect(m_serialBridge, &SerialBridge::connectionChanged,
             this, &VaultController::onSerialConnectionChanged);
+    connect(m_serialBridge, &SerialBridge::heartbeatReceived, this, [this]() {
+        if (!m_serialBridge || !m_serialBridge->isConnected())
+            return;
+        m_serialConnectQueued = false;
+        m_manualConnectRequested = false;
+        endStartupConnectPhase();
+        m_sensorPortPathDisplay = m_serialBridge->portName();
+        const bool wasConnected = (m_sensorStatus == QStringLiteral("connected"));
+        updateSensorStatus(SensorStatus::Connected);
+        if (!wasConnected)
+            emit notificationReceived(QStringLiteral("Fingerprint sensor connected"), false);
+    });
     connect(m_serialBridge, &SerialBridge::connectionLost,
             this, &VaultController::onSerialConnectionLost);
 
@@ -554,8 +566,6 @@ void VaultController::startupRecovery()
 
 bool VaultController::sensorConnected() const
 {
-    if (m_serialBridge && m_serialBridge->isConnected())
-        return true;
     return m_sensorStatus == QStringLiteral("connected");
 }
 
@@ -776,7 +786,8 @@ void VaultController::tryConnectSerial()
         m_lastAttemptedPort = port;
         m_sensorPortPathDisplay = port;
         if (m_sensorStatus != QStringLiteral("connected"))
-            updateSensorStatus(SensorStatus::Connected);
+            updateSensorStatus(SensorStatus::Connecting,
+                               QStringLiteral("Waiting for STM32 heartbeat…"));
         return;
     }
     if (m_serialConnectQueued && m_lastAttemptedPort == port)
@@ -812,7 +823,9 @@ void VaultController::connectToConfiguredPort(const QString &port)
     m_sensorPortPathDisplay = trimmed;
     if (m_serialBridge && m_serialBridge->isConnected()
         && m_serialBridge->portName() == trimmed) {
-        updateSensorStatus(SensorStatus::Connected);
+        if (m_sensorStatus != QStringLiteral("connected"))
+            updateSensorStatus(SensorStatus::Connecting,
+                               QStringLiteral("Waiting for STM32 heartbeat…"));
         return;
     }
     if (m_serialConnectQueued && m_lastAttemptedPort == trimmed)
@@ -921,17 +934,12 @@ void VaultController::onSerialConnectionChanged()
 
     m_serialConnectQueued = false;
 
-    const bool wasConnected = (m_sensorStatus == QStringLiteral("connected"));
-
     if (m_serialBridge->isConnected()) {
         endStartupConnectPhase();
-        m_manualConnectRequested = false;
-        ++m_serialRetryGeneration;
         m_sensorPortPathDisplay = m_serialBridge->portName();
-        updateSensorStatus(SensorStatus::Connected);
-        if (!wasConnected) {
-            emit notificationReceived(QStringLiteral("Fingerprint sensor connected"), false);
-        }
+        if (m_sensorStatus != QStringLiteral("connected"))
+            updateSensorStatus(SensorStatus::Connecting,
+                               QStringLiteral("Waiting for STM32 heartbeat…"));
     } else {
         const QString port = resolveSerialPort();
         updateSensorStatus(port.isEmpty() ? SensorStatus::Unconfigured : SensorStatus::Disconnected);
@@ -941,7 +949,7 @@ void VaultController::onSerialConnectionChanged()
 
 void VaultController::beginFingerprintUnlockAfterConnect()
 {
-    if (!m_serialBridge || !m_serialBridge->isConnected()) {
+    if (!sensorConnected()) {
         emit notificationReceived(QStringLiteral("Fingerprint sensor not connected"), true);
         return;
     }
@@ -950,7 +958,7 @@ void VaultController::beginFingerprintUnlockAfterConnect()
 
 void VaultController::beginSetupOwnerEnrollAfterConnect(int fingerId)
 {
-    if (!m_serialBridge || !m_serialBridge->isConnected()) {
+    if (!sensorConnected()) {
         emit notificationReceived(QStringLiteral("Fingerprint sensor not connected"), true);
         return;
     }
@@ -1118,7 +1126,7 @@ void VaultController::runExclusiveSerialOpRetry(int generation,
     if (generation != m_serialExclusiveGeneration)
         return;
 
-    if (!m_serialBridge || !m_serialBridge->isConnected()) {
+    if (!sensorConnected()) {
         if (m_fpUnlockActive)
             abortFingerprintOperationUi();
         emit notificationReceived(QStringLiteral("Fingerprint sensor not connected"), true);
@@ -1187,7 +1195,7 @@ void VaultController::rollbackSetupEnrollAfterVerifyFail(const QString &reason)
 
 void VaultController::beginOwnerEnrollAuto()
 {
-    if (!m_serialBridge || !m_serialBridge->isConnected()) {
+    if (!sensorConnected()) {
         if (m_fpUnlockActive)
             abortFingerprintOperationUi();
         emit notificationReceived(QStringLiteral("Fingerprint sensor not connected"), true);
@@ -1260,11 +1268,9 @@ void VaultController::beginSetupOwnerEnrollForDevice(const QString &devicePath)
     }
     m_setupDevicePath = path;
 
-    if (!m_serialBridge->isConnected()) {
+    if (!sensorConnected()) {
         if (!ensureFingerprintIdle())
             return;
-        beginFingerprintOperationUi(FpFlow::SetupFindExisting,
-                                    QStringLiteral("Connecting to sensor…"));
         tryConnectSerial();
         QTimer::singleShot(500, this, [this, path]() {
             beginSetupOwnerEnrollForDeviceAfterConnect(path);
@@ -1276,7 +1282,7 @@ void VaultController::beginSetupOwnerEnrollForDevice(const QString &devicePath)
 
 void VaultController::beginSetupOwnerEnrollForDeviceAfterConnect(const QString &devicePath)
 {
-    if (!m_serialBridge || !m_serialBridge->isConnected()) {
+    if (!sensorConnected()) {
         if (m_fpUnlockActive)
             abortFingerprintOperationUi();
         emit notificationReceived(QStringLiteral("Fingerprint sensor not connected"), true);
@@ -1317,7 +1323,7 @@ void VaultController::beginSetupOwnerEnrollForDeviceAfterConnect(const QString &
 
 void VaultController::beginSetupFindExisting()
 {
-    if (!m_serialBridge || !m_serialBridge->isConnected()) {
+    if (!sensorConnected()) {
         if (m_fpUnlockActive)
             abortFingerprintOperationUi();
         emit notificationReceived(QStringLiteral("Fingerprint sensor not connected"), true);
@@ -1344,7 +1350,7 @@ void VaultController::beginSetupFindExisting()
 
 void VaultController::beginSetupEnrollAfterNoMatch()
 {
-    if (!m_serialBridge || !m_serialBridge->isConnected()) {
+    if (!sensorConnected()) {
         abortFingerprintOperationUi();
         emit notificationReceived(QStringLiteral("Fingerprint sensor not connected"), true);
         return;
@@ -1372,7 +1378,7 @@ void VaultController::beginSetupEnrollAfterNoMatch()
 
 void VaultController::beginSetupAccessEnrollAfterNoMatch()
 {
-    if (!m_serialBridge || !m_serialBridge->isConnected()) {
+    if (!sensorConnected()) {
         abortFingerprintOperationUi();
         emit notificationReceived(QStringLiteral("Fingerprint sensor not connected"), true);
         return;
@@ -1522,7 +1528,7 @@ void VaultController::beginSetupAccessEnroll(const QString &label)
         emit notificationReceived(QStringLiteral("Maximum of 4 access entries per vault"), true);
         return;
     }
-    if (!m_serialBridge || !m_serialBridge->isConnected()) {
+    if (!sensorConnected()) {
         emit notificationReceived(QStringLiteral("Fingerprint sensor not connected"), true);
         return;
     }
@@ -1885,7 +1891,7 @@ void VaultController::startAuthorizedVerify(FpFlow flow, const QString &devicePa
     if (!ensureFingerprintIdle())
         return;
 
-    if (!m_serialBridge || !m_serialBridge->isConnected()) {
+    if (!sensorConnected()) {
         emit notificationReceived(QStringLiteral("Fingerprint sensor not connected"), true);
         return;
     }
@@ -2239,7 +2245,7 @@ void VaultController::startGrantEnrollForVault(const QString &devicePath, const 
     if (!ensureFingerprintIdle())
         return;
 
-    if (!m_serialBridge || !m_serialBridge->isConnected()) {
+    if (!sensorConnected()) {
         emit notificationReceived(QStringLiteral("Fingerprint sensor not connected"), true);
         return;
     }
@@ -2756,7 +2762,7 @@ void VaultController::beginFingerprintUnlock()
         emit notificationReceived(QStringLiteral("Select a vault first."), true);
         return;
     }
-    if (!m_serialBridge->isConnected()) {
+    if (!sensorConnected()) {
         tryConnectSerial();
         QTimer::singleShot(500, this, &VaultController::beginFingerprintUnlockAfterConnect);
         return;
@@ -2781,7 +2787,7 @@ void VaultController::beginFingerprintUnlock()
 void VaultController::beginSetupOwnerEnroll(int fingerId)
 {
     Q_UNUSED(fingerId);
-    if (!m_serialBridge->isConnected()) {
+    if (!sensorConnected()) {
         tryConnectSerial();
         QTimer::singleShot(500, this, [this, fingerId]() {
             beginSetupOwnerEnrollAfterConnect(fingerId);
@@ -2894,7 +2900,7 @@ bool VaultController::beginVaultSetupBiometric(const QString &device, bool force
             QStringLiteral("Enroll the owner fingerprint before starting setup"), true);
         return false;
     }
-    if (!m_serialBridge->isConnected()) {
+    if (!sensorConnected()) {
         emit notificationReceived(QStringLiteral("Fingerprint sensor not connected"), true);
         return false;
     }
@@ -3098,7 +3104,7 @@ void VaultController::toggleVault()
         return;
     }
 
-    if (m_serialBridge && m_serialBridge->isConnected()) {
+    if (sensorConnected()) {
         beginFingerprintUnlock();
         return;
     }
@@ -3148,13 +3154,12 @@ bool VaultController::setupVault(const QString &device, bool force, int ownerId,
             QStringLiteral("System is busy — close apps using the vault and retry."), true);
         return false;
     }
-    if (m_serialBridge && m_serialBridge->isConnected()) {
-        m_setupOwnerFingerId = ownerId;
-        return beginVaultSetupBiometric(device, force, vaultSizeMB, vaultName, normalName, normalFs);
+    if (!sensorConnected()) {
+        emit notificationReceived(QStringLiteral("Fingerprint sensor not connected"), true);
+        return false;
     }
-    launchSetupAsync(device, ownerId, force, vaultSizeMB, vaultName, normalName, normalFs,
-                     m_setupOwnerLabel.trimmed(), QByteArray());
-    return true;
+    m_setupOwnerFingerId = ownerId;
+    return beginVaultSetupBiometric(device, force, vaultSizeMB, vaultName, normalName, normalFs);
 }
 
 void VaultController::launchSetupAsync(const QString &device, int ownerId, bool force, int vaultSizeMB,
@@ -4658,7 +4663,7 @@ bool VaultController::verifyOwner(int fingerId)
         return false;
     }
 
-    if (m_serialBridge && m_serialBridge->isConnected()) {
+    if (sensorConnected()) {
         if (m_serialBridge->isBusy()) {
             emit notificationReceived(QStringLiteral("Sensor is busy"), true);
             return false;
@@ -5517,6 +5522,17 @@ QVariantMap VaultController::enrichVaultEntry(const QVariantMap &entry) const
     out.insert(QStringLiteral("displayName"), displayName);
 
     QString sizeLabel = entry.value(QStringLiteral("luksSize")).toString();
+    if (sizeLabel.isEmpty()) {
+        const QVariantMap layout = storageLayoutForDevice(path);
+        const QVariantList parts = layout.value(QStringLiteral("partitions")).toList();
+        for (const QVariant &v : parts) {
+            const QVariantMap part = v.toMap();
+            if (part.value(QStringLiteral("role")).toString() != QStringLiteral("luks"))
+                continue;
+            sizeLabel = part.value(QStringLiteral("size")).toString();
+            break;
+        }
+    }
     if (sizeLabel.isEmpty()) {
         const int capacityMB = entry.value(QStringLiteral("capacityMB")).toInt();
         if (capacityMB > 0)

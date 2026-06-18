@@ -73,34 +73,36 @@ Item {
                 wrapMode: Text.Wrap
             }
 
-            Rectangle {
-                id: progressTrack
-                width: parent.width
-                height: 6
-                radius: 3
-                color: Theme.bgOverlay
-                clip: true
+            Item {
+                id: busySpinner
+                width: 42
+                height: 42
+                anchors.horizontalCenter: parent.horizontalCenter
 
                 Rectangle {
-                    height: parent.height
-                    radius: parent.radius
+                    anchors.fill: parent
+                    radius: width / 2
+                    color: "transparent"
+                    border.color: Theme.border
+                    border.width: 2
+                }
+
+                Rectangle {
+                    width: 9
+                    height: 9
+                    radius: width / 2
                     color: Theme.accent
-                    SequentialAnimation on width {
-                        running: vaultController.isSetupRunning
-                        loops: Animation.Infinite
-                        NumberAnimation {
-                            from: 0
-                            to: progressTrack.width
-                            duration: 1800
-                            easing.type: Easing.InOutQuart
-                        }
-                        NumberAnimation {
-                            from: progressTrack.width
-                            to: 0
-                            duration: 1800
-                            easing.type: Easing.InOutQuart
-                        }
-                    }
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    y: -1
+                }
+
+                RotationAnimation on rotation {
+                    running: vaultController.isSetupRunning
+                    from: 0
+                    to: 360
+                    duration: 1100
+                    loops: Animation.Infinite
+                    easing.type: Easing.Linear
                 }
             }
 

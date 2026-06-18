@@ -103,6 +103,26 @@ Repeated lock/unlock & User repeatedly opens and closes the vault & Vault return
 
 These tests were also a practical check for the storage design decision. Since the project uses block-device encryption, the filesystem inside the vault remains a standard filesystem after unlock. Therefore, normal file operations are handled by the operating system rather than by custom file-operation code. In the filesystem tests, the important observation was not only that individual file operations succeeded, but also that the vault could still be locked afterwards without leaving an open mapper or stale mount point behind.
 
+\section{Storage Verification Evidence}
+
+The encrypted storage result was also checked with standard Linux tools after formatting and unlocking the physical USB storage device. These checks were not used as performance tests. Their purpose was to confirm that the selected device was prepared as an encrypted LUKS volume and that the opened vault appeared as the expected mapped block device while mounted.
+
+The \texttt{lsblk} output in Figure \ref{fig:lsblk-mounted} shows the block-device view after the vault was opened. This helped verify that the physical partition, encrypted mapper, and mounted filesystem were visible in the expected structure.
+
+\begin{figure}[!htbp]
+    \centering
+    \includegraphics[width=0.98\textwidth,height=0.72\textheight,keepaspectratio]{lsblk_output_when_mounted.png}
+    \caption{\label{fig:lsblk-mounted}\texttt{lsblk} output after opening and mounting the encrypted USB vault.}
+\end{figure}
+
+The \texttt{cryptsetup luksDump} output in Figure \ref{fig:luksdump} was used to check that the target partition contained a LUKS header. This is useful evidence because it verifies the encrypted container format directly, instead of only showing the mounted filesystem after unlock.
+
+\begin{figure}[!htbp]
+    \centering
+    \includegraphics[width=0.98\textwidth,height=0.72\textheight,keepaspectratio]{luksdump.png}
+    \caption{\label{fig:luksdump}\texttt{cryptsetup luksDump} output for the encrypted vault partition.}
+\end{figure}
+
 \section{Serial Communication Tests}
 
 The serial communication layer was tested before relying on the GUI workflow. The goal was to confirm that commands such as enroll, verify, cancel, delete, list enrolled fingerprints, and key request could be sent and interpreted correctly. Testing this layer separately made debugging easier because communication problems could be identified before they appeared as GUI workflow problems.

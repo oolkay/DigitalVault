@@ -45,7 +45,7 @@ The firmware side is responsible for biometric access decisions and key-release 
 
 The hardware architecture consists of three main components: the AS608 fingerprint sensor, the STM32 Blue Pill microcontroller, and the PL2303 USB-UART bridge. The AS608 sensor is responsible for biometric enrollment and matching. Fingerprint templates are stored inside the sensor, so the host computer does not need to store raw fingerprint data or template data.
 
-The STM32 Blue Pill works as the controller between the fingerprint sensor and the host computer. It receives commands from the host, drives the fingerprint operation flow, checks sensor results, and sends structured responses back to the host. The firmware also represents the key-control boundary of the system. The vault key is generated and controlled on the firmware side, and key access is allowed only after a valid fingerprint verification.
+The STM32 Blue Pill works as the controller between the fingerprint sensor and the host computer. It receives commands from the host, drives the fingerprint operation flow, checks sensor results, and sends structured responses back to the host. The firmware also represents the key-control boundary of the system. Vault key material is generated and controlled on the firmware side, and key access is allowed only after a valid fingerprint verification.
 
 The PL2303 USB-UART bridge provides the physical communication path between the STM32 firmware and the computer. From the host side, this appears as a serial port. This choice keeps the hardware connection simple and easy to test while still allowing the project to define its own command and response protocol above the serial link.
 
@@ -105,13 +105,13 @@ When the vault is unlocked, the vault manager opens the LUKS2 container as a dm-
 
 The authentication flow is designed around the idea that fingerprint verification controls access to the vault key. The fingerprint itself is not used as a cryptographic key. Instead, the AS608 sensor performs biometric matching, the STM32 firmware controls the verification flow, and the host requests key access only after successful verification.
 
-There are two main key-access situations: vault setup and vault unlock. During setup, the system needs the vault key to format the new LUKS2 container. During unlock, it needs the same key to open the existing LUKS2 container. In both cases, the key is managed on the firmware side and used by the host only for the minimum time needed to perform the storage operation.
+There are two main key-access situations: vault setup and vault unlock. During setup, the system needs vault-specific key material to format the new LUKS2 container. LUKS2 stores the required protected keyslot information in its header, not the plaintext key itself. During unlock, the system needs the corresponding vault key material to open the existing LUKS2 container. In both cases, the key material is managed on the firmware side and used by the host only for the minimum time needed to perform the storage operation.
 
 The host-side controller treats fingerprint operations as explicit flows. A verification result is interpreted according to the current state: setup confirmation, unlock, delete confirmation, or another controlled operation. The same physical action, scanning a finger, can mean very different things depending on the active workflow, so the controller has to know which flow it is in before acting on a result.
 
 After key material reaches the host for a setup or unlock operation, it is passed to the vault manager for the required \texttt{cryptsetup} command through standard input instead of command-line arguments. The key buffer is wiped after use, and no persistent host-side copy is kept.
 
-Key access is only needed for operations that open or initialize encrypted storage. Vault setup uses the key to format the new LUKS2 container and create the ext4 filesystem. Vault unlock uses the same key to open the existing container and mount the filesystem. Locking does not need the key, because it only unmounts the filesystem and closes the mapper. Vault deletion may still use a biometric gate as a safety step, but the vault key is not needed to remove encrypted data or container metadata.
+Key access is only needed for operations that open or initialize encrypted storage. Vault setup uses the key to format the new LUKS2 container and create the ext4 filesystem. Vault unlock uses the corresponding vault key to open the existing container and mount the filesystem. Locking does not need the key, because it only unmounts the filesystem and closes the mapper. Vault deletion may still use a biometric gate as a safety step, but the vault key is not needed to remove encrypted data or container metadata.
 
 \begin{figure}[!htbp]
     \centering

@@ -121,6 +121,11 @@
                 },
                 {
                     "access": "public",
+                    "name": "heartbeatReceived",
+                    "returnType": "void"
+                },
+                {
+                    "access": "public",
                     "name": "busyChanged",
                     "returnType": "void"
                 },

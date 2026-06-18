@@ -711,9 +711,11 @@ private:
             if (code == kResSuccess && payload.size() >= 1
                 && static_cast<quint8>(payload.at(0)) != 0) {
                 m_heartbeatFailures = 0;
+                emit m_bridge->heartbeatReceived();
             } else if (code == kResBusy) {
                 // STM32 is busy with another operation — the link is alive, not lost.
                 m_heartbeatFailures = 0;
+                emit m_bridge->heartbeatReceived();
             } else {
                 m_rx.clear();
                 recordHeartbeatFailure(code == kResSuccess

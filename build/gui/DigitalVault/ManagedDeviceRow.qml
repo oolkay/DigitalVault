@@ -13,7 +13,7 @@ Rectangle {
     property var deviceData: ({})
     readonly property bool canShowUnlock: (deviceData.statusLabel || "") === "Locked"
     readonly property bool canShowSetup: (deviceData.statusLabel || "") === "Container"
-    readonly property real actionsWidth: actionRow.visible ? actionRow.width + 8 : 0
+    readonly property real actionsWidth: actionRow.visible ? actionRow.implicitWidth + 8 : 0
 
     signal rowClicked()
     signal deleteClicked()

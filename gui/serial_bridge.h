@@ -45,6 +45,7 @@ public:
 
 signals:
     void connectionChanged();
+    void heartbeatReceived();
     void busyChanged();
     void operationRejected(const QString &reason);
     void sensorEvent(int eventCode);

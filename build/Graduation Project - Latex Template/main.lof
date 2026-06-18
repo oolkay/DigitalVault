@@ -9,5 +9,11 @@
 \contentsline {figure}{\numberline {3.5}{\ignorespaces Vault lifecycle state diagram.}}{24}{figure.3.5}%
 \addvspace {10\p@ }
 \contentsline {figure}{\numberline {4.1}{\ignorespaces Physical prototype including the AS608 fingerprint sensor, STM32 Blue Pill, and PL2303 USB-UART bridge.}}{31}{figure.4.1}%
+\contentsline {figure}{\numberline {4.2}{\ignorespaces Main GUI views before and after unlocking a vault.}}{32}{figure.4.2}%
+\contentsline {figure}{\numberline {4.3}{\ignorespaces Fingerprint wizard used during biometric verification and enrollment flows.}}{33}{figure.4.3}%
 \addvspace {10\p@ }
+\contentsline {figure}{\numberline {5.1}{\ignorespaces \texttt {lsblk} output after opening and mounting the encrypted USB vault.}}{41}{figure.5.1}%
+\contentsline {figure}{\numberline {5.2}{\ignorespaces \texttt {cryptsetup luksDump} output for the encrypted vault partition.}}{42}{figure.5.2}%
 \addvspace {10\p@ }
+\contentsline {figure}{\numberline {B.1}{\ignorespaces GParted view of the physical USB storage after vault formatting.}}{52}{figure.6.1}%
+\contentsline {figure}{\numberline {B.2}{\ignorespaces Additional GParted view showing the formatted storage layout.}}{53}{figure.6.2}%

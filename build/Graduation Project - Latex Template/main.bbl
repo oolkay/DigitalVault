@@ -387,7 +387,7 @@
       \field{sortinithash}{4f6aaa89bab872aa0999fec09ff8e98a}
       \field{labelnamesource}{author}
       \field{labeltitlesource}{title}
-      \field{title}{BitLocker Overview}
+      \field{title}{{BitLocker Overview}}
       \field{urlday}{11}
       \field{urlmonth}{6}
       \field{urlyear}{2026}
@@ -419,7 +419,7 @@
       \field{labelnamesource}{author}
       \field{labeltitlesource}{title}
       \field{journaltitle}{arXiv preprint arXiv:2110.14090}
-      \field{title}{Teardown and Feasibility Study of IronKey: The Most Secure USB Flash Drive}
+      \field{title}{{Teardown and Feasibility Study of IronKey: The Most Secure USB Flash Drive}}
       \field{urlday}{11}
       \field{urlmonth}{6}
       \field{urlyear}{2026}
@@ -471,7 +471,7 @@
       \field{labelnamesource}{author}
       \field{labeltitlesource}{title}
       \field{journaltitle}{arXiv preprint arXiv:1910.00947}
-      \field{title}{Interdiction in Practice: Hardware Trojan Against a High-Security USB Flash Drive}
+      \field{title}{{Interdiction in Practice: Hardware Trojan Against a High-Security USB Flash Drive}}
       \field{urlday}{11}
       \field{urlmonth}{6}
       \field{urlyear}{2026}
@@ -500,7 +500,7 @@
       \field{sortinithash}{4f6aaa89bab872aa0999fec09ff8e98a}
       \field{labelnamesource}{author}
       \field{labeltitlesource}{title}
-      \field{title}{libfuse: The Reference Implementation of the Linux FUSE Interface}
+      \field{title}{{libfuse: The Reference Implementation of the Linux FUSE Interface}}
       \field{urlday}{11}
       \field{urlmonth}{6}
       \field{urlyear}{2026}

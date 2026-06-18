@@ -52,6 +52,36 @@ The controller stores the current runtime state of the application. Examples inc
 
 Long operations are handled asynchronously. Formatting a device, opening a vault, closing a mapper, creating a loop device, or deleting a vault may take time and may fail. For this reason, the controller uses busy flags, completion signals, and recovery paths instead of assuming that every operation finishes immediately.
 
+\section{Graphical User Interface}
+
+The graphical interface was implemented as the main way to use the vault. It presents the available vaults, storage state, fingerprint prompts, and security-related actions without requiring the user to run storage commands manually. Figure \ref{fig:gui-main-views} shows the main dashboard view and the interface after a successful unlock operation.
+
+\begin{figure}[!htbp]
+    \centering
+    \begin{minipage}[t]{0.48\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{dashboard.png}\\[0.2cm]
+        \small Main dashboard
+    \end{minipage}
+    \hfill
+    \begin{minipage}[t]{0.48\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{after_unlock.png}\\[0.2cm]
+        \small After unlocking the vault
+    \end{minipage}
+    \caption{\label{fig:gui-main-views}Main GUI views before and after unlocking a vault.}
+\end{figure}
+
+Fingerprint steps are shown in a separate prompt. Figure \ref{fig:fingerprint-wizard} shows the fingerprint wizard used during biometric workflows such as enrollment or verification.
+
+\begin{figure}[!htbp]
+    \centering
+    \includegraphics[width=0.86\textwidth,height=0.70\textheight,keepaspectratio]{fingerprintwizard.png}
+    \caption{\label{fig:fingerprint-wizard}Fingerprint wizard used during biometric verification and enrollment flows.}
+\end{figure}
+
+After a successful unlock, the interface updates the vault state and exposes the available actions for the opened vault. At this point, the mounted vault can also be used like a normal folder from the terminal or from the Linux file manager.
+
 \section{Firmware Communication}
 
 The host communicates with the STM32 firmware through the \texttt{SerialBridge} class. This bridge opens the selected serial port, configures it at 115200 baud, sends compact binary packets, and parses responses from the firmware. The supported command types include enrollment, verification, deletion, cancellation, key request, and enrolled-fingerprint listing.
@@ -63,6 +93,8 @@ Firmware responses are converted into higher-level Qt signals such as verificati
 \section{Vault Manager}
 
 The \texttt{vault\_manager} program is a separate command-line component because storage operations require privileges. It prepares the encrypted vault container, opens the decrypted device mapping, creates the ext4 filesystem, mounts and unmounts the vault, creates loop devices, detaches virtual containers, and deletes vault metadata when needed.
+
+The implementation depends on standard Linux storage tools instead of a custom storage stack. The vault manager uses \texttt{cryptsetup} for LUKS2 formatting and opening, dm-crypt for the kernel mapper, \texttt{mkfs.ext4} for creating the filesystem, \texttt{mount} and \texttt{umount} for attaching and detaching the vault, and \texttt{losetup} for virtual containers. Tools such as \texttt{lsblk} and \texttt{blkid} are used to read device information. This keeps the storage behavior close to normal Linux workflows and makes the implementation easier to inspect.
 
 On Linux, LUKS containers are commonly managed through the \texttt{cryptsetup} tool. In this project, the vault manager starts \texttt{cryptsetup} as a child process and sends the key through a pipe connected to its standard input. The key is therefore not placed in the command-line arguments, which avoids exposing it in the process list. After the operation finishes, the key buffer is wiped from memory. Listing~\ref{lst:key-stdin} shows a simplified version of this handling.
 
